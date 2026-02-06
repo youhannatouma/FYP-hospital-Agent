@@ -10,6 +10,7 @@ jobs:
   # Frontend (TypeScript/Next.js) checks
   frontend-checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     
     defaults:
       run:
