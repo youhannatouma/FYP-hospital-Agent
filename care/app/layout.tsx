@@ -12,7 +12,11 @@ const _spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
+<<<<<<< Updated upstream
   title: "MediAssist AI - Your Intelligent Healthcare Companion",
+=======
+  title: "Care - Your Intelligent Healthcare Companion",
+>>>>>>> Stashed changes
   description:
     "AI-powered healthcare platform. Find doctors, check symptoms, book appointments, and get 24/7 AI medical guidance.",
 }

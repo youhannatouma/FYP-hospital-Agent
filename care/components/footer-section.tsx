@@ -2,19 +2,29 @@
 
 import { Activity, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
 
 export function FooterSection() {
+  const { ref: ctaRef, isVisible: ctaVisible } = useScrollAnimation(0.15)
+
   return (
     <footer className="border-t border-border bg-card">
-      {/* CTA */}
+      {/* CTA - fades in from below with scale */}
       <div className="mx-auto max-w-7xl px-6 py-20">
-        <div className="rounded-2xl bg-primary p-8 text-center sm:p-12 lg:p-16">
-          <h2 className="text-balance text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl">
+        <div
+          ref={ctaRef}
+          className={`rounded-2xl bg-primary p-8 text-center sm:p-12 lg:p-16 transition-all duration-700 ease-out ${
+            ctaVisible
+              ? "translate-y-0 opacity-100 scale-100"
+              : "translate-y-8 opacity-0 scale-95"
+          }`}
+        >
+          <h2 className="text-balance text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl font-heading">
             Ready to Transform Your Healthcare Experience?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-pretty text-lg text-primary-foreground/80">
-            Join 260,000+ patients already using MediAssist AI for smarter, faster,
-            and more accessible healthcare.
+            Join 260,000+ patients already using Care for smarter, faster, and
+            more accessible healthcare.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Button
@@ -44,8 +54,8 @@ export function FooterSection() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                   <Activity className="h-4 w-4 text-primary-foreground" />
                 </div>
-                <span className="text-lg font-bold text-card-foreground">
-                  MediAssist<span className="text-primary">AI</span>
+                <span className="text-lg font-bold italic text-card-foreground font-heading">
+                  Care
                 </span>
               </a>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -95,7 +105,7 @@ export function FooterSection() {
 
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
             <p className="text-sm text-muted-foreground">
-              2026 MediAssist AI. All rights reserved.
+              2026 Care. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">

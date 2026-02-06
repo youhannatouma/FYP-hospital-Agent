@@ -10,11 +10,15 @@ import {
   Users,
   Star,
 } from "lucide-react"
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
 
 export function HeroSection() {
+  const { ref, isVisible } = useScrollAnimation(0.1)
+
   return (
     <section
       id="home"
+      ref={ref}
       className="relative overflow-hidden pt-28 pb-20 lg:pt-36 lg:pb-28"
     >
       {/* Background decoration */}
@@ -25,8 +29,14 @@ export function HeroSection() {
 
       <div className="relative mx-auto max-w-7xl px-6">
         <div className="flex flex-col items-center gap-16 lg:flex-row lg:items-start lg:gap-20">
-          {/* Left content */}
-          <div className="flex max-w-2xl flex-1 flex-col items-center text-center lg:items-start lg:text-left">
+          {/* Left content - fade in from left */}
+          <div
+            className={`flex max-w-2xl flex-1 flex-col items-center text-center lg:items-start lg:text-left transition-all duration-700 ease-out ${
+              isVisible
+                ? "translate-x-0 opacity-100"
+                : "-translate-x-16 opacity-0"
+            }`}
+          >
             {/* Trust badge */}
             <div className="mb-8 flex items-center gap-3 rounded-full border border-border bg-card px-5 py-2.5 shadow-sm">
               <div className="flex -space-x-2">
@@ -57,7 +67,7 @@ export function HeroSection() {
               </div>
             </div>
 
-            <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+            <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl font-heading">
               {"Your Family's Health,"}
               <br />
               <span className="text-primary">Our AI-Powered</span> Mission
@@ -65,7 +75,7 @@ export function HeroSection() {
 
             <p className="mt-6 max-w-lg text-pretty text-lg leading-relaxed text-muted-foreground">
               From pediatrics to geriatrics, our integrated healthcare system
-              ensures seamless support throughout life's journey with
+              ensures seamless support throughout life{"'"}s journey with
               intelligent AI assistance.
             </p>
 
@@ -106,9 +116,14 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right - AI Assistant Card */}
-          <div className="relative flex-shrink-0">
-            {/* Main AI Card */}
+          {/* Right - AI Assistant Card - fade in from right */}
+          <div
+            className={`relative flex-shrink-0 transition-all duration-700 delay-200 ease-out ${
+              isVisible
+                ? "translate-x-0 opacity-100"
+                : "translate-x-16 opacity-0"
+            }`}
+          >
             <div className="relative w-80 sm:w-96">
               <div className="rounded-2xl border border-border bg-card p-6 shadow-xl">
                 <div className="mb-4 flex items-center gap-3">
