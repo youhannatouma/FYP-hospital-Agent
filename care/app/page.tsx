@@ -8,11 +8,13 @@ import { TechStackSection } from "@/components/tech-stack-section"
 import { RoadmapSection } from "@/components/roadmap-section"
 import { SecuritySection } from "@/components/security-section"
 import { FooterSection } from "@/components/footer-section"
+import { FloatingAvatar } from "@/components/floating-avatar"
 
 export default function Page() {
   return (
     <main className="min-h-screen">
       <Navbar />
+      <FloatingAvatar />
       <HeroSection />
       <FeaturesSection />
       <DoctorsSection />

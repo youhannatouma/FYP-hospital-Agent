@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Star, MapPin, Clock, ArrowRight } from "lucide-react"
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
 
 const doctors = [
   {
@@ -43,14 +44,25 @@ const doctors = [
 ]
 
 export function DoctorsSection() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
+  const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation(0.1)
+
   return (
     <section id="doctors" className="bg-muted/50 py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
+        {/* Header fades in from right */}
+        <div
+          ref={headerRef}
+          className={`mx-auto max-w-2xl text-center transition-all duration-700 ease-out ${
+            headerVisible
+              ? "translate-x-0 opacity-100"
+              : "translate-x-16 opacity-0"
+          }`}
+        >
           <span className="text-sm font-semibold tracking-wider text-primary uppercase">
             Find Your Doctor
           </span>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl font-heading">
             Top-Rated Specialists Near You
           </h2>
           <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
@@ -59,7 +71,15 @@ export function DoctorsSection() {
           </p>
         </div>
 
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Cards fade in from left */}
+        <div
+          ref={gridRef}
+          className={`mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4 transition-all duration-700 delay-150 ease-out ${
+            gridVisible
+              ? "translate-x-0 opacity-100"
+              : "-translate-x-16 opacity-0"
+          }`}
+        >
           {doctors.map((doc) => (
             <div
               key={doc.name}

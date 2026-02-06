@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
 
 const capabilities = [
   {
@@ -50,14 +51,25 @@ const capabilities = [
 ]
 
 export function AISection() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
+  const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation(0.1)
+
   return (
     <section id="ai" className="py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
+        {/* Header fades in from left */}
+        <div
+          ref={headerRef}
+          className={`mx-auto max-w-2xl text-center transition-all duration-700 ease-out ${
+            headerVisible
+              ? "translate-x-0 opacity-100"
+              : "-translate-x-16 opacity-0"
+          }`}
+        >
           <span className="text-sm font-semibold tracking-wider text-primary uppercase">
             AI-Powered Care
           </span>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl font-heading">
             Your Personal Healthcare Navigator
           </h2>
           <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
@@ -67,7 +79,15 @@ export function AISection() {
           </p>
         </div>
 
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Grid fades in from right */}
+        <div
+          ref={gridRef}
+          className={`mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 transition-all duration-700 delay-150 ease-out ${
+            gridVisible
+              ? "translate-x-0 opacity-100"
+              : "translate-x-16 opacity-0"
+          }`}
+        >
           {capabilities.map((cap) => (
             <div
               key={cap.title}

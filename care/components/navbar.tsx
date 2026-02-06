@@ -1,15 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import {
-  Activity,
-  Menu,
-  X,
-  Sun,
-  Moon,
-  Globe,
-} from "lucide-react"
+import { Activity, Menu, X, Sun, Moon, Globe } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navLinks = [
@@ -17,12 +10,17 @@ const navLinks = [
   { label: "Features", href: "#features" },
   { label: "Doctors", href: "#doctors" },
   { label: "AI Assistant", href: "#ai" },
-  { label: "Architecture", href: "#architecture" },
+  { label: "Departments", href: "#architecture" },
 ]
 
 export function Navbar() {
-  const { theme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -31,8 +29,8 @@ export function Navbar() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
             <Activity className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-foreground">
-            MediAssist<span className="text-primary">AI</span>
+          <span className="text-xl font-bold italic tracking-tight text-foreground font-heading">
+            Care
           </span>
         </a>
 
@@ -53,11 +51,19 @@ export function Navbar() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             className="text-muted-foreground hover:text-foreground"
             aria-label="Toggle theme"
           >
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {mounted ? (
+              resolvedTheme === "dark" ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )
+            ) : (
+              <span className="h-5 w-5" />
+            )}
           </Button>
           <Button
             variant="ghost"
@@ -84,7 +90,11 @@ export function Navbar() {
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle menu"
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </Button>
         </div>
       </nav>
@@ -105,7 +115,10 @@ export function Navbar() {
             ))}
           </ul>
           <div className="mt-4 flex flex-col gap-2">
-            <Button variant="ghost" className="w-full justify-center text-foreground">
+            <Button
+              variant="ghost"
+              className="w-full justify-center text-foreground"
+            >
               Sign In
             </Button>
             <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
