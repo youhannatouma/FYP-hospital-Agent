@@ -1,63 +1,84 @@
 "use client"
 
-const techCategories = [
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
+
+const medicalCategories = [
   {
-    category: "Frontend",
+    category: "Diagnostic Imaging",
     items: [
-      { name: "Next.js 16", desc: "React Framework" },
-      { name: "TypeScript", desc: "Type Safety" },
-      { name: "Tailwind CSS", desc: "Utility Styling" },
-      { name: "shadcn/ui", desc: "UI Components" },
+      { name: "MRI Scanning", desc: "3T High-Resolution" },
+      { name: "CT Imaging", desc: "128-Slice Scanner" },
+      { name: "Digital X-Ray", desc: "Low Radiation Dose" },
+      { name: "Ultrasound", desc: "4D Color Doppler" },
     ],
   },
   {
-    category: "Backend",
+    category: "Laboratory",
     items: [
-      { name: "Node.js", desc: "Runtime" },
-      { name: "PostgreSQL", desc: "Database" },
-      { name: "Redis", desc: "Caching" },
-      { name: "GraphQL", desc: "API Layer" },
+      { name: "Hematology Panel", desc: "CBC & Differentials" },
+      { name: "Metabolic Profile", desc: "Glucose, Lipids, Liver" },
+      { name: "Immunology", desc: "Antibody & Allergy Testing" },
+      { name: "Pathology", desc: "Biopsy & Cytology" },
     ],
   },
   {
-    category: "AI / ML",
+    category: "Surgical Suites",
     items: [
-      { name: "TensorFlow", desc: "ML Framework" },
-      { name: "OpenAI", desc: "LLM Provider" },
-      { name: "Whisper", desc: "Voice AI" },
-      { name: "LangChain", desc: "AI Orchestration" },
+      { name: "Robotic Surgery", desc: "Da Vinci Xi System" },
+      { name: "Laparoscopy", desc: "Minimally Invasive" },
+      { name: "Endoscopy Center", desc: "GI & Pulmonary" },
+      { name: "Cath Lab", desc: "Cardiac Interventions" },
     ],
   },
   {
-    category: "DevOps",
+    category: "Patient Care",
     items: [
-      { name: "Docker", desc: "Containers" },
-      { name: "Kubernetes", desc: "Orchestration" },
-      { name: "Vercel", desc: "Deployment" },
-      { name: "GitHub Actions", desc: "CI/CD" },
+      { name: "ICU Monitoring", desc: "24/7 Telemetry" },
+      { name: "Rehabilitation", desc: "Physical & Occupational" },
+      { name: "Telemedicine", desc: "Virtual Consultations" },
+      { name: "Home Health", desc: "Post-Discharge Care" },
     ],
   },
 ]
 
 export function TechStackSection() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
+  const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation(0.1)
+
   return (
     <section className="py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
+        {/* Header fades in from left */}
+        <div
+          ref={headerRef}
+          className={`mx-auto max-w-2xl text-center transition-all duration-700 ease-out ${
+            headerVisible
+              ? "translate-x-0 opacity-100"
+              : "-translate-x-16 opacity-0"
+          }`}
+        >
           <span className="text-sm font-semibold tracking-wider text-primary uppercase">
-            Technology Stack
+            Medical Capabilities
           </span>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Modern Technologies for Modern Healthcare
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl font-heading">
+            Advanced Equipment & Services
           </h2>
           <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
-            Built with cutting-edge technologies for enterprise-grade healthcare
-            solutions.
+            State-of-the-art medical technology and compassionate care teams
+            ensuring accurate diagnosis and effective treatment.
           </p>
         </div>
 
-        <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {techCategories.map((cat) => (
+        {/* Grid fades in from right */}
+        <div
+          ref={gridRef}
+          className={`mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4 transition-all duration-700 delay-150 ease-out ${
+            gridVisible
+              ? "translate-x-0 opacity-100"
+              : "translate-x-16 opacity-0"
+          }`}
+        >
+          {medicalCategories.map((cat) => (
             <div key={cat.category}>
               <h3 className="mb-4 text-sm font-semibold tracking-wider text-primary uppercase">
                 {cat.category}

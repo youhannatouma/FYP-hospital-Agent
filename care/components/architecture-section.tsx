@@ -1,114 +1,139 @@
 "use client"
 
 import {
-  Monitor,
-  Server,
+  Heart,
+  Stethoscope,
   Brain,
-  Plug,
-  Database,
-  Lock,
-  Cloud,
-  Zap,
+  Pill,
+  Ambulance,
+  Hospital,
+  Thermometer,
+  Syringe,
 } from "lucide-react"
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
 
-const layers = [
+const departments = [
   {
-    icon: Monitor,
-    title: "Frontend Layer",
-    color: "text-blue-500 dark:text-blue-400",
-    borderColor: "border-blue-500/30",
-    bg: "bg-blue-500/10",
+    icon: Heart,
+    title: "Cardiology Center",
+    color: "text-rose-500 dark:text-rose-400",
+    borderColor: "border-rose-500/30",
+    bg: "bg-rose-500/10",
     items: [
-      "Next.js 16 App Router",
-      "TypeScript + React 19",
-      "Tailwind CSS + shadcn/ui",
-      "Real-time WebSocket",
-    ],
-  },
-  {
-    icon: Server,
-    title: "Backend Layer",
-    color: "text-emerald-500 dark:text-emerald-400",
-    borderColor: "border-emerald-500/30",
-    bg: "bg-emerald-500/10",
-    items: [
-      "Node.js + Express",
-      "REST + GraphQL APIs",
-      "JWT Authentication",
-      "Rate Limiting & CORS",
+      "ECG & Echocardiography",
+      "Cardiac Catheterization",
+      "Heart Failure Management",
+      "Arrhythmia Monitoring",
     ],
   },
   {
     icon: Brain,
-    title: "AI/ML Services",
+    title: "Neurology & Psychiatry",
+    color: "text-indigo-500 dark:text-indigo-400",
+    borderColor: "border-indigo-500/30",
+    bg: "bg-indigo-500/10",
+    items: [
+      "EEG & Brain Mapping",
+      "Stroke Rapid Response",
+      "Cognitive Behavioral Therapy",
+      "Sleep Disorder Clinic",
+    ],
+  },
+  {
+    icon: Stethoscope,
+    title: "Primary & Family Care",
     color: "text-primary",
     borderColor: "border-primary/30",
     bg: "bg-primary/10",
     items: [
-      "NLP Symptom Analysis",
-      "Voice Recognition",
-      "Emotion Detection",
-      "Medical Image AI",
+      "Annual Health Screenings",
+      "Chronic Disease Management",
+      "Immunization Programs",
+      "Pediatric Well-Child Visits",
     ],
   },
   {
-    icon: Plug,
-    title: "Integrations",
+    icon: Pill,
+    title: "Pharmacy & Lab Services",
     color: "text-orange-500 dark:text-orange-400",
     borderColor: "border-orange-500/30",
     bg: "bg-orange-500/10",
     items: [
-      "Payment Gateway",
-      "SMS/Email Notifications",
-      "Video Conferencing",
-      "Pharmacy APIs",
+      "In-House Pharmacy",
+      "Blood Work & Pathology",
+      "Drug Interaction Screening",
+      "Personalized Medication Plans",
     ],
   },
 ]
 
-const infrastructure = [
-  { icon: Database, label: "PostgreSQL + Redis" },
-  { icon: Cloud, label: "Cloud Hosted" },
-  { icon: Lock, label: "End-to-End Encryption" },
-  { icon: Zap, label: "Edge Computing" },
+const quickStats = [
+  { icon: Ambulance, label: "Emergency Care 24/7" },
+  { icon: Hospital, label: "120+ Bed Capacity" },
+  { icon: Thermometer, label: "Same-Day Test Results" },
+  { icon: Syringe, label: "Vaccination Center" },
 ]
 
 export function ArchitectureSection() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation()
+  const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation(0.1)
+  const { ref: statsRef, isVisible: statsVisible } = useScrollAnimation(0.2)
+
   return (
     <section id="architecture" className="bg-muted/50 py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
+        {/* Header fades in from right */}
+        <div
+          ref={headerRef}
+          className={`mx-auto max-w-2xl text-center transition-all duration-700 ease-out ${
+            headerVisible
+              ? "translate-x-0 opacity-100"
+              : "translate-x-16 opacity-0"
+          }`}
+        >
           <span className="text-sm font-semibold tracking-wider text-primary uppercase">
-            System Architecture
+            Our Departments
           </span>
-          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Built for Scale, Security, and Speed
+          <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl font-heading">
+            Comprehensive Medical Specialties
           </h2>
           <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
-            A modern, microservices-based architecture designed for reliability
-            and performance at healthcare scale.
+            From preventive screenings to complex surgeries, our departments
+            work together to deliver integrated, patient-centered care.
           </p>
         </div>
 
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {layers.map((layer) => (
+        {/* Grid fades in from left */}
+        <div
+          ref={gridRef}
+          className={`mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4 transition-all duration-700 delay-150 ease-out ${
+            gridVisible
+              ? "translate-x-0 opacity-100"
+              : "-translate-x-16 opacity-0"
+          }`}
+        >
+          {departments.map((dept) => (
             <div
-              key={layer.title}
-              className={`rounded-2xl border bg-card p-6 ${layer.borderColor}`}
+              key={dept.title}
+              className={`rounded-2xl border bg-card p-6 ${dept.borderColor}`}
             >
-              <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${layer.bg}`}>
-                <layer.icon className={`h-6 w-6 ${layer.color}`} />
+              <div
+                className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${dept.bg}`}
+              >
+                <dept.icon className={`h-6 w-6 ${dept.color}`} />
               </div>
-              <h3 className={`mb-4 text-lg font-semibold ${layer.color}`}>
-                {layer.title}
+              <h3 className={`mb-4 text-lg font-semibold ${dept.color}`}>
+                {dept.title}
               </h3>
               <ul className="flex flex-col gap-2.5">
-                {layer.items.map((item) => (
+                {dept.items.map((item) => (
                   <li
                     key={item}
                     className="flex items-center gap-2 text-sm text-muted-foreground"
                   >
-                    <div className={`h-1.5 w-1.5 rounded-full ${layer.bg} ${layer.color}`} />
+                    <div
+                      className={`h-1.5 w-1.5 rounded-full ${dept.bg} ${dept.color}`}
+                    />
                     {item}
                   </li>
                 ))}
@@ -117,10 +142,17 @@ export function ArchitectureSection() {
           ))}
         </div>
 
-        {/* Infrastructure bar */}
-        <div className="mt-10 rounded-2xl border border-border bg-card p-6">
+        {/* Stats bar fades in from right */}
+        <div
+          ref={statsRef}
+          className={`mt-10 rounded-2xl border border-border bg-card p-6 transition-all duration-700 delay-300 ease-out ${
+            statsVisible
+              ? "translate-x-0 opacity-100"
+              : "translate-x-16 opacity-0"
+          }`}
+        >
           <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
-            {infrastructure.map((item) => (
+            {quickStats.map((item) => (
               <div key={item.label} className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                   <item.icon className="h-5 w-5 text-primary" />
