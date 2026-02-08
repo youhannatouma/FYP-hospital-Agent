@@ -1,189 +1,347 @@
-import { Calendar, Clock, MapPin, Video, MoreHorizontal, FileText, Plus } from "lucide-react"
-//random comment
+"use client"
 
+import { useState } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  CalendarDays,
+  Clock,
+  Video,
+  MapPin,
+  Phone,
+  Download,
+  X,
+  RefreshCw,
+  Eye,
+  CalendarPlus,
+} from "lucide-react"
+
+interface Appointment {
+  id: number
+  doctor: string
+  specialty: string
+  avatar: string
+  date: string
+  time: string
+  type: "Video" | "In-person" | "Phone"
+  typeIcon: typeof Video
+  status: string
+  statusColor: string
+  location: string
+  notes?: string
+}
+
+const upcomingAppointments: Appointment[] = [
+  {
+    id: 1,
+    doctor: "Dr. Michael Chen",
+    specialty: "Cardiology",
+    avatar: "MC",
+    date: "Jan 25, 2024",
+    time: "10:00 AM",
+    type: "Video",
+    typeIcon: Video,
+    status: "Confirmed",
+    statusColor: "bg-emerald-500/10 text-emerald-600",
+    location: "Virtual - Telehealth",
+    notes: "Follow-up for cholesterol management",
+  },
+  {
+    id: 2,
+    doctor: "Dr. Emily Watson",
+    specialty: "General Practice",
+    avatar: "EW",
+    date: "Feb 15, 2024",
+    time: "2:30 PM",
+    type: "In-person",
+    typeIcon: MapPin,
+    status: "Scheduled",
+    statusColor: "bg-blue-500/10 text-blue-600",
+    location: "Westside Clinic, Suite 204",
+    notes: "Annual physical examination",
+  },
+  {
+    id: 3,
+    doctor: "Dr. Raj Patel",
+    specialty: "Endocrinology",
+    avatar: "RP",
+    date: "Mar 5, 2024",
+    time: "11:00 AM",
+    type: "Phone",
+    typeIcon: Phone,
+    status: "Pending",
+    statusColor: "bg-amber-500/10 text-amber-600",
+    location: "Phone consultation",
+    notes: "Blood sugar monitoring review",
+  },
+]
+
+const pastAppointments: Appointment[] = [
+  {
+    id: 4,
+    doctor: "Dr. Michael Chen",
+    specialty: "Cardiology",
+    avatar: "MC",
+    date: "Jan 10, 2024",
+    time: "10:00 AM",
+    type: "In-person",
+    typeIcon: MapPin,
+    status: "Completed",
+    statusColor: "bg-emerald-500/10 text-emerald-600",
+    location: "Downtown Medical Center",
+  },
+  {
+    id: 5,
+    doctor: "Dr. Sarah Kim",
+    specialty: "Dermatology",
+    avatar: "SK",
+    date: "Dec 20, 2023",
+    time: "3:00 PM",
+    type: "Video",
+    typeIcon: Video,
+    status: "Completed",
+    statusColor: "bg-emerald-500/10 text-emerald-600",
+    location: "Virtual - Telehealth",
+  },
+  {
+    id: 6,
+    doctor: "Dr. Emily Watson",
+    specialty: "General Practice",
+    avatar: "EW",
+    date: "Nov 15, 2023",
+    time: "9:00 AM",
+    type: "In-person",
+    typeIcon: MapPin,
+    status: "Completed",
+    statusColor: "bg-emerald-500/10 text-emerald-600",
+    location: "Westside Clinic, Suite 204",
+  },
+]
+
+const cancelledAppointments: Appointment[] = [
+  {
+    id: 7,
+    doctor: "Dr. James Rodriguez",
+    specialty: "Orthopedics",
+    avatar: "JR",
+    date: "Jan 5, 2024",
+    time: "1:00 PM",
+    type: "In-person",
+    typeIcon: MapPin,
+    status: "Cancelled",
+    statusColor: "bg-destructive/10 text-destructive",
+    location: "Sports Medicine Center",
+    notes: "Cancelled by patient",
+  },
+]
+
+function AppointmentCard({
+  appointment,
+  tab,
+}: {
+  appointment: Appointment
+  tab: string
+}) {
+  return (
+    <Card className="border border-border bg-card shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-start gap-4">
+          <Avatar className="h-12 w-12 ring-2 ring-primary/10">
+            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+              {appointment.avatar}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-semibold text-card-foreground">
+                  {appointment.doctor}
+                </h3>
+                <p className="text-sm text-primary">{appointment.specialty}</p>
+              </div>
+              <Badge
+                variant="secondary"
+                className={`text-xs ${appointment.statusColor} border-0`}
+              >
+                {appointment.status}
+              </Badge>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" />
+                <span>{appointment.date}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{appointment.time}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <appointment.typeIcon className="h-3.5 w-3.5" />
+                <span>{appointment.type}</span>
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5" />
+              <span>{appointment.location}</span>
+            </div>
+
+            {appointment.notes && (
+              <p className="mt-2 text-xs text-muted-foreground italic">
+                {appointment.notes}
+              </p>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {tab === "upcoming" && (
+                <>
+                  {appointment.type === "Video" && (
+                    <Button
+                      size="sm"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
+                    >
+                      <Video className="h-3 w-3" />
+                      Join Call
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 border-border text-foreground"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Reschedule
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  >
+                    <X className="h-3 w-3" />
+                    Cancel
+                  </Button>
+                </>
+              )}
+              {tab === "past" && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 border-border text-foreground"
+                  >
+                    <Eye className="h-3 w-3" />
+                    View Details
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 border-border text-foreground"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download Prescription
+                  </Button>
+                </>
+              )}
+              {tab === "cancelled" && (
+                <Button
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
+                >
+                  <CalendarPlus className="h-3 w-3" />
+                  Rebook
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function AppointmentsPage() {
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Appointments</h2>
-        <div className="flex items-center space-x-2">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" /> Book Appointment
-          </Button>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            My Appointments
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Manage and view your scheduled appointments
+          </p>
         </div>
+        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
+          <CalendarPlus className="h-4 w-4" />
+          Book New Appointment
+        </Button>
       </div>
-      <Tabs defaultValue="upcoming" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-          <TabsTrigger value="past">Past</TabsTrigger>
-          <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
-        </TabsList>
-        <TabsContent value="upcoming" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming Appointments</CardTitle>
-              <CardDescription>
-                Manage your scheduled appointments.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-6">
-              {/* Appointment Card 1 */}
-              <div className="flex items-start justify-between rounded-lg border p-4">
-                 <div className="flex items-start gap-4">
-                    <Avatar className="h-12 w-12">
-                        <AvatarImage src="/doctors/dr-sarah.jpg" alt="@drsarah" />
-                        <AvatarFallback>SM</AvatarFallback>
-                    </Avatar>
-                    <div className="grid gap-1">
-                        <h3 className="font-semibold">Dr. Sarah Smith</h3>
-                        <p className="text-sm text-muted-foreground">Cardiologist • General Consultation</p>
-                        <div className="flex items-center gap-4 mt-2 text-sm">
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                                <Calendar className="h-4 w-4" />
-                                <span>Today, Feb 06</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                                <Clock className="h-4 w-4" />
-                                <span>2:00 PM - 2:30 PM</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
-                                <Video className="mr-1 h-3 w-3" /> Video Call
-                            </Badge>
-                             <Badge variant="secondary">Confirmed</Badge>
-                        </div>
-                    </div>
-                 </div>
-                 <div className="flex flex-col gap-2">
-                    <Button size="sm" variant="default">Join Call</Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Actions</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>Reschedule</DropdownMenuItem>
-                            <DropdownMenuItem>Add to Calendar</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">Cancel Appointment</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                 </div>
-              </div>
 
-               {/* Appointment Card 2 */}
-               <div className="flex items-start justify-between rounded-lg border p-4">
-                 <div className="flex items-start gap-4">
-                    <Avatar className="h-12 w-12">
-                        <AvatarImage src="/doctors/dr-mike.jpg" alt="@drmike" />
-                        <AvatarFallback>MR</AvatarFallback>
-                    </Avatar>
-                    <div className="grid gap-1">
-                        <h3 className="font-semibold">Dr. Michael Ross</h3>
-                        <p className="text-sm text-muted-foreground">Dermatologist • Skin Screening</p>
-                         <div className="flex items-center gap-4 mt-2 text-sm">
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                                <Calendar className="h-4 w-4" />
-                                <span>Wed, Feb 12</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                                <Clock className="h-4 w-4" />
-                                <span>10:30 AM - 11:00 AM</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                                <MapPin className="mr-1 h-3 w-3" /> In-Person
-                            </Badge>
-                             <Badge variant="secondary">Confirmed</Badge>
-                        </div>
-                    </div>
-                 </div>
-                 <div className="flex flex-col gap-2">
-                    <Button size="sm" variant="outline">View Details</Button>
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Actions</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Reschedule</DropdownMenuItem>
-                            <DropdownMenuItem>Add to Calendar</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">Cancel Appointment</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                 </div>
-              </div>
-            </CardContent>
-          </Card>
+      <Tabs defaultValue="upcoming" className="w-full">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <TabsList className="bg-muted">
+            <TabsTrigger value="upcoming">
+              Upcoming (3)
+            </TabsTrigger>
+            <TabsTrigger value="past">Past</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2">
+            <Select defaultValue="all">
+              <SelectTrigger className="w-32 h-8 text-xs">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="video">Video</SelectItem>
+                <SelectItem value="in-person">In-person</SelectItem>
+                <SelectItem value="phone">Phone</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select defaultValue="date-asc">
+              <SelectTrigger className="w-32 h-8 text-xs">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date-asc">Date (Earliest)</SelectItem>
+                <SelectItem value="date-desc">Date (Latest)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <TabsContent value="upcoming" className="flex flex-col gap-4">
+          {upcomingAppointments.map((apt) => (
+            <AppointmentCard key={apt.id} appointment={apt} tab="upcoming" />
+          ))}
         </TabsContent>
-        <TabsContent value="past" className="space-y-4">
-           {/* Reuse structure for past appointments */}
-           <Card>
-            <CardHeader>
-              <CardTitle>Past Appointments</CardTitle>
-              <CardDescription>
-                View history and follow-up notes.
-              </CardDescription>
-            </CardHeader>
-             <CardContent className="grid gap-6">
-                <div className="flex items-start justify-between rounded-lg border p-4 opacity-75 hover:opacity-100 transition-opacity">
-                    <div className="flex items-start gap-4">
-                        <Avatar className="h-12 w-12">
-                            <AvatarFallback>JL</AvatarFallback>
-                        </Avatar>
-                         <div className="grid gap-1">
-                            <h3 className="font-semibold">Dr. Jennifer Lee</h3>
-                            <p className="text-sm text-muted-foreground">Pediatrician • Yearly Checkup</p>
-                            <div className="flex items-center gap-4 mt-2 text-sm">
-                                <div className="flex items-center gap-1 text-muted-foreground">
-                                    <Calendar className="h-4 w-4" />
-                                    <span>Jan 15, 2024</span>
-                                </div>
-                            </div>
-                             <Badge variant="secondary" className="mt-2 w-fit">Completed</Badge>
-                        </div>
-                    </div>
-                     <div className="flex flex-col gap-2">
-                        <Button size="sm" variant="outline" className="gap-1">
-                            <FileText className="h-3 w-3" /> View Notes
-                        </Button>
-                    </div>
-                </div>
-             </CardContent>
-           </Card>
+
+        <TabsContent value="past" className="flex flex-col gap-4">
+          {pastAppointments.map((apt) => (
+            <AppointmentCard key={apt.id} appointment={apt} tab="past" />
+          ))}
+        </TabsContent>
+
+        <TabsContent value="cancelled" className="flex flex-col gap-4">
+          {cancelledAppointments.map((apt) => (
+            <AppointmentCard key={apt.id} appointment={apt} tab="cancelled" />
+          ))}
+          {cancelledAppointments.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <CalendarDays className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-semibold text-foreground">
+                No cancelled appointments
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                All your appointments are on track
+              </p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
