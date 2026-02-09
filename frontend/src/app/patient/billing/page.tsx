@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,11 +11,12 @@ import {
   DollarSign,
   Clock,
   CheckCircle2,
-  AlertTriangle,
   FileText,
   CalendarDays,
   Building2,
 } from "lucide-react"
+import { PaymentDialog } from "@/components/patient/billing/payment-dialog"
+import { useHospital } from "@/hooks/use-hospital"
 
 const invoices = [
   {
@@ -79,6 +81,19 @@ const insuranceInfo = {
 }
 
 export default function BillingPage() {
+  const { payment } = useHospital()
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false)
+
+  const handlePayNow = (invoice: any) => {
+    setSelectedInvoice(invoice)
+    setIsPaymentOpen(true)
+  }
+
+  const handlePaymentSuccess = () => {
+    console.log("Payment successful for invoice:", selectedInvoice?.id)
+  }
+
   const totalDue = invoices
     .filter((i) => i.status === "Due")
     .reduce((sum, i) => sum + parseFloat(i.patientDue.replace("$", "")), 0)
@@ -92,7 +107,6 @@ export default function BillingPage() {
         </p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <Card className="border border-border bg-card">
           <CardContent className="flex items-center gap-3 p-4">
@@ -149,7 +163,11 @@ export default function BillingPage() {
 
         <TabsContent value="invoices" className="mt-4 flex flex-col gap-4">
           {invoices.map((invoice) => (
-            <Card key={invoice.id} className="border border-border bg-card shadow-sm">
+            <Card 
+              key={invoice.id} 
+              className="border border-border bg-card shadow-sm hover:border-primary/50 transition-colors cursor-pointer"
+              onClick={() => handlePayNow(invoice)}
+            >
               <CardContent className="p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-start gap-4">
@@ -158,21 +176,15 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-card-foreground">
-                          {invoice.description}
-                        </h3>
+                        <h3 className="font-semibold text-card-foreground">{invoice.description}</h3>
                         <Badge variant="secondary" className={`${invoice.statusColor} border-0 text-xs`}>
                           {invoice.status}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        {invoice.provider}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <CalendarDays className="h-3.5 w-3.5" />
-                          <span>{invoice.date}</span>
-                        </div>
+                      <p className="text-sm text-muted-foreground mt-0.5">{invoice.provider}</p>
+                      <div className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        <span>{invoice.date}</span>
                       </div>
                       <div className="mt-2 grid grid-cols-3 gap-4 text-sm">
                         <div>
@@ -192,11 +204,18 @@ export default function BillingPage() {
                   </div>
                   <div className="flex gap-2">
                     {invoice.status === "Due" && (
-                      <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                      <Button 
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        onClick={(e) => { e.stopPropagation(); handlePayNow(invoice); }}
+                      >
                         Pay Now
                       </Button>
                     )}
-                    <Button variant="outline" size="icon" className="border-border text-foreground">
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={(e) => { e.stopPropagation(); payment.handleAction('download_invoice', { id: invoice.id }); }}
+                    >
                       <Download className="h-4 w-4" />
                     </Button>
                   </div>
@@ -294,6 +313,13 @@ export default function BillingPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PaymentDialog 
+        invoice={selectedInvoice}
+        open={isPaymentOpen}
+        onOpenChange={setIsPaymentOpen}
+        onSuccess={handlePaymentSuccess}
+      />
     </div>
   )
 }

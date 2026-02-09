@@ -139,18 +139,28 @@ const cancelledAppointments: Appointment[] = [
   },
 ]
 
+import { AppointmentDetailDialog } from "@/components/patient/appointment-detail-dialog"
+import { useHospital } from "@/hooks/use-hospital"
+
 function AppointmentCard({
   appointment,
   tab,
+  onClick,
 }: {
   appointment: Appointment
   tab: string
+  onClick: () => void
 }) {
+  const { booking } = useHospital()
+  
   return (
-    <Card className="border border-border bg-card shadow-sm">
+    <Card 
+      className="border border-border bg-card shadow-sm hover:border-primary/50 transition-all cursor-pointer group"
+      onClick={onClick}
+    >
       <CardContent className="p-5">
         <div className="flex items-start gap-4">
-          <Avatar className="h-12 w-12 ring-2 ring-primary/10">
+          <Avatar className="h-12 w-12 ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all">
             <AvatarFallback className="bg-primary/10 text-primary font-semibold">
               {appointment.avatar}
             </AvatarFallback>
@@ -158,7 +168,7 @@ function AppointmentCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-semibold text-card-foreground">
+                <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
                   {appointment.doctor}
                 </h3>
                 <p className="text-sm text-primary">{appointment.specialty}</p>
@@ -192,7 +202,7 @@ function AppointmentCard({
             </div>
 
             {appointment.notes && (
-              <p className="mt-2 text-xs text-muted-foreground italic">
+              <p className="mt-2 text-xs text-muted-foreground italic line-clamp-1">
                 {appointment.notes}
               </p>
             )}
@@ -203,7 +213,11 @@ function AppointmentCard({
                   {appointment.type === "Video" && (
                     <Button
                       size="sm"
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1 shadow-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        booking.handleAction('join_call', { id: appointment.id });
+                      }}
                     >
                       <Video className="h-3 w-3" />
                       Join Call
@@ -212,7 +226,11 @@ function AppointmentCard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1 border-border text-foreground"
+                    className="gap-1 border-border text-foreground hover:bg-muted"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      booking.handleAction('reschedule', { id: appointment.id });
+                    }}
                   >
                     <RefreshCw className="h-3 w-3" />
                     Reschedule
@@ -221,6 +239,10 @@ function AppointmentCard({
                     size="sm"
                     variant="outline"
                     className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      booking.handleAction('cancel', { id: appointment.id });
+                    }}
                   >
                     <X className="h-3 w-3" />
                     Cancel
@@ -232,7 +254,11 @@ function AppointmentCard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1 border-border text-foreground"
+                    className="gap-1 border-border text-foreground hover:bg-muted"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClick();
+                    }}
                   >
                     <Eye className="h-3 w-3" />
                     View Details
@@ -240,7 +266,11 @@ function AppointmentCard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1 border-border text-foreground"
+                    className="gap-1 border-border text-foreground hover:bg-muted"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      booking.handleAction('download_prescription', { id: appointment.id });
+                    }}
                   >
                     <Download className="h-3 w-3" />
                     Download Prescription
@@ -250,7 +280,11 @@ function AppointmentCard({
               {tab === "cancelled" && (
                 <Button
                   size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1 shadow-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    booking.handleAction('rebook', { doctor: appointment.doctor });
+                  }}
                 >
                   <CalendarPlus className="h-3 w-3" />
                   Rebook
@@ -265,6 +299,15 @@ function AppointmentCard({
 }
 
 export default function AppointmentsPage() {
+  const { booking } = useHospital()
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
+
+  const handleCardClick = (apt: any) => {
+    setSelectedAppointment(apt)
+    setIsDetailOpen(true)
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -276,7 +319,10 @@ export default function AppointmentsPage() {
             Manage and view your scheduled appointments
           </p>
         </div>
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
+        <Button 
+          className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 shadow-sm"
+          onClick={() => booking.handleAction('book_new', {})}
+        >
           <CalendarPlus className="h-4 w-4" />
           Book New Appointment
         </Button>
@@ -284,16 +330,16 @@ export default function AppointmentsPage() {
 
       <Tabs defaultValue="upcoming" className="w-full">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <TabsList className="bg-muted">
+          <TabsList className="bg-muted shadow-sm">
             <TabsTrigger value="upcoming">
-              Upcoming (3)
+              Upcoming ({upcomingAppointments.length})
             </TabsTrigger>
             <TabsTrigger value="past">Past</TabsTrigger>
             <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <Select defaultValue="all">
-              <SelectTrigger className="w-32 h-8 text-xs">
+              <SelectTrigger className="w-32 h-8 text-xs bg-card border-border">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -304,7 +350,7 @@ export default function AppointmentsPage() {
               </SelectContent>
             </Select>
             <Select defaultValue="date-asc">
-              <SelectTrigger className="w-32 h-8 text-xs">
+              <SelectTrigger className="w-32 h-8 text-xs bg-card border-border">
                 <SelectValue placeholder="Sort" />
               </SelectTrigger>
               <SelectContent>
@@ -317,33 +363,43 @@ export default function AppointmentsPage() {
 
         <TabsContent value="upcoming" className="flex flex-col gap-4">
           {upcomingAppointments.map((apt) => (
-            <AppointmentCard key={apt.id} appointment={apt} tab="upcoming" />
+            <AppointmentCard 
+              key={apt.id} 
+              appointment={apt} 
+              tab="upcoming" 
+              onClick={() => handleCardClick(apt)}
+            />
           ))}
         </TabsContent>
 
         <TabsContent value="past" className="flex flex-col gap-4">
           {pastAppointments.map((apt) => (
-            <AppointmentCard key={apt.id} appointment={apt} tab="past" />
+            <AppointmentCard 
+              key={apt.id} 
+              appointment={apt} 
+              tab="past" 
+              onClick={() => handleCardClick(apt)}
+            />
           ))}
         </TabsContent>
 
         <TabsContent value="cancelled" className="flex flex-col gap-4">
           {cancelledAppointments.map((apt) => (
-            <AppointmentCard key={apt.id} appointment={apt} tab="cancelled" />
+            <AppointmentCard 
+              key={apt.id} 
+              appointment={apt} 
+              tab="cancelled" 
+              onClick={() => handleCardClick(apt)}
+            />
           ))}
-          {cancelledAppointments.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <CalendarDays className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold text-foreground">
-                No cancelled appointments
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                All your appointments are on track
-              </p>
-            </div>
-          )}
         </TabsContent>
       </Tabs>
+
+      <AppointmentDetailDialog 
+        appointment={selectedAppointment}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+      />
     </div>
   )
 }
