@@ -161,12 +161,14 @@ CREATE TABLE time_slot (
 --------------------------------------------------
 CREATE TABLE appointment (
     appointment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id UUID REFERENCES usr(user_id) ON DELETE CASCADE,
-    doctor_id UUID REFERENCES usr(user_id) ON DELETE CASCADE,
-    slot_id UUID REFERENCES time_slot(slot_id) ON DELETE CASCADE,
-    status appointment_status DEFAULT 'scheduled',
+    patient_id UUID NOT NULL REFERENCES usr(user_id) ON DELETE CASCADE,
+    doctor_id UUID NOT NULL REFERENCES usr(user_id) ON DELETE CASCADE,
+    slot_id UUID NOT NULL REFERENCES time_slot(slot_id) ON DELETE CASCADE,
+    status appointment_status NOT NULL DEFAULT 'scheduled',
     appointment_type TEXT,
-    fee NUMERIC,
+    fee NUMERIC CHECK (fee >= 0),   -- ensures fee can't be negative
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
     deleted_at TIMESTAMP
 );
 
