@@ -20,7 +20,7 @@ export function FooterSection() {
           }`}
         >
           <h2 className="text-balance text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl font-heading">
-            Ready to Transform Your Healthcare Experience?
+            Ready to Transform Your Care Experience?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-pretty text-lg text-primary-foreground/80">
             Join 260,000+ patients already using Care for smarter, faster, and

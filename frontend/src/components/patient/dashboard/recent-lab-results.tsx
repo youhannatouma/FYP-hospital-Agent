@@ -1,45 +1,61 @@
 "use client"
 
+import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FlaskConical, Download } from "lucide-react"
 import Link from "next/link"
 
-const labResults = [
-  {
-    id: 1,
-    title: "Lipid Panel",
-    collected: "Collected: Jan 8, 2024",
-    status: "Review Needed",
-    statusColor: "bg-amber-500/10 text-amber-600",
-    values: [
-      { label: "Total Cholesterol", value: "245 mg/dL", flag: true },
-      { label: "LDL", value: "165 mg/dL", flag: true },
-      { label: "HDL", value: "48 mg/dL", flag: false },
-      { label: "Triglycerides", value: "160 mg/dL", flag: false },
-    ],
-    borderColor: "border-amber-300/50",
-    downloadColor: "bg-amber-500 text-white hover:bg-amber-600",
-  },
-  {
-    id: 2,
-    title: "Complete Blood Count",
-    collected: "Collected: Dec 15, 2023",
-    status: "Normal",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    values: [
-      { label: "WBC", value: "7.2 K/uL", flag: false },
-      { label: "RBC", value: "4.8 M/uL", flag: false },
-      { label: "Hemoglobin", value: "14.2 g/dL", flag: false },
-      { label: "Platelets", value: "250 K/uL", flag: false },
-    ],
-    borderColor: "border-border",
-    downloadColor: "bg-muted text-muted-foreground hover:bg-muted/80",
-  },
-]
-
 export function RecentLabResults() {
+  const [labResults, setLabResults] = React.useState([
+    {
+      id: 1,
+      title: "Lipid Panel",
+      collected: "Collected: Jan 8, 2024",
+      status: "Review Needed",
+      statusColor: "bg-amber-500/10 text-amber-600",
+      values: [
+        { label: "Total Cholesterol", value: "245 mg/dL", flag: true },
+        { label: "LDL", value: "165 mg/dL", flag: true },
+        { label: "HDL", value: "48 mg/dL", flag: false },
+        { label: "Triglycerides", value: "160 mg/dL", flag: false },
+      ],
+      borderColor: "border-amber-300/50",
+      downloadColor: "bg-amber-500 text-white hover:bg-amber-600",
+    },
+    {
+      id: 2,
+      title: "Complete Blood Count",
+      collected: "Collected: Dec 15, 2023",
+      status: "Normal",
+      statusColor: "bg-emerald-500/10 text-emerald-600",
+      values: [
+        { label: "WBC", value: "7.2 K/uL", flag: false },
+        { label: "RBC", value: "4.8 M/uL", flag: false },
+        { label: "Hemoglobin", value: "14.2 g/dL", flag: false },
+        { label: "Platelets", value: "250 K/uL", flag: false },
+      ],
+      borderColor: "border-border",
+      downloadColor: "bg-muted text-muted-foreground hover:bg-muted/80",
+    },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/labs/recent -> Fetch recent lab results for the patient
+  /*
+    React.useEffect(() => {
+      const fetchLabResults = async () => {
+        try {
+          // const response = await apiClient.get('/patient/labs/recent');
+          // setLabResults(response.data);
+        } catch (error) {
+          console.error('Failed to fetch lab results', error);
+        }
+      };
+      fetchLabResults();
+    }, []);
+  */
   return (
     <Card className="border border-border bg-card shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-3">

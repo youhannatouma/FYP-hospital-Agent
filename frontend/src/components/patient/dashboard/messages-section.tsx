@@ -7,69 +7,84 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Mail, Plus, Bot, Bell, CreditCard, CalendarDays } from "lucide-react"
 
-const messages = [
-  {
-    id: 1,
-    sender: "Dr. Michael Chen",
-    avatar: "MC",
-    avatarBg: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
-    time: "2 hours ago",
-    message: "Your recent lab results show elevated cholesterol. Let's discuss treatment options at your next appointment.",
-    action: { label: "Reply", variant: "default" as const },
-    unread: true,
-  },
-  {
-    id: 2,
-    sender: "Pharmacy - CVS",
-    avatar: null,
-    icon: CreditCard,
-    iconBg: "bg-emerald-100 dark:bg-emerald-500/10",
-    iconColor: "text-emerald-600",
-    time: "Yesterday",
-    message: "Your prescription for Lisinopril is ready for pickup. Available until 9 PM today.",
-    action: { label: "Mark as Read", variant: "ghost" as const },
-    unread: false,
-  },
-  {
-    id: 3,
-    sender: "Appointment Reminder",
-    avatar: null,
-    icon: CalendarDays,
-    iconBg: "bg-blue-100 dark:bg-blue-500/10",
-    iconColor: "text-blue-600",
-    time: "2 days ago",
-    message: "Your follow-up appointment with Dr. Chen is scheduled for Jan 25 at 10:00 AM.",
-    action: { label: "Confirm", variant: "default" as const },
-    unread: false,
-  },
-  {
-    id: 4,
-    sender: "System Notification",
-    avatar: null,
-    icon: Bell,
-    iconBg: "bg-violet-100 dark:bg-violet-500/10",
-    iconColor: "text-violet-600",
-    time: "3 days ago",
-    message: "Your health insurance information has been updated successfully.",
-    action: { label: "View Details", variant: "ghost" as const },
-    unread: false,
-  },
-  {
-    id: 5,
-    sender: "Billing Department",
-    avatar: null,
-    icon: CreditCard,
-    iconBg: "bg-amber-100 dark:bg-amber-500/10",
-    iconColor: "text-amber-600",
-    time: "1 week ago",
-    message: "Your recent visit invoice is now available. Amount due: $45.00",
-    action: { label: "Pay Now", variant: "default" as const },
-    unread: false,
-  },
-]
-
 export function MessagesSection() {
   const [filter, setFilter] = useState<"unread" | "all">("unread")
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      sender: "Dr. Michael Chen",
+      avatar: "MC",
+      avatarBg: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
+      time: "2 hours ago",
+      message: "Your recent lab results show elevated cholesterol. Let's discuss treatment options at your next appointment.",
+      action: { label: "Reply", variant: "default" as const },
+      unread: true,
+    },
+    {
+      id: 2,
+      sender: "Pharmacy - CVS",
+      avatar: null,
+      icon: CreditCard,
+      iconBg: "bg-emerald-100 dark:bg-emerald-500/10",
+      iconColor: "text-emerald-600",
+      time: "Yesterday",
+      message: "Your prescription for Lisinopril is ready for pickup. Available until 9 PM today.",
+      action: { label: "Mark as Read", variant: "ghost" as const },
+      unread: false,
+    },
+    {
+      id: 3,
+      sender: "Appointment Reminder",
+      avatar: null,
+      icon: CalendarDays,
+      iconBg: "bg-blue-100 dark:bg-blue-500/10",
+      iconColor: "text-blue-600",
+      time: "2 days ago",
+      message: "Your follow-up appointment with Dr. Chen is scheduled for Jan 25 at 10:00 AM.",
+      action: { label: "Confirm", variant: "default" as const },
+      unread: false,
+    },
+    {
+      id: 4,
+      sender: "System Notification",
+      avatar: null,
+      icon: Bell,
+      iconBg: "bg-violet-100 dark:bg-violet-500/10",
+      iconColor: "text-violet-600",
+      time: "3 days ago",
+      message: "Your health insurance information has been updated successfully.",
+      action: { label: "View Details", variant: "ghost" as const },
+      unread: false,
+    },
+    {
+      id: 5,
+      sender: "Billing Department",
+      avatar: null,
+      icon: CreditCard,
+      iconBg: "bg-amber-100 dark:bg-amber-500/10",
+      iconColor: "text-amber-600",
+      time: "1 week ago",
+      message: "Your recent visit invoice is now available. Amount due: $45.00",
+      action: { label: "Pay Now", variant: "default" as const },
+      unread: false,
+    },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/messages -> Fetch messages for the logged-in patient
+  /*
+    useEffect(() => {
+      const fetchMessages = async () => {
+        try {
+          // const response = await apiClient.get('/patient/messages');
+          // setMessages(response.data);
+        } catch (error) {
+          console.error('Failed to fetch messages', error);
+        }
+      };
+      fetchMessages();
+    }, []);
+  */
 
   const filtered = filter === "unread" ? messages.filter((m) => m.unread) : messages
 

@@ -1,49 +1,65 @@
 "use client"
 
+import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Pill, RefreshCw, Trash2 } from "lucide-react"
 import Link from "next/link"
 
-const medications = [
-  {
-    id: 1,
-    name: "Lisinopril",
-    purpose: "For: Hypertension",
-    dosage: "10mg",
-    frequency: "Once daily",
-    refillsLeft: 2,
-    status: "Active",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    highlight: true,
-  },
-  {
-    id: 2,
-    name: "Atorvastatin",
-    purpose: "For: High Cholesterol",
-    dosage: "20mg",
-    frequency: "Once daily",
-    refillsLeft: 5,
-    status: "Active",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    highlight: false,
-  },
-  {
-    id: 3,
-    name: "Aspirin",
-    purpose: "For: Cardiovascular Protection",
-    dosage: "81mg",
-    frequency: "Once daily",
-    refillsLeft: null,
-    status: "Active",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    highlight: false,
-    type: "OTC",
-  },
-]
-
 export function CurrentMedications() {
+  const [medications, setMedications] = React.useState([
+    {
+      id: 1,
+      name: "Lisinopril",
+      purpose: "For: Hypertension",
+      dosage: "10mg",
+      frequency: "Once daily",
+      refillsLeft: 2,
+      status: "Active",
+      statusColor: "bg-emerald-500/10 text-emerald-600",
+      highlight: true,
+    },
+    {
+      id: 2,
+      name: "Atorvastatin",
+      purpose: "For: High Cholesterol",
+      dosage: "20mg",
+      frequency: "Once daily",
+      refillsLeft: 5,
+      status: "Active",
+      statusColor: "bg-emerald-500/10 text-emerald-600",
+      highlight: false,
+    },
+    {
+      id: 3,
+      name: "Aspirin",
+      purpose: "For: Cardiovascular Protection",
+      dosage: "81mg",
+      frequency: "Once daily",
+      refillsLeft: null,
+      status: "Active",
+      statusColor: "bg-emerald-500/10 text-emerald-600",
+      highlight: false,
+      type: "OTC",
+    },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/medications/current -> Fetch current medications for the patient
+  /*
+    React.useEffect(() => {
+      const fetchMedications = async () => {
+        try {
+          // const response = await apiClient.get('/patient/medications/current');
+          // setMedications(response.data);
+        } catch (error) {
+          console.error('Failed to fetch medications', error);
+        }
+      };
+      fetchMedications();
+    }, []);
+  */
   return (
     <Card className="border border-border bg-card shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-3">

@@ -15,19 +15,34 @@ import {
   Legend,
 } from "recharts"
 
-const vitalsData = [
-  { date: "Jan 8", systolic: 135, diastolic: 82, heartRate: 72 },
-  { date: "Jan 9", systolic: 138, diastolic: 85, heartRate: 75 },
-  { date: "Jan 10", systolic: 132, diastolic: 80, heartRate: 70 },
-  { date: "Jan 11", systolic: 140, diastolic: 88, heartRate: 78 },
-  { date: "Jan 12", systolic: 136, diastolic: 84, heartRate: 73 },
-  { date: "Jan 13", systolic: 137, diastolic: 85, heartRate: 72 },
-  { date: "Jan 14", systolic: 134, diastolic: 82, heartRate: 71 },
-  { date: "Jan 15", systolic: 137, diastolic: 85, heartRate: 72 },
-]
-
 export function VitalsTracking() {
   const [period] = useState("7d")
+  const [vitalsData, setVitalsData] = useState([
+    { date: "Jan 8", systolic: 135, diastolic: 82, heartRate: 72 },
+    { date: "Jan 9", systolic: 138, diastolic: 85, heartRate: 75 },
+    { date: "Jan 10", systolic: 132, diastolic: 80, heartRate: 70 },
+    { date: "Jan 11", systolic: 140, diastolic: 88, heartRate: 78 },
+    { date: "Jan 12", systolic: 136, diastolic: 84, heartRate: 73 },
+    { date: "Jan 13", systolic: 137, diastolic: 85, heartRate: 72 },
+    { date: "Jan 14", systolic: 134, diastolic: 82, heartRate: 71 },
+    { date: "Jan 15", systolic: 137, diastolic: 85, heartRate: 72 },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/vitals?period=... -> Fetch vitals for the patient
+  /*
+    useEffect(() => {
+      const fetchVitals = async () => {
+        try {
+          // const response = await apiClient.get(`/patient/vitals?period=${period}`);
+          // setVitalsData(response.data);
+        } catch (error) {
+          console.error('Failed to fetch vitals', error);
+        }
+      };
+      fetchVitals();
+    }, [period]);
+  */
 
   return (
     <Card className="border border-border bg-card shadow-sm">

@@ -1,80 +1,96 @@
 "use client"
 
+import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FolderOpen, Download, MoreVertical, Plus, Search, FileText, Stethoscope, ShieldCheck } from "lucide-react"
 
-const documents = [
-  {
-    id: 1,
-    title: "Lipid Panel Report",
-    date: "Jan 8, 2024",
-    size: "245 KB",
-    icon: FileText,
-    iconBg: "bg-rose-100 dark:bg-rose-500/10",
-    iconColor: "text-rose-600",
-  },
-  {
-    id: 2,
-    title: "Visit Summary",
-    date: "Jan 10, 2024",
-    size: "184 KB",
-    icon: FileText,
-    iconBg: "bg-blue-100 dark:bg-blue-500/10",
-    iconColor: "text-blue-600",
-  },
-  {
-    id: 3,
-    title: "Prescription - Lisinopril",
-    date: "Dec 20, 2023",
-    size: "88 KB",
-    icon: Stethoscope,
-    iconBg: "bg-violet-100 dark:bg-violet-500/10",
-    iconColor: "text-violet-600",
-  },
-  {
-    id: 4,
-    title: "CBC Results",
-    date: "Dec 15, 2023",
-    size: "196 KB",
-    icon: FlaskConical,
-    iconBg: "bg-emerald-100 dark:bg-emerald-500/10",
-    iconColor: "text-emerald-600",
-  },
-  {
-    id: 5,
-    title: "Chest X-Ray",
-    date: "Aug 22, 2023",
-    size: "1.2 MB",
-    icon: FileText,
-    iconBg: "bg-amber-100 dark:bg-amber-500/10",
-    iconColor: "text-amber-600",
-  },
-  {
-    id: 6,
-    title: "Insurance Card",
-    date: "Jan 15, 2023",
-    size: "156 KB",
-    icon: ShieldCheck,
-    iconBg: "bg-emerald-100 dark:bg-emerald-500/10",
-    iconColor: "text-emerald-600",
-  },
-  {
-    id: 7,
-    title: "Consent Forms",
-    date: "Jun 15, 2023",
-    size: "2.56 KB",
-    icon: FileText,
-    iconBg: "bg-muted",
-    iconColor: "text-muted-foreground",
-  },
-]
-
 import { FlaskConical } from "lucide-react"
 
 export function MedicalDocuments() {
+  const [documents, setDocuments] = React.useState([
+    {
+      id: 1,
+      title: "Lipid Panel Report",
+      date: "Jan 8, 2024",
+      size: "245 KB",
+      icon: FileText,
+      iconBg: "bg-rose-100 dark:bg-rose-500/10",
+      iconColor: "text-rose-600",
+    },
+    {
+      id: 2,
+      title: "Visit Summary",
+      date: "Jan 10, 2024",
+      size: "184 KB",
+      icon: FileText,
+      iconBg: "bg-blue-100 dark:bg-blue-500/10",
+      iconColor: "text-blue-600",
+    },
+    {
+      id: 3,
+      title: "Prescription - Lisinopril",
+      date: "Dec 20, 2023",
+      size: "88 KB",
+      icon: Stethoscope,
+      iconBg: "bg-violet-100 dark:bg-violet-500/10",
+      iconColor: "text-violet-600",
+    },
+    {
+      id: 4,
+      title: "CBC Results",
+      date: "Dec 15, 2023",
+      size: "196 KB",
+      icon: FlaskConical,
+      iconBg: "bg-emerald-100 dark:bg-emerald-500/10",
+      iconColor: "text-emerald-600",
+    },
+    {
+      id: 5,
+      title: "Chest X-Ray",
+      date: "Aug 22, 2023",
+      size: "1.2 MB",
+      icon: FileText,
+      iconBg: "bg-amber-100 dark:bg-amber-500/10",
+      iconColor: "text-amber-600",
+    },
+    {
+      id: 6,
+      title: "Insurance Card",
+      date: "Jan 15, 2023",
+      size: "156 KB",
+      icon: ShieldCheck,
+      iconBg: "bg-emerald-100 dark:bg-emerald-500/10",
+      iconColor: "text-emerald-600",
+    },
+    {
+      id: 7,
+      title: "Consent Forms",
+      date: "Jun 15, 2023",
+      size: "2.56 KB",
+      icon: FileText,
+      iconBg: "bg-muted",
+      iconColor: "text-muted-foreground",
+    },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/documents -> Fetch medical documents for the logged-in patient
+  /*
+    React.useEffect(() => {
+      const fetchDocuments = async () => {
+        try {
+          // const response = await apiClient.get('/patient/documents');
+          // setDocuments(response.data);
+        } catch (error) {
+          console.error('Failed to fetch documents', error);
+        }
+      };
+      fetchDocuments();
+    }, []);
+  */
   return (
     <Card className="border border-border bg-card shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-3">

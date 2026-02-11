@@ -70,7 +70,7 @@ export function AISection() {
             AI-Powered Care
           </span>
           <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl font-heading">
-            Your Personal Healthcare Navigator
+            Your Personal Care Navigator
           </h2>
           <p className="mt-4 text-pretty text-lg leading-relaxed text-muted-foreground">
             Experience the future of healthcare with our intelligent AI
