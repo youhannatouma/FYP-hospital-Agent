@@ -1,46 +1,62 @@
 "use client"
 
+import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Heart, Apple, Dumbbell, Pill } from "lucide-react"
 import Link from "next/link"
 
-const resources = [
-  {
-    id: 1,
-    title: "Managing Hypertension",
-    description: "Learn about blood pressure control and lifestyle modifications.",
-    icon: Heart,
-    iconBg: "bg-primary",
-    action: "Read Article",
-  },
-  {
-    id: 2,
-    title: "Heart-Healthy Diet",
-    description: "Nutrition tips for cardiovascular wellness.",
-    icon: Apple,
-    iconBg: "bg-emerald-500",
-    action: "Read Article",
-  },
-  {
-    id: 3,
-    title: "Exercise Guidelines",
-    description: "Safe and effective workout routines for heart health.",
-    icon: Dumbbell,
-    iconBg: "bg-blue-500",
-    action: "Read Article",
-  },
-  {
-    id: 4,
-    title: "Medication Guide",
-    description: "Understanding your prescriptions and their effects.",
-    icon: Pill,
-    iconBg: "bg-amber-500",
-    action: "Read Article",
-  },
-]
-
 export function HealthEducation() {
+  const [resources, setResources] = React.useState([
+    {
+      id: 1,
+      title: "Managing Hypertension",
+      description: "Learn about blood pressure control and lifestyle modifications.",
+      icon: Heart,
+      iconBg: "bg-primary",
+      action: "Read Article",
+    },
+    {
+      id: 2,
+      title: "Heart-Healthy Diet",
+      description: "Nutrition tips for cardiovascular wellness.",
+      icon: Apple,
+      iconBg: "bg-emerald-500",
+      action: "Read Article",
+    },
+    {
+      id: 3,
+      title: "Exercise Guidelines",
+      description: "Safe and effective workout routines for heart health.",
+      icon: Dumbbell,
+      iconBg: "bg-blue-500",
+      action: "Read Article",
+    },
+    {
+      id: 4,
+      title: "Medication Guide",
+      description: "Understanding your prescriptions and their effects.",
+      icon: Pill,
+      iconBg: "bg-amber-500",
+      action: "Read Article",
+    },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/education/resources -> Fetch health education resources
+  /*
+    React.useEffect(() => {
+      const fetchResources = async () => {
+        try {
+          // const response = await apiClient.get('/patient/education/resources');
+          // setResources(response.data);
+        } catch (error) {
+          console.error('Failed to fetch health resources', error);
+        }
+      };
+      fetchResources();
+    }, []);
+  */
   return (
     <div>
       <div className="flex items-center justify-between mb-4">

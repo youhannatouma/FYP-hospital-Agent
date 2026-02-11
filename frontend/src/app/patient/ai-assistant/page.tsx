@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import apiClient from "@/lib/api-client"
 import {
   Bot,
   Send,
@@ -71,7 +72,7 @@ export default function AIAssistantPage() {
     }
   }, [messages, isTyping])
 
-  const sendMessage = (content: string) => {
+  const sendMessage = async (content: string) => {
     if (!content.trim()) return
 
     const userMessage: ChatMessage = {
@@ -85,38 +86,52 @@ export default function AIAssistantPage() {
     setInputValue("")
     setIsTyping(true)
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponses: Record<string, string> = {
-        cholesterol:
-          "Based on your recent lipid panel from January 8th, your total cholesterol is 245 mg/dL and LDL is 165 mg/dL. Both are above recommended levels. Your doctor has suggested dietary changes alongside your Atorvastatin medication. I'd recommend:\n\n1. Reducing saturated fat intake\n2. Increasing fiber-rich foods\n3. Regular exercise (30 min, 3-5 times/week)\n4. Omega-3 rich foods like salmon and walnuts\n\nWould you like more specific dietary recommendations?",
-        medication:
-          "You're currently taking 3 medications:\n\n1. **Lisinopril 10mg** - For hypertension, once daily\n2. **Atorvastatin 20mg** - For cholesterol, once daily\n3. **Aspirin 81mg** - For cardiovascular protection, once daily\n\nNo known interactions between these medications. However, avoid grapefruit with Atorvastatin as it can increase side effects. Your Lisinopril has 2 refills remaining.",
-        appointment:
-          "Your next appointment is:\n\n**Cardiology Follow-up**\nDr. Michael Chen\nJanuary 25, 2024 at 10:00 AM\nType: Video Consultation\n\nYou also have an Annual Physical with Dr. Emily Watson on February 15, 2024 at 2:30 PM. Would you like to schedule any additional appointments?",
-      }
-
-      let response = "I understand your concern. Based on your medical history, I'd recommend discussing this with your healthcare provider at your next appointment on January 25th. Is there anything specific you'd like me to help you prepare for that visit?"
-
-      const lowerContent = content.toLowerCase()
-      if (lowerContent.includes("cholesterol") || lowerContent.includes("lipid")) {
-        response = aiResponses.cholesterol
-      } else if (lowerContent.includes("medication") || lowerContent.includes("medicine") || lowerContent.includes("drug") || lowerContent.includes("interaction")) {
-        response = aiResponses.medication
-      } else if (lowerContent.includes("appointment") || lowerContent.includes("next") || lowerContent.includes("schedule")) {
-        response = aiResponses.appointment
-      }
-
+    try {
+      // Future: Replace with actual AI endpoint
+      const response = await apiClient.post('/ai/chat', { message: content });
       const aiMessage: ChatMessage = {
         id: messages.length + 2,
         role: "assistant",
-        content: response,
+        content: response.data.reply,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       }
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.warn('[AI Assistant] API failed, using local simulation');
+      // Simulate AI response
+      setTimeout(() => {
+        const aiResponses: Record<string, string> = {
+          cholesterol:
+            "Based on your recent lipid panel from January 8th, your total cholesterol is 245 mg/dL and LDL is 165 mg/dL. Both are above recommended levels. Your doctor has suggested dietary changes alongside your Atorvastatin medication. I'd recommend:\n\n1. Reducing saturated fat intake\n2. Increasing fiber-rich foods\n3. Regular exercise (30 min, 3-5 times/week)\n4. Omega-3 rich foods like salmon and walnuts\n\nWould you like more specific dietary recommendations?",
+          medication:
+            "You're currently taking 3 medications:\n\n1. **Lisinopril 10mg** - For hypertension, once daily\n2. **Atorvastatin 20mg** - For cholesterol, once daily\n3. **Aspirin 81mg** - For cardiovascular protection, once daily\n\nNo known interactions between these medications. However, avoid grapefruit with Atorvastatin as it can increase side effects. Your Lisinopril has 2 refills remaining.",
+          appointment:
+            "Your next appointment is:\n\n**Cardiology Follow-up**\nDr. Michael Chen\nJanuary 25, 2024 at 10:00 AM\nType: Video Consultation\n\nYou also have an Annual Physical with Dr. Emily Watson on February 15, 2024 at 2:30 PM. Would you like to schedule any additional appointments?",
+        }
 
-      setMessages((prev) => [...prev, aiMessage])
+        let responseText = "I understand your concern. Based on your medical history, I'd recommend discussing this with your healthcare provider at your next appointment on January 25th. Is there anything specific you'd like me to help you prepare for that visit?"
+
+        const lowerContent = content.toLowerCase()
+        if (lowerContent.includes("cholesterol") || lowerContent.includes("lipid")) {
+          responseText = aiResponses.cholesterol
+        } else if (lowerContent.includes("medication") || lowerContent.includes("medicine") || lowerContent.includes("drug") || lowerContent.includes("interaction")) {
+          responseText = aiResponses.medication
+        } else if (lowerContent.includes("appointment") || lowerContent.includes("next") || lowerContent.includes("schedule")) {
+          responseText = aiResponses.appointment
+        }
+
+        const aiMessage: ChatMessage = {
+          id: messages.length + 2,
+          role: "assistant",
+          content: responseText,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        }
+
+        setMessages((prev) => [...prev, aiMessage])
+      }, 1500)
+    } finally {
       setIsTyping(false)
-    }, 1500)
+    }
   }
 
   return (

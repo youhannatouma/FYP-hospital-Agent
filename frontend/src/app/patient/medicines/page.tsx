@@ -22,114 +22,133 @@ import {
   Package,
 } from "lucide-react"
 
-const activePrescriptions = [
-  {
-    id: 1,
-    name: "Lisinopril",
-    dosage: "10mg",
-    frequency: "Once daily",
-    purpose: "Hypertension",
-    doctor: "Dr. Michael Chen",
-    startDate: "Oct 15, 2023",
-    endDate: "Apr 15, 2024",
-    refillsLeft: 2,
-    progress: 60,
-    status: "Active",
-    nextDose: "Today, 8:00 AM",
-    sideEffects: "Dizziness, dry cough",
-  },
-  {
-    id: 2,
-    name: "Atorvastatin",
-    dosage: "20mg",
-    frequency: "Once daily",
-    purpose: "High Cholesterol",
-    doctor: "Dr. Michael Chen",
-    startDate: "Nov 1, 2023",
-    endDate: "May 1, 2024",
-    refillsLeft: 5,
-    progress: 45,
-    status: "Active",
-    nextDose: "Today, 9:00 PM",
-    sideEffects: "Muscle pain, fatigue",
-  },
-  {
-    id: 3,
-    name: "Aspirin",
-    dosage: "81mg",
-    frequency: "Once daily",
-    purpose: "Cardiovascular Protection",
-    doctor: "Dr. Emily Watson",
-    startDate: "Sep 1, 2023",
-    endDate: "Ongoing",
-    refillsLeft: 8,
-    progress: 100,
-    status: "Active",
-    nextDose: "Today, 8:00 AM",
-    sideEffects: "Stomach irritation",
-  },
-]
-
-const pastPrescriptions = [
-  {
-    id: 4,
-    name: "Amoxicillin",
-    dosage: "500mg",
-    frequency: "Three times daily",
-    purpose: "Bacterial Infection",
-    doctor: "Dr. Emily Watson",
-    startDate: "Dec 1, 2023",
-    endDate: "Dec 14, 2023",
-    status: "Completed",
-  },
-  {
-    id: 5,
-    name: "Prednisone",
-    dosage: "10mg",
-    frequency: "Twice daily",
-    purpose: "Inflammation",
-    doctor: "Dr. Raj Patel",
-    startDate: "Nov 15, 2023",
-    endDate: "Nov 30, 2023",
-    status: "Completed",
-  },
-]
-
-const pharmacyResults = [
-  {
-    id: 1,
-    name: "CVS Pharmacy",
-    distance: "0.5 mi",
-    address: "123 Main St",
-    phone: "(555) 123-4567",
-    price: "$12.99",
-    inStock: true,
-    deliveryAvailable: true,
-  },
-  {
-    id: 2,
-    name: "Walgreens",
-    distance: "1.2 mi",
-    address: "456 Oak Ave",
-    phone: "(555) 234-5678",
-    price: "$14.49",
-    inStock: true,
-    deliveryAvailable: false,
-  },
-  {
-    id: 3,
-    name: "Rite Aid",
-    distance: "2.1 mi",
-    address: "789 Elm Blvd",
-    phone: "(555) 345-6789",
-    price: "$11.99",
-    inStock: false,
-    deliveryAvailable: true,
-  },
-]
-
 export default function MedicinesPage() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [activePrescriptions, setActivePrescriptions] = useState([
+    {
+      id: 1,
+      name: "Lisinopril",
+      dosage: "10mg",
+      frequency: "Once daily",
+      purpose: "Hypertension",
+      doctor: "Dr. Michael Chen",
+      startDate: "Oct 15, 2023",
+      endDate: "Apr 15, 2024",
+      refillsLeft: 2,
+      progress: 60,
+      status: "Active",
+      nextDose: "Today, 8:00 AM",
+      sideEffects: "Dizziness, dry cough",
+    },
+    {
+      id: 2,
+      name: "Atorvastatin",
+      dosage: "20mg",
+      frequency: "Once daily",
+      purpose: "High Cholesterol",
+      doctor: "Dr. Michael Chen",
+      startDate: "Nov 1, 2023",
+      endDate: "May 1, 2024",
+      refillsLeft: 5,
+      progress: 45,
+      status: "Active",
+      nextDose: "Today, 9:00 PM",
+      sideEffects: "Muscle pain, fatigue",
+    },
+    {
+      id: 3,
+      name: "Aspirin",
+      dosage: "81mg",
+      frequency: "Once daily",
+      purpose: "Cardiovascular Protection",
+      doctor: "Dr. Emily Watson",
+      startDate: "Sep 1, 2023",
+      endDate: "Ongoing",
+      refillsLeft: 8,
+      progress: 100,
+      status: "Active",
+      nextDose: "Today, 8:00 AM",
+      sideEffects: "Stomach irritation",
+    },
+  ])
+
+  const [pastPrescriptions, setPastPrescriptions] = useState([
+    {
+      id: 4,
+      name: "Amoxicillin",
+      dosage: "500mg",
+      frequency: "Three times daily",
+      purpose: "Bacterial Infection",
+      doctor: "Dr. Emily Watson",
+      startDate: "Dec 1, 2023",
+      endDate: "Dec 14, 2023",
+      status: "Completed",
+    },
+    {
+      id: 5,
+      name: "Prednisone",
+      dosage: "10mg",
+      frequency: "Twice daily",
+      purpose: "Inflammation",
+      doctor: "Dr. Raj Patel",
+      startDate: "Nov 15, 2023",
+      endDate: "Nov 30, 2023",
+      status: "Completed",
+    },
+  ])
+
+  const [pharmacyResults, setPharmacyResults] = useState([
+    {
+      id: 1,
+      name: "CVS Pharmacy",
+      distance: "0.5 mi",
+      address: "123 Main St",
+      phone: "(555) 123-4567",
+      price: "$12.99",
+      inStock: true,
+      deliveryAvailable: true,
+    },
+    {
+      id: 2,
+      name: "Walgreens",
+      distance: "1.2 mi",
+      address: "456 Oak Ave",
+      phone: "(555) 234-5678",
+      price: "$14.49",
+      inStock: true,
+      deliveryAvailable: false,
+    },
+    {
+      id: 3,
+      name: "Rite Aid",
+      distance: "2.1 mi",
+      address: "789 Elm Blvd",
+      phone: "(555) 345-6789",
+      price: "$11.99",
+      inStock: false,
+      deliveryAvailable: true,
+    },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/medicines/active -> Fetch active prescriptions
+  // GET: /patient/medicines/history -> Fetch past medications
+  // GET: /pharmacy/search?q=... -> Search for pharmacies and prices
+  /*
+    useEffect(() => {
+      const fetchMedicines = async () => {
+        try {
+          // const active = await apiClient.get('/patient/medicines/active');
+          // const past = await apiClient.get('/patient/medicines/history');
+          // setActivePrescriptions(active.data);
+          // setPastPrescriptions(past.data);
+        } catch (error) {
+          console.error('Failed to fetch medicines', error);
+        }
+      };
+      fetchMedicines();
+    }, []);
+  */
 
   return (
     <div className="flex flex-col gap-6">

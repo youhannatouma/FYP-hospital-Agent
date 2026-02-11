@@ -1,50 +1,66 @@
 "use client"
 
+import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Lightbulb, Heart, AlertTriangle, Apple, Bot } from "lucide-react"
 
-const insights = [
-  {
-    id: 1,
-    title: "Cardiovascular Health",
-    icon: Heart,
-    iconBg: "bg-blue-600",
-    description:
-      "Your blood pressure is well-controlled. Continue current medication regimen. Consider adding 30 minutes of cardio exercise 3x per week.",
-    tags: [
-      { label: "Good", color: "bg-emerald-500/10 text-emerald-600" },
-    ],
-    action: "Learn More",
-  },
-  {
-    id: 2,
-    title: "Cholesterol Management",
-    icon: AlertTriangle,
-    iconBg: "bg-amber-500",
-    description:
-      "LDL cholesterol is elevated. Discuss medication adjustment with your doctor. Focus on reducing saturated fats and increasing fiber intake.",
-    tags: [
-      { label: "Needs Attention", color: "bg-amber-500/10 text-amber-600" },
-    ],
-    action: "Learn More",
-  },
-  {
-    id: 3,
-    title: "Nutrition Guidance",
-    icon: Apple,
-    iconBg: "bg-violet-600",
-    description:
-      "Consider Mediterranean diet principles. Increase omega-3 fatty acids, reduce sodium intake to below 2000mg daily for optimal heart health.",
-    tags: [
-      { label: "Recommended", color: "bg-blue-500/10 text-blue-600" },
-    ],
-    action: "Learn More",
-  },
-]
-
 export function AIHealthInsights() {
+  const [insights, setInsights] = React.useState([
+    {
+      id: 1,
+      title: "Cardiovascular Health",
+      icon: Heart,
+      iconBg: "bg-blue-600",
+      description:
+        "Your blood pressure is well-controlled. Continue current medication regimen. Consider adding 30 minutes of cardio exercise 3x per week.",
+      tags: [
+        { label: "Good", color: "bg-emerald-500/10 text-emerald-600" },
+      ],
+      action: "Learn More",
+    },
+    {
+      id: 2,
+      title: "Cholesterol Management",
+      icon: AlertTriangle,
+      iconBg: "bg-amber-500",
+      description:
+        "LDL cholesterol is elevated. Discuss medication adjustment with your doctor. Focus on reducing saturated fats and increasing fiber intake.",
+      tags: [
+        { label: "Needs Attention", color: "bg-amber-500/10 text-amber-600" },
+      ],
+      action: "Learn More",
+    },
+    {
+      id: 3,
+      title: "Nutrition Guidance",
+      icon: Apple,
+      iconBg: "bg-violet-600",
+      description:
+        "Consider Mediterranean diet principles. Increase omega-3 fatty acids, reduce sodium intake to below 2000mg daily for optimal heart health.",
+      tags: [
+        { label: "Recommended", color: "bg-blue-500/10 text-blue-600" },
+      ],
+      action: "Learn More",
+    },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/health-insights -> Fetch AI-generated health insights for the patient
+  /*
+    React.useEffect(() => {
+      const fetchInsights = async () => {
+        try {
+          // const response = await apiClient.get('/patient/health-insights');
+          // setInsights(response.data);
+        } catch (error) {
+          console.error('Failed to fetch health insights', error);
+        }
+      };
+      fetchInsights();
+    }, []);
+  */
   return (
     <div>
       <div className="flex items-center justify-between mb-4">

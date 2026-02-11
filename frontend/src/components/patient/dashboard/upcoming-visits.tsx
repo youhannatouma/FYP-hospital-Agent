@@ -1,35 +1,51 @@
 "use client"
 
+import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CalendarDays, Clock, Video } from "lucide-react"
 import Link from "next/link"
 
-const visits = [
-  {
-    id: 1,
-    title: "Cardiology Follow-up",
-    doctor: "Dr. Michael Chen",
-    date: "Jan 25, 2024",
-    time: "10:00 AM",
-    type: "Next",
-    typeColor: "bg-primary text-primary-foreground",
-    isVirtual: true,
-  },
-  {
-    id: 2,
-    title: "Annual Physical",
-    doctor: "Dr. Emily Watson",
-    date: "Feb 15, 2024",
-    time: "2:30 PM",
-    type: "Scheduled",
-    typeColor: "bg-muted text-muted-foreground",
-    isVirtual: false,
-  },
-]
-
 export function UpcomingVisits() {
+  const [visits, setVisits] = React.useState([
+    {
+      id: 1,
+      title: "Cardiology Follow-up",
+      doctor: "Dr. Michael Chen",
+      date: "Jan 25, 2024",
+      time: "10:00 AM",
+      type: "Next",
+      typeColor: "bg-primary text-primary-foreground",
+      isVirtual: true,
+    },
+    {
+      id: 2,
+      title: "Annual Physical",
+      doctor: "Dr. Emily Watson",
+      date: "Feb 15, 2024",
+      time: "2:30 PM",
+      type: "Scheduled",
+      typeColor: "bg-muted text-muted-foreground",
+      isVirtual: false,
+    },
+  ])
+
+  // API Endpoints Suggestion:
+  // GET: /patient/appointments/upcoming -> Fetch upcoming visits for the logged-in patient
+  /*
+    React.useEffect(() => {
+      const fetchUpcomingVisits = async () => {
+        try {
+          // const response = await apiClient.get('/patient/appointments/upcoming');
+          // setVisits(response.data);
+        } catch (error) {
+          console.error('Failed to fetch upcoming visits', error);
+        }
+      };
+      fetchUpcomingVisits();
+    }, []);
+  */
   return (
     <Card className="border border-border bg-card shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-3">

@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import {
   ArrowRight,
   Bot,
@@ -19,12 +20,12 @@ export function HeroSection() {
     <section
       id="home"
       ref={ref}
-      className="relative overflow-hidden pt-28 pb-20 lg:pt-36 lg:pb-28"
+      className="relative overflow-hidden pt-28 pb-20 lg:pt-36 lg:pb-28 mesh-gradient"
     >
       {/* Background decoration */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute top-20 right-1/4 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute bottom-20 left-1/4 h-96 w-96 rounded-full bg-accent/5 blur-3xl" />
+        <div className="absolute top-20 right-1/4 h-72 w-72 rounded-full bg-primary/20 blur-[120px] dark:opacity-50" />
+        <div className="absolute bottom-20 left-1/4 h-96 w-96 rounded-full bg-accent/10 blur-[120px] dark:opacity-30" />
       </div>
 
       <div className="relative mx-auto max-w-7xl px-6">
@@ -68,7 +69,7 @@ export function HeroSection() {
             </div>
 
             <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl font-heading">
-              {"Your Family's Health,"}
+              {"Your Family's Care,"}
               <br />
               <span className="text-primary">Our AI-Powered</span> Mission
             </h1>
@@ -80,13 +81,15 @@ export function HeroSection() {
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Button
-                size="lg"
-                className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8 text-base"
-              >
-                Get Started Free
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+              <Link href="/sign-up">
+                <Button
+                  size="lg"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8 text-base"
+                >
+                  Get Started Free
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
               <Button
                 size="lg"
                 variant="outline"
