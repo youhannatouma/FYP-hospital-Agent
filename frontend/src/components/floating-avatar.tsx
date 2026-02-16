@@ -1,11 +1,9 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { X } from "lucide-react"
 import ThreeAvatar from "./ThreeAvatar"
 
 export function FloatingAvatar() {
-  const [expanded, setExpanded] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [initialized, setInitialized] = useState(false)
@@ -16,16 +14,15 @@ export function FloatingAvatar() {
   const hasDragged = useRef(false)
 
   // Initialize bottom-right position
-useEffect(() => {
-  requestAnimationFrame(() => {
-    setPosition({
-      x: window.innerWidth - 80,
-      y: window.innerHeight - 80,
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setPosition({
+        x: window.innerWidth - 120, // fixed starting size
+        y: window.innerHeight - 120,
+      })
+      setInitialized(true)
     })
-    setInitialized(true)
-  })
-}, [])
-
+  }, [])
 
   const startDrag = useCallback((clientX: number, clientY: number) => {
     if (!dragRef.current) return
@@ -41,7 +38,7 @@ useEffect(() => {
     (clientX: number, clientY: number) => {
       if (!isDragging) return
       hasDragged.current = true
-      const avatarSize = expanded ? 128 : 64
+      const avatarSize = 120 // fixed size
       const newX = Math.min(
         Math.max(0, clientX - offsetRef.current.x),
         window.innerWidth - avatarSize
@@ -52,7 +49,7 @@ useEffect(() => {
       )
       setPosition({ x: newX, y: newY })
     },
-    [isDragging, expanded]
+    [isDragging]
   )
 
   const stopDrag = useCallback(() => {
@@ -61,21 +58,6 @@ useEffect(() => {
       longPressTimer.current = null
     }
     setIsDragging(false)
-  }, [])
-
-  const handleClick = useCallback(() => {
-    if (!hasDragged.current) {
-      setExpanded((prev) => {
-        const next = !prev
-        if (next) {
-          setPosition((pos) => ({
-            x: Math.min(pos.x, window.innerWidth - 128),
-            y: Math.min(pos.y, window.innerHeight - 128),
-          }))
-        }
-        return next
-      })
-    }
   }, [])
 
   // Mouse events
@@ -113,7 +95,7 @@ useEffect(() => {
 
   if (!initialized) return null
 
-  const size = expanded ? 300 : 120
+  const size = 120 // fixed avatar size
 
   return (
     <div
@@ -126,14 +108,16 @@ useEffect(() => {
         height: size,
         transition: isDragging
           ? "none"
-          : "width 0.3s ease, height 0.3s ease, left 0.3s ease, top 0.3s ease",
+          : "left 0.3s ease, top 0.3s ease",
         cursor: isDragging ? "grabbing" : "pointer",
       }}
       onMouseDown={(e) => {
         e.preventDefault()
         startDrag(e.clientX, e.clientY)
       }}
-      onMouseUp={handleClick}
+      onMouseUp={() => {
+        if (!hasDragged.current) stopDrag()
+      }}
       onTouchStart={(e) => {
         const touch = e.touches[0]
         startDrag(touch.clientX, touch.clientY)
@@ -141,30 +125,14 @@ useEffect(() => {
       onTouchEnd={(e) => {
         e.preventDefault()
         stopDrag()
-        handleClick()
       }}
       role="button"
       tabIndex={0}
-      aria-label={expanded ? "Collapse avatar" : "Expand avatar"}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault()
-          setExpanded((prev) => !prev)
-        }
-      }}
     >
-
       {/* Avatar container */}
       <div className="relative h-full w-full overflow-hidden rounded-full border-2 border-primary/60 bg-card shadow-xl">
-        <ThreeAvatar size={size}/>
+        <ThreeAvatar size={size} />
       </div>
-
-      {/* Close hint when expanded */}
-      {expanded && (
-        <div className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border shadow-md">
-          <X className="h-3 w-3 text-muted-foreground" />
-        </div>
-      )}
     </div>
   )
 }

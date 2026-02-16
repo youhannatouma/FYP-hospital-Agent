@@ -1,92 +1,91 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { Canvas, useFrame } from "@react-three/fiber"
+import { useGLTF } from "@react-three/drei"
+import { useRef, useMemo, useEffect } from "react"
 import * as THREE from "three"
 
-export default function ThreeAvatar({ size }: { size: number }) {
-  const mountRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const mount = mountRef.current
-    if (!mount) return
-
-    const scene = new THREE.Scene()
-
-    const camera = new THREE.PerspectiveCamera(50, size / size, 0.1, 1000)
-    camera.position.z = 3
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-    renderer.setSize(size, size)
-    mount.appendChild(renderer.domElement)
-
-    // --- HEAD: Ellipsoid (taller than wide) ---
-    const headGeo = new THREE.SphereGeometry(1, 64, 64)
-    headGeo.scale(1, 1.2, 1) // stretch in Y for a more human head shape
-    const headMat = new THREE.MeshStandardMaterial({
-      color: 0x111111,
-      metalness: 0.6,
-      roughness: 0.4,
-    })
-    const head = new THREE.Mesh(headGeo, headMat)
-    scene.add(head)
-
-    // --- VISOR: Eye area ---
-    const visorGeo = new THREE.SphereGeometry(
-      0.6,  // slightly smaller than before
-      64,
-      64,
-      0,
-      Math.PI * 2,
-      Math.PI * 0.3,
-      Math.PI * 0.4
-    )
-    const visorMat = new THREE.MeshStandardMaterial({
-      color: 0x00ffff,
-      emissive: 0x00ffff,
-      emissiveIntensity: 1.2,
-      metalness: 0.9,
-      roughness: 0.1,
-      transparent: true,
-      opacity: 0.9,
-    })
-    const visor = new THREE.Mesh(visorGeo, visorMat)
-    visor.position.set(0, 0.1, 0.85) // move up slightly for eye level
-    head.add(visor)
-
-    // --- Subtle nose hint ---
-    const noseGeo = new THREE.ConeGeometry(0.08, 0.3, 16)
-    const noseMat = new THREE.MeshStandardMaterial({ color: 0x111111 })
-    const nose = new THREE.Mesh(noseGeo, noseMat)
-    nose.rotation.x = Math.PI / 2
-    nose.position.set(0, 0, 0.9)
-    head.add(nose)
-
-    // --- LIGHTS ---
-    const light = new THREE.PointLight(0xffffff, 2)
-    light.position.set(5, 5, 5)
-    scene.add(light)
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4)
-    scene.add(ambient)
-
-    // --- ANIMATE ---
-    let frameId: number
-    const animate = () => {
-      frameId = requestAnimationFrame(animate)
-      head.rotation.y += 0.003
-      const pulse = 1 + Math.sin(Date.now() * 0.005) * 0.02
-      visor.scale.set(pulse, pulse, pulse)
-      renderer.render(scene, camera)
-    }
-    animate()
-
-    // --- CLEANUP ---
-    return () => {
-      cancelAnimationFrame(frameId)
-      renderer.dispose()
-      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
-    }
-  }, [size])
-
-  return <div ref={mountRef} className="h-full w-full" />
+interface Props {
+  size: number
+  speaking?: number
 }
 
+function Head({ speaking = 0 }: { speaking?: number }) {
+  const group = useRef<THREE.Group>(null)
+  const { scene } = useGLTF("/models/charlize_theron_head.glb")
+  const clonedScene = useMemo(() => scene.clone(), [scene])
+
+  // Store mouse position relative to canvas
+  const mouse = useRef({ x: 0, y: 0 })
+
+  // Track mouse movements
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const canvas = document.querySelector("canvas")
+      if (!canvas) return
+
+      const rect = canvas.getBoundingClientRect()
+      // normalize between -1 and 1 relative to canvas center
+      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    return () => window.removeEventListener("mousemove", handleMouseMove)
+  }, [])
+
+  useFrame(() => {
+    if (!group.current) return
+
+    const baseTilt = -0.2 // radians, starts slightly looking upward
+
+    // Sensitivity multipliers
+    const horizontalSensitivity = 0.15 // smaller = less movement
+    const verticalSensitivity = 0.025
+
+    // Target rotations
+    let targetY = mouse.current.x * horizontalSensitivity
+    let targetX = -mouse.current.y * verticalSensitivity + baseTilt
+
+    // Clamp rotations to prevent over-rotation
+    targetY = THREE.MathUtils.clamp(targetY, -0.3, 0.3) // ~17° left/right
+    targetX = THREE.MathUtils.clamp(targetX, -0.15 + baseTilt, 0.15 + baseTilt) // very minimal vertical
+
+    // Smooth interpolation
+    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.05)
+    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, targetX, 0.05)
+
+    // Mouth animation
+    const mouth = group.current.getObjectByName("Mouth") as THREE.Mesh | null
+    if (mouth) {
+      mouth.scale.y = 1 + speaking * 0.35
+    }
+  })
+
+  return (
+    <primitive
+      ref={group}
+      object={clonedScene}
+      scale={0.1}
+      position={[0, -1.5, 0]}
+      rotation={[0, 0, 0]}
+    />
+  )
+}
+
+export default function ThreeAvatar({ size, speaking = 0 }: Props) {
+  return (
+    <Canvas
+      style={{ width: size, height: size }}
+      camera={{ position: [0, 1.4, 3], fov: 45 }}
+      gl={{ antialias: true }}
+    >
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[2, 5, 2]} intensity={2} />
+      <Head speaking={speaking} />
+    </Canvas>
+  )
+}
+
+// Preload model
+useGLTF.preload("/models/charlize_theron_head.glb")
