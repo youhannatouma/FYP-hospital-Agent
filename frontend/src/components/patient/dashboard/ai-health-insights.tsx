@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Lightbulb, Heart, AlertTriangle, Apple, Bot } from "lucide-react"
+import Link from "next/link"
+import { HealthInsightDialog } from "@/components/patient/dashboard/dialogs/health-insight-dialog"
 
 export function AIHealthInsights() {
   const [insights, setInsights] = React.useState([
@@ -68,10 +70,12 @@ export function AIHealthInsights() {
           <Lightbulb className="h-5 w-5 text-amber-500" />
           AI Health Insights & Recommendations
         </h2>
-        <Button variant="ghost" size="sm" className="text-primary gap-1 text-xs">
-          <Bot className="h-3 w-3" />
-          Ask AI
-        </Button>
+        <Link href="/patient/ai-assistant">
+          <Button variant="ghost" size="sm" className="text-primary gap-1 text-xs">
+            <Bot className="h-3 w-3" />
+            Ask AI
+          </Button>
+        </Link>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {insights.map((insight) => (
@@ -98,13 +102,13 @@ export function AIHealthInsights() {
                     {tag.label}
                   </Badge>
                 ))}
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="ml-auto p-0 text-xs text-primary"
-                >
-                  {insight.action}
-                </Button>
+                <HealthInsightDialog
+                  title={insight.title}
+                  description={insight.description}
+                  icon={insight.icon}
+                  iconBg={insight.iconBg}
+                  tags={insight.tags}
+                />
               </div>
             </CardContent>
           </Card>

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Activity } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import {
   LineChart,
   Line,
@@ -27,6 +28,7 @@ const vitalsData = [
 ]
 
 export function VitalsTracking() {
+  const { toast } = useToast()
   const [period] = useState("7d")
 
   return (
@@ -36,7 +38,10 @@ export function VitalsTracking() {
           <Activity className="h-5 w-5 text-primary" />
           Vitals Tracking
         </CardTitle>
-        <Select defaultValue={period}>
+        <Select defaultValue={period} onValueChange={(val) => toast({
+          title: "Period Updated",
+          description: `Loading vitals data for the last ${val === '7d' ? '7 days' : val === '30d' ? '30 days' : '90 days'}.`,
+        })}>
           <SelectTrigger className="w-32 h-8 text-xs">
             <SelectValue />
           </SelectTrigger>

@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Bot, Heart, MessageCircle, Mic } from "lucide-react"
+import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 const suggestedQuestions = [
   "What should I know about my cholesterol levels?",
@@ -12,6 +14,7 @@ const suggestedQuestions = [
 ]
 
 export function AIHealthAvatar() {
+  const { toast } = useToast()
   return (
     <Card className="border-0 bg-gradient-to-b from-indigo-600 to-violet-700 text-white shadow-lg">
       <CardContent className="p-5">
@@ -46,24 +49,33 @@ export function AIHealthAvatar() {
           </p>
           <div className="flex flex-col gap-2">
             {suggestedQuestions.map((q, i) => (
-              <button
-                key={i}
-                className="rounded-lg bg-white/10 px-3 py-2 text-left text-xs text-white/90 transition-colors hover:bg-white/20"
-              >
-                {`"${q}"`}
-              </button>
+              <Link key={i} href="/patient/ai-assistant">
+                <button
+                  className="rounded-lg bg-white/10 px-3 py-2 text-left text-xs text-white/90 transition-colors hover:bg-white/20 w-full"
+                >
+                  {`"${q}"`}
+                </button>
+              </Link>
             ))}
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <Button className="w-full bg-amber-500 text-white hover:bg-amber-600 border-0">
-            <MessageCircle className="mr-2 h-4 w-4" />
-            Start AI Chat
-          </Button>
+          <Link href="/patient/ai-assistant">
+            <Button className="w-full bg-amber-500 text-white hover:bg-amber-600 border-0">
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Start AI Chat
+            </Button>
+          </Link>
           <Button
             variant="outline"
             className="w-full border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"
+            onClick={() => {
+              toast({
+                title: "Voice Avatar",
+                description: "Voice-powered AI is being activated...",
+              })
+            }}
           >
             <Mic className="mr-2 h-4 w-4" />
             Launch Voice Avatar

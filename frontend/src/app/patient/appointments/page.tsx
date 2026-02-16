@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,158 +13,78 @@ import {
   MapPin,
   Phone,
   Download,
-  X,
-  RefreshCw,
-  Eye,
   CalendarPlus,
+  Eye,
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { useDataStore, type Appointment } from "@/hooks/use-data-store"
+import { BookAppointmentDialog } from "@/components/patient/appointments/book-appointment-dialog"
+import { RescheduleDialog } from "@/components/patient/appointments/reschedule-dialog"
+import { CancelAppointmentAlert } from "@/components/patient/appointments/cancel-alert"
+import { DoctorDetailDialog } from "@/components/shared/dialogs/doctor-detail-dialog"
+import { useState } from "react"
 
-interface Appointment {
-  id: number
-  doctor: string
-  specialty: string
-  avatar: string
-  date: string
-  time: string
-  type: "Video" | "In-person" | "Phone"
-  typeIcon: typeof Video
-  status: string
-  statusColor: string
-  location: string
-  notes?: string
+// Using pat-1 as the current patient (would come from Clerk in production)
+const CURRENT_PATIENT_ID = "pat-1"
+const CURRENT_PATIENT_NAME = "Sarah Johnson"
+
+function getInitials(name: string) {
+  return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
 }
 
-const upcomingAppointments: Appointment[] = [
-  {
-    id: 1,
-    doctor: "Dr. Michael Chen",
-    specialty: "Cardiology",
-    avatar: "MC",
-    date: "Jan 25, 2024",
-    time: "10:00 AM",
-    type: "Video",
-    typeIcon: Video,
-    status: "Confirmed",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    location: "Virtual - Telehealth",
-    notes: "Follow-up for cholesterol management",
-  },
-  {
-    id: 2,
-    doctor: "Dr. Emily Watson",
-    specialty: "General Practice",
-    avatar: "EW",
-    date: "Feb 15, 2024",
-    time: "2:30 PM",
-    type: "In-person",
-    typeIcon: MapPin,
-    status: "Scheduled",
-    statusColor: "bg-blue-500/10 text-blue-600",
-    location: "Westside Clinic, Suite 204",
-    notes: "Annual physical examination",
-  },
-  {
-    id: 3,
-    doctor: "Dr. Raj Patel",
-    specialty: "Endocrinology",
-    avatar: "RP",
-    date: "Mar 5, 2024",
-    time: "11:00 AM",
-    type: "Phone",
-    typeIcon: Phone,
-    status: "Pending",
-    statusColor: "bg-amber-500/10 text-amber-600",
-    location: "Phone consultation",
-    notes: "Blood sugar monitoring review",
-  },
-]
+function getStatusColor(status: string) {
+  switch (status) {
+    case "Scheduled": return "bg-blue-500/10 text-blue-600"
+    case "Completed": return "bg-emerald-500/10 text-emerald-600"
+    case "Cancelled": return "bg-destructive/10 text-destructive"
+    case "Pending": return "bg-amber-500/10 text-amber-600"
+    default: return "bg-muted text-muted-foreground"
+  }
+}
 
-const pastAppointments: Appointment[] = [
-  {
-    id: 4,
-    doctor: "Dr. Michael Chen",
-    specialty: "Cardiology",
-    avatar: "MC",
-    date: "Jan 10, 2024",
-    time: "10:00 AM",
-    type: "In-person",
-    typeIcon: MapPin,
-    status: "Completed",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    location: "Downtown Medical Center",
-  },
-  {
-    id: 5,
-    doctor: "Dr. Sarah Kim",
-    specialty: "Dermatology",
-    avatar: "SK",
-    date: "Dec 20, 2023",
-    time: "3:00 PM",
-    type: "Video",
-    typeIcon: Video,
-    status: "Completed",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    location: "Virtual - Telehealth",
-  },
-  {
-    id: 6,
-    doctor: "Dr. Emily Watson",
-    specialty: "General Practice",
-    avatar: "EW",
-    date: "Nov 15, 2023",
-    time: "9:00 AM",
-    type: "In-person",
-    typeIcon: MapPin,
-    status: "Completed",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    location: "Westside Clinic, Suite 204",
-  },
-]
-
-const cancelledAppointments: Appointment[] = [
-  {
-    id: 7,
-    doctor: "Dr. James Rodriguez",
-    specialty: "Orthopedics",
-    avatar: "JR",
-    date: "Jan 5, 2024",
-    time: "1:00 PM",
-    type: "In-person",
-    typeIcon: MapPin,
-    status: "Cancelled",
-    statusColor: "bg-destructive/10 text-destructive",
-    location: "Sports Medicine Center",
-    notes: "Cancelled by patient",
-  },
-]
+function getTypeIcon(apt: Appointment) {
+  if (apt.isVirtual) return Video
+  return MapPin
+}
 
 function AppointmentCard({
   appointment,
   tab,
+  onDoctorClick,
 }: {
   appointment: Appointment
   tab: string
+  onDoctorClick: (doctor: any) => void
 }) {
+  const { toast } = useToast()
+  const TypeIcon = getTypeIcon(appointment)
+
   return (
     <Card className="border border-border bg-card shadow-sm">
       <CardContent className="p-5">
         <div className="flex items-start gap-4">
-          <Avatar className="h-12 w-12 ring-2 ring-primary/10">
+          <Avatar 
+            className="h-12 w-12 ring-2 ring-primary/10 cursor-pointer hover:ring-primary transition-all"
+            onClick={() => onDoctorClick({ name: appointment.doctorName, specialty: appointment.specialty })}
+          >
             <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-              {appointment.avatar}
+              {getInitials(appointment.doctorName)}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold text-card-foreground">
-                  {appointment.doctor}
+              <div 
+                className="cursor-pointer group"
+                onClick={() => onDoctorClick({ name: appointment.doctorName, specialty: appointment.specialty })}
+              >
+                <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
+                  {appointment.doctorName}
                 </h3>
                 <p className="text-sm text-primary">{appointment.specialty}</p>
               </div>
               <Badge
                 variant="secondary"
-                className={`text-xs ${appointment.statusColor} border-0`}
+                className={`text-xs ${getStatusColor(appointment.status)} border-0`}
               >
                 {appointment.status}
               </Badge>
@@ -174,22 +93,24 @@ function AppointmentCard({
             <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <CalendarDays className="h-3.5 w-3.5" />
-                <span>{appointment.date}</span>
+                <span>{new Date(appointment.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" />
                 <span>{appointment.time}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <appointment.typeIcon className="h-3.5 w-3.5" />
-                <span>{appointment.type}</span>
+                <TypeIcon className="h-3.5 w-3.5" />
+                <span>{appointment.isVirtual ? "Video" : "In-person"}</span>
               </div>
             </div>
 
-            <div className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" />
-              <span>{appointment.location}</span>
-            </div>
+            {appointment.type && (
+              <div className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5" />
+                <span>{appointment.type}</span>
+              </div>
+            )}
 
             {appointment.notes && (
               <p className="mt-2 text-xs text-muted-foreground italic">
@@ -200,31 +121,31 @@ function AppointmentCard({
             <div className="mt-4 flex flex-wrap gap-2">
               {tab === "upcoming" && (
                 <>
-                  {appointment.type === "Video" && (
+                  {appointment.isVirtual && (
                     <Button
                       size="sm"
                       className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
+                      onClick={() => {
+                        toast({
+                          title: "Connecting...",
+                          description: "Joining secure video room with " + appointment.doctorName,
+                        })
+                      }}
                     >
                       <Video className="h-3 w-3" />
                       Join Call
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1 border-border text-foreground"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                    Reschedule
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
-                  >
-                    <X className="h-3 w-3" />
-                    Cancel
-                  </Button>
+                  <div className="flex gap-2">
+                    <RescheduleDialog 
+                      appointmentId={appointment.id} 
+                      doctorName={appointment.doctorName} 
+                    />
+                    <CancelAppointmentAlert 
+                      appointmentId={appointment.id}
+                      doctorName={appointment.doctorName}
+                    />
+                  </div>
                 </>
               )}
               {tab === "past" && (
@@ -232,7 +153,8 @@ function AppointmentCard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1 border-border text-foreground"
+                    className="gap-1 border-border text-foreground hover:bg-muted"
+                    onClick={() => onDoctorClick({ name: appointment.doctorName, specialty: appointment.specialty })}
                   >
                     <Eye className="h-3 w-3" />
                     View Details
@@ -241,6 +163,12 @@ function AppointmentCard({
                     size="sm"
                     variant="outline"
                     className="gap-1 border-border text-foreground"
+                    onClick={() => {
+                      toast({
+                        title: "Downloading...",
+                        description: "Prescription download started.",
+                      })
+                    }}
                   >
                     <Download className="h-3 w-3" />
                     Download Prescription
@@ -248,13 +176,10 @@ function AppointmentCard({
                 </>
               )}
               {tab === "cancelled" && (
-                <Button
-                  size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
-                >
-                  <CalendarPlus className="h-3 w-3" />
-                  Rebook
-                </Button>
+                <BookAppointmentDialog 
+                  patientId={CURRENT_PATIENT_ID}
+                  patientName={CURRENT_PATIENT_NAME}
+                />
               )}
             </div>
           </div>
@@ -265,6 +190,22 @@ function AppointmentCard({
 }
 
 export default function AppointmentsPage() {
+  const { getAppointmentsByPatient } = useDataStore()
+  const [selectedDoctor, setSelectedDoctor] = useState<any>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+
+  const allAppointments = getAppointmentsByPatient(CURRENT_PATIENT_ID)
+  const today = new Date().toISOString().split('T')[0]
+
+  const upcoming = allAppointments.filter(a => a.status === 'Scheduled' && a.date >= today)
+  const past = allAppointments.filter(a => a.status === 'Completed')
+  const cancelled = allAppointments.filter(a => a.status === 'Cancelled')
+
+  const handleDoctorClick = (doctor: any) => {
+    setSelectedDoctor(doctor)
+    setDialogOpen(true)
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -276,74 +217,70 @@ export default function AppointmentsPage() {
             Manage and view your scheduled appointments
           </p>
         </div>
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
-          <CalendarPlus className="h-4 w-4" />
-          Book New Appointment
-        </Button>
+        <BookAppointmentDialog 
+          patientId={CURRENT_PATIENT_ID}
+          patientName={CURRENT_PATIENT_NAME}
+        />
       </div>
 
       <Tabs defaultValue="upcoming" className="w-full">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <TabsList className="bg-muted">
             <TabsTrigger value="upcoming">
-              Upcoming (3)
+              Upcoming ({upcoming.length})
             </TabsTrigger>
-            <TabsTrigger value="past">Past</TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+            <TabsTrigger value="past">Past ({past.length})</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled ({cancelled.length})</TabsTrigger>
           </TabsList>
-          <div className="flex items-center gap-2">
-            <Select defaultValue="all">
-              <SelectTrigger className="w-32 h-8 text-xs">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="video">Video</SelectItem>
-                <SelectItem value="in-person">In-person</SelectItem>
-                <SelectItem value="phone">Phone</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="date-asc">
-              <SelectTrigger className="w-32 h-8 text-xs">
-                <SelectValue placeholder="Sort" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="date-asc">Date (Earliest)</SelectItem>
-                <SelectItem value="date-desc">Date (Latest)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         <TabsContent value="upcoming" className="flex flex-col gap-4">
-          {upcomingAppointments.map((apt) => (
-            <AppointmentCard key={apt.id} appointment={apt} tab="upcoming" />
-          ))}
+          {upcoming.length > 0 ? (
+            upcoming.map((apt) => (
+              <AppointmentCard key={apt.id} appointment={apt} tab="upcoming" onDoctorClick={handleDoctorClick} />
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <CalendarDays className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-semibold text-foreground">No upcoming appointments</h3>
+              <p className="text-sm text-muted-foreground mt-1">Book a new appointment to get started</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="past" className="flex flex-col gap-4">
-          {pastAppointments.map((apt) => (
-            <AppointmentCard key={apt.id} appointment={apt} tab="past" />
-          ))}
+          {past.length > 0 ? (
+            past.map((apt) => (
+              <AppointmentCard key={apt.id} appointment={apt} tab="past" onDoctorClick={handleDoctorClick} />
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <CalendarDays className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-semibold text-foreground">No past appointments</h3>
+              <p className="text-sm text-muted-foreground mt-1">Your completed appointments will appear here</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="cancelled" className="flex flex-col gap-4">
-          {cancelledAppointments.map((apt) => (
-            <AppointmentCard key={apt.id} appointment={apt} tab="cancelled" />
-          ))}
-          {cancelledAppointments.length === 0 && (
+          {cancelled.length > 0 ? (
+            cancelled.map((apt) => (
+              <AppointmentCard key={apt.id} appointment={apt} tab="cancelled" onDoctorClick={handleDoctorClick} />
+            ))
+          ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <CalendarDays className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold text-foreground">
-                No cancelled appointments
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                All your appointments are on track
-              </p>
+              <h3 className="text-lg font-semibold text-foreground">No cancelled appointments</h3>
+              <p className="text-sm text-muted-foreground mt-1">All your appointments are on track</p>
             </div>
           )}
         </TabsContent>
       </Tabs>
+      <DoctorDetailDialog 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen} 
+        doctor={selectedDoctor} 
+      />
     </div>
   )
 }

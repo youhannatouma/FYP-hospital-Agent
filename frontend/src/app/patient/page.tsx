@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { CalendarPlus, Phone } from "lucide-react"
+import { BookAppointmentDialog } from "@/components/patient/appointments/book-appointment-dialog"
+import { ContactDoctorDialog } from "@/components/patient/dashboard/dialogs/contact-doctor-dialog"
 import { StatCards } from "@/components/patient/dashboard/stat-cards"
 import { MedicalHistoryTimeline } from "@/components/patient/dashboard/medical-history-timeline"
 import { AIHealthAvatar } from "@/components/patient/dashboard/ai-health-avatar"
@@ -15,72 +15,77 @@ import { HealthEducation } from "@/components/patient/dashboard/health-education
 import { CurrentMedications } from "@/components/patient/dashboard/current-medications"
 import { RecentLabResults } from "@/components/patient/dashboard/recent-lab-results"
 import { MedicalDocuments } from "@/components/patient/dashboard/medical-documents"
+import { useDataStore } from "@/hooks/use-data-store"
+import { useUser } from "@clerk/nextjs"
+import { format } from "date-fns"
 
 export default function PatientDashboardPage() {
+  const { isHydrating } = useDataStore()
+  const { user } = useUser()
+
+  if (isHydrating) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8 animate-in fade-in duration-700">
       {/* Welcome Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground lg:text-3xl">
-            Welcome back, Sarah
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Welcome back, {user?.firstName || "Friend"}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {"Here's your health overview for January 15, 2024"}
+          <p className="text-muted-foreground mt-1">
+            {"Your health summary for " + format(new Date(), "MMMM dd, yyyy")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2 border-border text-foreground">
-            <CalendarPlus className="h-4 w-4" />
-            Book Appointment
-          </Button>
-          <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-            <Phone className="h-4 w-4" />
-            Contact Doctor
-          </Button>
+        <div className="flex items-center gap-3">
+          <BookAppointmentDialog />
+          <ContactDoctorDialog />
         </div>
       </div>
 
       {/* Stat Cards */}
       <StatCards />
 
-      {/* Medical History Timeline + AI Avatar + Upcoming Visits */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Left Columns */}
+        <div className="lg:col-span-2 space-y-8">
           <MedicalHistoryTimeline />
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            <CurrentMedications />
+            <RecentLabResults />
+          </div>
+          <MedicalDocuments />
         </div>
-        <div className="flex flex-col gap-6">
+
+        {/* Right Column */}
+        <div className="flex flex-col gap-8">
           <AIHealthAvatar />
           <UpcomingVisits />
+          <VitalsTracking />
+          <HealthGoals />
         </div>
       </div>
 
-      {/* Current Medications + Recent Lab Results */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <CurrentMedications />
-        <RecentLabResults />
+      {/* Insights Section */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+         <div className="lg:col-span-2">
+            <AIHealthInsights />
+         </div>
+         <HealthTip />
       </div>
 
-      {/* Medical Documents */}
-      <MedicalDocuments />
-
-      {/* Vitals Tracking + Health Goals */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <VitalsTracking />
-        <HealthGoals />
+      {/* Bottom Section */}
+      <div className="border-t border-sidebar-border pt-8 space-y-8">
+        <MessagesSection />
+        <HealthEducation />
       </div>
-
-      {/* AI Health Insights */}
-      <AIHealthInsights />
-
-      {/* Health Tip */}
-      <HealthTip />
-
-      {/* Messages & Communication */}
-      <MessagesSection />
-
-      {/* Health Education */}
-      <HealthEducation />
     </div>
   )
 }

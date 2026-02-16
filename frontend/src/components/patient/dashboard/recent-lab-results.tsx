@@ -1,45 +1,70 @@
 "use client"
 
 import * as React from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FlaskConical, Download } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
+import { Dialog, DialogTrigger } from "@/components/ui/dialog"
+import { ReportDetailModal, Report } from "../report-detail-dialog"
+import { FileText, FlaskConical } from "lucide-react"
 
 export function RecentLabResults() {
+  const { toast } = useToast()
+  const [downloading, setDownloading] = useState<number | null>(null)
   const [labResults, setLabResults] = React.useState([
     {
       id: 1,
-      title: "Lipid Panel",
-      collected: "Collected: Jan 8, 2024",
+      name: "Lipid Panel",
+      type: "Lab Report",
+      typeIcon: FileText,
+      typeColor: "text-amber-500",
+      uploadDate: "Jan 8, 2024",
+      fileSize: "1.2 MB",
+      aiSummary: "Lipid profile shows elevated LDL and total cholesterol levels.",
+      aiFindings: ["Total Cholesterol: 245 mg/dL (High)", "LDL: 165 mg/dL (High)", "HDL: 48 mg/dL (Low)"],
+      doctor: "Dr. Michael Chen",
       status: "Review Needed",
       statusColor: "bg-amber-500/10 text-amber-600",
+      borderColor: "border-amber-300/50",
+      downloadColor: "bg-amber-500 text-white hover:bg-amber-600",
+      collected: "Collected: Jan 8, 2024",
       values: [
         { label: "Total Cholesterol", value: "245 mg/dL", flag: true },
         { label: "LDL", value: "165 mg/dL", flag: true },
         { label: "HDL", value: "48 mg/dL", flag: false },
         { label: "Triglycerides", value: "160 mg/dL", flag: false },
       ],
-      borderColor: "border-amber-300/50",
-      downloadColor: "bg-amber-500 text-white hover:bg-amber-600",
     },
     {
       id: 2,
-      title: "Complete Blood Count",
-      collected: "Collected: Dec 15, 2023",
+      name: "Complete Blood Count",
+      type: "Lab Report",
+      typeIcon: FileText,
+      typeColor: "text-rose-500",
+      uploadDate: "Dec 15, 2023",
+      fileSize: "0.8 MB",
+      aiSummary: "CBC results are within normal ranges with no significant abnormalities.",
+      aiFindings: ["WBC, RBC, and Platelets all normal", "Hemoglobin stable"],
+      doctor: "Dr. Michael Chen",
       status: "Normal",
       statusColor: "bg-emerald-500/10 text-emerald-600",
+      borderColor: "border-border",
+      downloadColor: "bg-muted text-muted-foreground hover:bg-muted/80",
+      collected: "Collected: Dec 15, 2023",
       values: [
         { label: "WBC", value: "7.2 K/uL", flag: false },
         { label: "RBC", value: "4.8 M/uL", flag: false },
         { label: "Hemoglobin", value: "14.2 g/dL", flag: false },
         { label: "Platelets", value: "250 K/uL", flag: false },
       ],
-      borderColor: "border-border",
-      downloadColor: "bg-muted text-muted-foreground hover:bg-muted/80",
     },
   ])
+
+  const [selectedReport, setSelectedReport] = useState<any>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   // API Endpoints Suggestion:
   // GET: /patient/labs/recent -> Fetch recent lab results for the patient
@@ -71,11 +96,15 @@ export function RecentLabResults() {
         {labResults.map((result) => (
           <div
             key={result.id}
-            className={`rounded-lg border p-4 ${result.borderColor}`}
+            className={`rounded-lg border p-4 cursor-pointer hover:shadow-md transition-all ${result.borderColor}`}
+            onClick={() => {
+              setSelectedReport(result)
+              setDialogOpen(true)
+            }}
           >
             <div className="flex items-start justify-between mb-1">
               <h4 className="text-sm font-semibold text-card-foreground">
-                {result.title}
+                {result.name}
               </h4>
               <Badge
                 variant="secondary"
@@ -105,16 +134,12 @@ export function RecentLabResults() {
                 </div>
               ))}
             </div>
-            <Button
-              size="sm"
-              className={`mt-3 w-full gap-1 ${result.downloadColor}`}
-            >
-              <Download className="h-3 w-3" />
-              Download Report
-            </Button>
           </div>
         ))}
       </CardContent>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {selectedReport && <ReportDetailModal report={selectedReport} />}
+      </Dialog>
     </Card>
   )
 }

@@ -6,6 +6,7 @@ import Link from "next/link"
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
 import { Activity, Menu, X, Sun, Moon, Globe, LayoutDashboard } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/hooks/use-toast"
 
 const navLinks = [
   { label: "Home", href: "#home" },
@@ -16,6 +17,7 @@ const navLinks = [
 ]
 
 export function Navbar() {
+  const { toast } = useToast()
   const { resolvedTheme, setTheme } = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -77,6 +79,12 @@ export function Navbar() {
             size="icon"
             className="text-muted-foreground hover:text-foreground"
             aria-label="Toggle language"
+            onClick={() => {
+              toast({
+                title: "Multi-language Support",
+                description: "Localization features are coming soon.",
+              })
+            }}
           >
             <Globe className="h-5 w-5" />
           </Button>

@@ -6,8 +6,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Target, Plus } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { AddGoalDialog } from "@/components/patient/goals/add-goal-dialog"
 
 export function HealthGoals() {
+  const { toast } = useToast()
   const [goals, setGoals] = React.useState([
     {
       id: 1,
@@ -66,10 +69,7 @@ export function HealthGoals() {
           <Target className="h-5 w-5 text-emerald-500" />
           Health Goals
         </CardTitle>
-        <Button variant="ghost" size="sm" className="text-primary gap-1 text-xs">
-          <Plus className="h-3 w-3" />
-          Add Goal
-        </Button>
+        <AddGoalDialog />
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {goals.map((goal) => (

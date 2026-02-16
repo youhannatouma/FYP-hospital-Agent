@@ -16,7 +16,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.message || 'An unexpected error occurred';
-    console.error('[API Error]', message);
+    console.log('[API Error]', message);
     return Promise.reject(error);
   }
 );

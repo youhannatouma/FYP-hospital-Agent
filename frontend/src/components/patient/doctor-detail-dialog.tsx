@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CalendarDays, MapPin, Star, Phone, Mail, Clock } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface DoctorDetailDialogProps {
   doctor: any
@@ -22,6 +23,8 @@ export function DoctorDetailDialog({
   open,
   onOpenChange,
 }: DoctorDetailDialogProps) {
+  const { toast } = useToast()
+
   if (!doctor) return null
 
   return (
@@ -93,11 +96,29 @@ export function DoctorDetailDialog({
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
+            <Button 
+              className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+              onClick={() => {
+                onOpenChange(false)
+                toast({
+                  title: "Book with " + doctor.name,
+                  description: "Proceeding to appointment scheduling...",
+                })
+              }}
+            >
               <CalendarDays className="h-4 w-4" />
               Book Appointment
             </Button>
-            <Button variant="outline" className="flex-1 border-border text-foreground">
+            <Button 
+              variant="outline" 
+              className="flex-1 border-border text-foreground"
+              onClick={() => {
+                toast({
+                  title: "Message " + doctor.name,
+                  description: "Opening secure messaging channel...",
+                })
+              }}
+            >
               Send Message
             </Button>
           </div>

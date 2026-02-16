@@ -9,6 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import * as React from "react";
+import { AppointmentDetailDialog } from "../dialogs/appointment-detail-dialog";
 
 const appointments = [
   {
@@ -77,7 +79,16 @@ function getStatusVariant(status: string) {
 }
 
 export function AppointmentsTable() {
+  const [selectedAppointment, setSelectedAppointment] = React.useState<any>(null);
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+
+  const handleRowClick = (appointment: any) => {
+    setSelectedAppointment(appointment);
+    setIsDialogOpen(true);
+  };
+
   return (
+    <>
     <Card className="border-none shadow-sm">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
@@ -107,7 +118,11 @@ export function AppointmentsTable() {
           </TableHeader>
           <TableBody>
             {appointments.map((apt) => (
-              <TableRow key={apt.id} className="cursor-pointer">
+              <TableRow 
+                key={apt.id} 
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => handleRowClick(apt)}
+              >
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="size-8">
@@ -142,5 +157,12 @@ export function AppointmentsTable() {
         </Table>
       </CardContent>
     </Card>
+
+    <AppointmentDetailDialog 
+      open={isDialogOpen}
+      onOpenChange={setIsDialogOpen}
+      appointment={selectedAppointment}
+    />
+    </>
   );
 }

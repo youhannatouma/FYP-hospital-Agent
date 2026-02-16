@@ -45,23 +45,7 @@ export function DoctorTopNav() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground"
-              aria-label="Language"
-            >
-              <Globe className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>English</DropdownMenuItem>
-            <DropdownMenuItem>Arabic</DropdownMenuItem>
-            <DropdownMenuItem>French</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        
 
         <Button
           variant="ghost"
@@ -94,24 +78,24 @@ export function DoctorTopNav() {
               className="gap-2 pl-2 pr-3"
             >
               <Avatar className="h-7 w-7">
-                <AvatarImage src="/placeholder-user.jpg" alt="Sarah Johnson" />
+                <AvatarImage src="/doctor-avatar.jpg" alt="Dr. John Smith" />
                 <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                  SJ
+                  JS
                 </AvatarFallback>
               </Avatar>
               <div className="hidden flex-col items-start md:flex">
                 <span className="text-xs font-medium text-foreground">
-                  Sarah Johnson
+                  Dr. John Smith
                 </span>
                 <span className="text-[10px] text-muted-foreground">
-                  Patient ID: P-1842
+                  Cardiologist • MD
                 </span>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem asChild>
-              <Link href="/patient/settings">Profile Settings</Link>
+              <Link href="/doctor/settings">Profile Settings</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive">

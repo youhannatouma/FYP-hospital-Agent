@@ -24,6 +24,7 @@ import {
   Headphones,
   Wind,
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 const phq9Questions = [
   "Little interest or pleasure in doing things",
@@ -105,6 +106,7 @@ const resources = [
 type ScreeningState = "intro" | "questions" | "results"
 
 export default function MentalHealthPage() {
+  const { toast } = useToast()
   const [screeningState, setScreeningState] = useState<ScreeningState>("intro")
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<number, string>>({})
@@ -174,7 +176,14 @@ export default function MentalHealthPage() {
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {resources.map((resource, idx) => (
-                <Card key={idx} className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                <Card key={idx} className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => {
+                    toast({
+                      title: resource.title,
+                      description: `Opening ${resource.type.toLowerCase()}: ${resource.duration}`,
+                    })
+                  }}
+                >
                   <CardContent className="p-4">
                     <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${resource.color}`}>
                       <resource.icon className="h-5 w-5" />
@@ -364,7 +373,15 @@ export default function MentalHealthPage() {
                     <p className="mt-2 text-xs text-muted-foreground">
                       {therapist.availability}
                     </p>
-                    <Button className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
+                    <Button
+                      className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
+                      onClick={() => {
+                        toast({
+                          title: "Session Requested",
+                          description: `Booking request sent to ${therapist.name}. You'll receive a confirmation shortly.`,
+                        })
+                      }}
+                    >
                       Book Session
                     </Button>
                   </CardContent>
@@ -386,7 +403,16 @@ export default function MentalHealthPage() {
             >
               Take Again
             </Button>
-            <Button variant="outline" className="border-border text-foreground">
+            <Button
+              variant="outline"
+              className="border-border text-foreground"
+              onClick={() => {
+                toast({
+                  title: "Downloading Report",
+                  description: `Your PHQ-9 screening report (Score: ${totalScore}/27) is being saved.`,
+                })
+              }}
+            >
               Download Report
             </Button>
           </div>

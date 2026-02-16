@@ -41,6 +41,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useToast } from "@/hooks/use-toast";
 import { AvatarAssistant } from "@/components/patient/avatar-assistant"; // Update path if needed
 
 const mainNavItems = [
@@ -84,6 +85,7 @@ const settingsNavItems = [
 export function DoctorSidebar() {
   const pathname = usePathname();
   const { state } = useSidebar();
+  const { toast } = useToast();
   const isCollapsed = state === "collapsed";
 
   const isActive = (href: string) => {
@@ -259,6 +261,12 @@ export function DoctorSidebar() {
             <SidebarMenuButton
               tooltip="Logout"
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => {
+                toast({
+                  title: "Logging Out",
+                  description: "Ending your clinical session and securing patient data...",
+                })
+              }}
             >
               <LogOut className="h-4 w-4" />
               <span>Logout</span>

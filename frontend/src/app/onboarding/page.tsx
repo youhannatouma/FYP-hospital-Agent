@@ -12,15 +12,8 @@ export default function OnboardingPage() {
   React.useEffect(() => {
     if (!isLoaded) return
 
-    // Read role from localStorage (set in /auth/role-selection)
-    const role = localStorage.getItem("onboarding_role")
-
-    // Default to patient if not specified or unrecognized
-    if (role === "doctor") {
-      router.push("/onboarding/doctor")
-    } else {
-      router.push("/onboarding/patient")
-    }
+    // Default to patient for simplified flow
+    router.push("/onboarding/patient")
   }, [isLoaded, router])
 
   return (

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Heart, Apple, Dumbbell, Pill } from "lucide-react"
 import Link from "next/link"
+import { ArticleViewerDialog } from "@/components/patient/dashboard/dialogs/article-viewer-dialog"
 
 export function HealthEducation() {
   const [resources, setResources] = React.useState([
@@ -86,13 +87,12 @@ export function HealthEducation() {
               <p className="mb-3 text-xs text-muted-foreground leading-relaxed">
                 {resource.description}
               </p>
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-xs text-primary"
-              >
-                {resource.action}
-              </Button>
+              <ArticleViewerDialog
+                title={resource.title}
+                description={resource.description}
+                icon={resource.icon}
+                iconBg={resource.iconBg}
+              />
             </CardContent>
           </Card>
         ))}

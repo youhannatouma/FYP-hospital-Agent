@@ -4,10 +4,15 @@ import React from "react";
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
+import { PatientDetailDialog } from "@/components/shared/dialogs/patient-detail-dialog";
+import { AddRecordDialog } from "../dialogs/add-record-dialog";
+import { PrescriptionDialog } from "../dialogs/prescription-dialog";
+import { BookAppointmentDialog } from "@/components/patient/appointments/book-appointment-dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -499,7 +504,8 @@ function TimelineEntry({
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground"
+                className="text-muted-foreground hover:text-primary"
+                onClick={() => onMarkReviewed(-1)} // Special trigger for full record
               >
                 <Eye className="mr-1.5 h-3.5 w-3.5" />
                 Full Record
@@ -515,6 +521,16 @@ function TimelineEntry({
 export function DoctorMedicalTimeline() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [items, setItems] = useState<TimelineItem[]>(initialTimelineItems);
+  const [patientDialogOpen, setPatientDialogOpen] = useState(false);
+  const [recordDialogOpen, setRecordDialogOpen] = useState(false);
+  const [prescriptionDialogOpen, setPrescriptionDialogOpen] = useState(false);
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
+
+  const activePatient = {
+    id: "pat-1", // Sarah Johnson for demo
+    name: "John Doe",
+    initials: "JD"
+  };
 
   const needsReviewCount = items.filter((i) => i.needsReview).length;
   const flaggedCount = items.filter((i) => i.flagged).length;
@@ -530,6 +546,10 @@ export function DoctorMedicalTimeline() {
   });
 
   function handleMarkReviewed(id: number) {
+    if (id === -1) {
+      setPatientDialogOpen(true);
+      return;
+    }
     setItems((prev) =>
       prev.map((item) =>
         item.id === id
@@ -584,19 +604,24 @@ export function DoctorMedicalTimeline() {
     );
   }
 
+  const { toast } = useToast();
+
   return (
     <Card className="border border-border bg-card shadow-sm">
       {/* Patient header */}
       <CardHeader className="space-y-4 pb-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10 border-2 border-primary/20">
-              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+          <div 
+            className="flex items-center gap-3 cursor-pointer group"
+            onClick={() => setPatientDialogOpen(true)}
+          >
+            <Avatar className="h-10 w-10 border-2 border-primary/20 group-hover:border-primary transition-colors">
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                 JD
               </AvatarFallback>
             </Avatar>
             <div>
-              <CardTitle className="text-lg font-semibold text-card-foreground">
+              <CardTitle className="text-lg font-semibold text-card-foreground group-hover:text-primary transition-colors">
                 John Doe
               </CardTitle>
               <p className="text-xs text-muted-foreground">
@@ -609,7 +634,11 @@ export function DoctorMedicalTimeline() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setAppointmentDialogOpen(true)}
+                  >
                     <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
                     Schedule
                   </Button>
@@ -620,7 +649,14 @@ export function DoctorMedicalTimeline() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => toast({
+                      title: "Laboratory Interface",
+                      description: "Opening diagnostic test ordering system...",
+                    })}
+                  >
                     <FlaskConical className="mr-1.5 h-3.5 w-3.5" />
                     Order Lab
                   </Button>
@@ -631,7 +667,11 @@ export function DoctorMedicalTimeline() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setPrescriptionDialogOpen(true)}
+                  >
                     <Pill className="mr-1.5 h-3.5 w-3.5" />
                     Prescribe
                   </Button>
@@ -642,7 +682,10 @@ export function DoctorMedicalTimeline() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm">
+                  <Button 
+                    size="sm"
+                    onClick={() => setRecordDialogOpen(true)}
+                  >
                     <Plus className="mr-1.5 h-3.5 w-3.5" />
                     New Entry
                   </Button>
@@ -736,11 +779,44 @@ export function DoctorMedicalTimeline() {
           <Button
             variant="ghost"
             className="text-primary hover:text-primary/80"
+            onClick={() => toast({
+              title: "Loading History",
+              description: "Fetching historical records from archive...",
+            })}
           >
             Load More History
           </Button>
         </div>
       </CardContent>
+      <PatientDetailDialog 
+        open={patientDialogOpen} 
+        onOpenChange={setPatientDialogOpen} 
+        patient={{
+          id: "P-002847",
+          name: "John Doe",
+          condition: "Hypertension",
+          joined: "Jan 2024",
+          status: "Active"
+        }} 
+      />
+      
+      <AddRecordDialog 
+        open={recordDialogOpen} 
+        onOpenChange={setRecordDialogOpen} 
+      />
+
+      <PrescriptionDialog 
+        open={prescriptionDialogOpen} 
+        onOpenChange={setPrescriptionDialogOpen}
+        patient={{ name: "John Doe", id: "P-002847" }}
+      />
+
+      <BookAppointmentDialog 
+        open={appointmentDialogOpen} 
+        onOpenChange={setAppointmentDialogOpen}
+        patientName="John Doe"
+        patientId="pat-1"
+      />
     </Card>
   );
 }

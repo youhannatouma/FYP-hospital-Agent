@@ -3,6 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Sparkles } from "lucide-react"
+import Link from "next/link"
 
 export function HealthTip() {
   return (
@@ -18,12 +19,14 @@ export function HealthTip() {
           <p className="text-sm text-muted-foreground leading-relaxed">
             Based on your health profile, try taking a 10-minute walk after meals. This can help improve blood sugar control and support your cardiovascular health goals. Studies show post-meal walking can reduce blood sugar spikes by up to 15%.
           </p>
-          <Button
-            size="sm"
-            className="mt-3 bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Get More Personalized Tips
-          </Button>
+          <Link href="/patient/ai-assistant">
+            <Button
+              size="sm"
+              className="mt-3 bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Get More Personalized Tips
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>

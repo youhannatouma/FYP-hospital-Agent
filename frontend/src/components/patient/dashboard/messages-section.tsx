@@ -6,8 +6,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Mail, Plus, Bot, Bell, CreditCard, CalendarDays } from "lucide-react"
+import Link from "next/link"
+import { NewMessageDialog } from "@/components/patient/dashboard/dialogs/new-message-dialog"
+import { PayInvoiceDialog } from "@/components/patient/dashboard/dialogs/pay-invoice-dialog"
+import { useToast } from "@/hooks/use-toast"
 
 export function MessagesSection() {
+  const { toast } = useToast()
   const [filter, setFilter] = useState<"unread" | "all">("unread")
   const [messages, setMessages] = useState([
     {
@@ -122,10 +127,7 @@ export function MessagesSection() {
               All
             </Button>
           </div>
-          <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1">
-            <Plus className="h-3 w-3" />
-            New Message
-          </Button>
+          <NewMessageDialog />
         </div>
       </CardHeader>
       <CardContent>
@@ -161,17 +163,45 @@ export function MessagesSection() {
                   <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                     {msg.message}
                   </p>
-                  <Button
-                    size="sm"
-                    variant={msg.action.variant}
-                    className={`mt-2 h-7 text-xs ${
-                      msg.action.variant === "default"
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {msg.action.label}
-                  </Button>
+                  {msg.action.label === "Pay Now" ? (
+                    <PayInvoiceDialog amount="$45.00">
+                      <Button
+                        size="sm"
+                        variant={msg.action.variant}
+                        className={`mt-2 h-7 text-xs ${
+                          msg.action.variant === "default"
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {msg.action.label}
+                      </Button>
+                    </PayInvoiceDialog>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant={msg.action.variant}
+                      className={`mt-2 h-7 text-xs ${
+                        msg.action.variant === "default"
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "text-muted-foreground"
+                      }`}
+                      onClick={() => {
+                        toast({
+                          title: msg.action.label === "Reply" ? "Reply Sent" :
+                                 msg.action.label === "Mark as Read" ? "Marked as Read" :
+                                 msg.action.label === "Confirm" ? "Appointment Confirmed" :
+                                 "Details",
+                          description: msg.action.label === "Reply" ? "Your reply has been sent to " + msg.sender + "." :
+                                       msg.action.label === "Mark as Read" ? "Message from " + msg.sender + " marked as read." :
+                                       msg.action.label === "Confirm" ? "Your appointment has been confirmed." :
+                                       "Viewing details for this notification.",
+                        })
+                      }}
+                    >
+                      {msg.action.label}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -193,13 +223,15 @@ export function MessagesSection() {
                 <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
                   Have questions about your medications, symptoms, or health goals? Our AI assistant is here to help!
                 </p>
-                <Button
-                  size="sm"
-                  className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
-                >
-                  <Bot className="mr-1 h-3 w-3" />
-                  Start AI Chat
-                </Button>
+                <Link href="/patient/ai-assistant">
+                  <Button
+                    size="sm"
+                    className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
+                  >
+                    <Bot className="mr-1 h-3 w-3" />
+                    Start AI Chat
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>

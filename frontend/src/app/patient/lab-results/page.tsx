@@ -1,5 +1,7 @@
 "use client"
 
+import { useState } from "react"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +17,7 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 const labResults = [
   {
@@ -68,6 +71,10 @@ function TrendIcon({ trend }: { trend: string }) {
 }
 
 export default function LabResultsPage() {
+  const { toast } = useToast()
+  const [downloading, setDownloading] = useState<number | null>(null)
+  const [exportingAll, setExportingAll] = useState(false)
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -77,9 +84,27 @@ export default function LabResultsPage() {
             View and track your laboratory test results
           </p>
         </div>
-        <Button variant="outline" className="gap-2 border-border text-foreground">
-          <Download className="h-4 w-4" />
-          Export All Results
+        <Button
+          variant="outline"
+          className="gap-2 border-border text-foreground"
+          disabled={exportingAll}
+          onClick={() => {
+            setExportingAll(true)
+            setTimeout(() => {
+              setExportingAll(false)
+              toast({
+                title: "Export Complete",
+                description: "All lab results exported as PDF.",
+              })
+            }, 1500)
+          }}
+        >
+          {exportingAll ? (
+            <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {exportingAll ? "Exporting..." : "Export All Results"}
         </Button>
       </div>
 
@@ -188,11 +213,44 @@ export default function LabResultsPage() {
               </div>
 
               <div className="mt-3 flex gap-2">
-                <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1">
-                  <Download className="h-3 w-3" />
-                  Download Report
+                <Button
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
+                  disabled={downloading === lab.id}
+                  onClick={() => {
+                    setDownloading(lab.id)
+                    setTimeout(() => {
+                      setDownloading(null)
+                      toast({
+                        title: "Download Complete",
+                        description: `${lab.testName} report saved to your device.`,
+                      })
+                    }, 1000)
+                  }}
+                >
+                  {downloading === lab.id ? (
+                    <>
+                      <span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-3 w-3" />
+                      Download Report
+                    </>
+                  )}
                 </Button>
-                <Button size="sm" variant="outline" className="gap-1 border-border text-foreground">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 border-border text-foreground"
+                  onClick={() => {
+                    toast({
+                      title: `Viewing ${lab.testName}`,
+                      description: `Full report from ${lab.collectedDate} by ${lab.orderedBy}`,
+                    })
+                  }}
+                >
                   <Eye className="h-3 w-3" />
                   View Full Report
                 </Button>

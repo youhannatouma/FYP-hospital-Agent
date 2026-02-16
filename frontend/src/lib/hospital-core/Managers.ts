@@ -11,10 +11,12 @@ export class BookingManager extends BaseHospitalComponent {
     try {
       const response = await apiClient.get(`/doctors`, { params: { specialty } });
       return response.data;
-    } catch (error) {
-      console.warn('[BookingManager] API failed, falling back to mock DB');
-      const users = db.getUsers();
-      return users.filter(u => u.role === 'Doctor' && (!specialty || u.status === 'Active'));
+    } catch {
+      const doctors = db.getDoctors();
+      if (specialty) {
+        return doctors.filter(d => d.specialty === specialty);
+      }
+      return doctors;
     }
   }
 
@@ -22,8 +24,13 @@ export class BookingManager extends BaseHospitalComponent {
     try {
       const response = await apiClient.get(`/doctors/${doctorId}/slots`, { params: { date } });
       return response.data;
-    } catch (error) {
-      return [{ time: "09:00 AM" }, { time: "10:30 AM" }, { time: "02:00 PM" }];
+    } catch {
+      return [
+        { time: "09:00 AM" }, { time: "09:30 AM" }, { time: "10:00 AM" },
+        { time: "10:30 AM" }, { time: "11:00 AM" }, { time: "11:30 AM" },
+        { time: "01:00 PM" }, { time: "01:30 PM" }, { time: "02:00 PM" },
+        { time: "02:30 PM" }, { time: "03:00 PM" }, { time: "03:30 PM" },
+      ];
     }
   }
 
@@ -31,18 +38,49 @@ export class BookingManager extends BaseHospitalComponent {
     try {
       const response = await apiClient.post(`/bookings`, formData);
       return { success: true, appointment: response.data };
-    } catch (error) {
+    } catch {
+      const doctor = db.getUserById(formData.doctorId);
       const result = db.addAppointment({
-        patientId: formData.patientId || "1",
+        patientId: formData.patientId || "pat-1",
         patientName: formData.patientName || "Sarah Johnson",
         doctorId: formData.doctorId,
-        doctorName: formData.doctorName,
+        doctorName: doctor?.name || formData.doctorName || "Doctor",
+        specialty: doctor?.specialty || formData.specialty,
         date: formData.date,
         time: formData.time,
-        status: 'Pending',
-        price: 150
+        status: 'Scheduled',
+        type: formData.type || 'Consultation',
+        price: formData.price || 150,
+        isVirtual: formData.isVirtual || false,
       });
       return { success: !!result, appointment: result };
+    }
+  }
+
+  async cancelAppointment(appointmentId: string) {
+    try {
+      const response = await apiClient.patch(`/appointments/${appointmentId}/cancel`);
+      return response.data;
+    } catch {
+      return db.updateAppointmentStatus(appointmentId, 'Cancelled');
+    }
+  }
+
+  async rescheduleAppointment(appointmentId: string, newDate: string, newTime: string) {
+    try {
+      const response = await apiClient.patch(`/appointments/${appointmentId}/reschedule`, { date: newDate, time: newTime });
+      return response.data;
+    } catch {
+      return db.rescheduleAppointment(appointmentId, newDate, newTime);
+    }
+  }
+
+  async completeAppointment(appointmentId: string) {
+    try {
+      const response = await apiClient.patch(`/appointments/${appointmentId}/complete`);
+      return response.data;
+    } catch {
+      return db.updateAppointmentStatus(appointmentId, 'Completed');
     }
   }
 }
@@ -56,7 +94,7 @@ export class AdminManager extends BaseHospitalComponent {
     try {
       const response = await apiClient.get('/admin/stats');
       return response.data;
-    } catch (error) {
+    } catch {
       return db.getStats();
     }
   }
@@ -65,7 +103,7 @@ export class AdminManager extends BaseHospitalComponent {
     try {
       const response = await apiClient.patch(`/${entity}/${id}/status`, { status });
       return response.data;
-    } catch (error) {
+    } catch {
       if (entity === 'users' || entity === 'user') {
         return db.updateUserStatus(id, status as any);
       }
@@ -77,7 +115,7 @@ export class AdminManager extends BaseHospitalComponent {
     try {
       const response = await apiClient.get('/users');
       return response.data;
-    } catch (error) {
+    } catch {
       return db.getUsers();
     }
   }
@@ -86,7 +124,7 @@ export class AdminManager extends BaseHospitalComponent {
     try {
       await apiClient.delete(`/users/${id}`);
       return true;
-    } catch (error) {
+    } catch {
       return db.deleteUser(id);
     }
   }
@@ -95,17 +133,40 @@ export class AdminManager extends BaseHospitalComponent {
     try {
       const response = await apiClient.post('/doctors', doctorData);
       return response.data;
-    } catch (error) {
+    } catch {
       return db.addUser({
-        id: Math.random().toString(36).substr(2, 9),
+        id: `doc-${Math.random().toString(36).substr(2, 9)}`,
         name: doctorData.name,
         email: doctorData.email,
         role: 'Doctor',
         status: 'Active',
         verified: true,
         password: doctorData.password,
-        customId: doctorData.customId
+        customId: doctorData.customId,
+        specialty: doctorData.specialty,
+        phone: doctorData.phone,
+        licenseNumber: doctorData.licenseNumber,
+        yearsOfExperience: doctorData.yearsOfExperience,
+        bio: doctorData.bio,
       });
+    }
+  }
+
+  async verifyDoctor(id: string) {
+    try {
+      const response = await apiClient.patch(`/doctors/${id}/verify`);
+      return response.data;
+    } catch {
+      return db.verifyDoctor(id);
+    }
+  }
+
+  async getAuditLogs() {
+    try {
+      const response = await apiClient.get('/admin/audit-logs');
+      return response.data;
+    } catch {
+      return db.getAuditLogs();
     }
   }
 }
@@ -115,14 +176,13 @@ export class PaymentProvider extends BaseHospitalComponent {
     super('patient');
   }
 
-  async processPayment(amount: number, appointmentId: string) {
+  async processPayment(amount: number, invoiceId: string) {
     try {
-      const response = await apiClient.post('/payments', { amount, appointmentId });
+      const response = await apiClient.post('/payments', { amount, invoiceId });
       return response.data.success;
-    } catch (error) {
-      console.log(`[Payment] Processing $${amount} for appointment ${appointmentId}`);
-      const result = await this.handleAction('pay', { amount, appointmentId });
-      return result && !result.error;
+    } catch {
+      const result = db.payInvoice(invoiceId);
+      return !!result;
     }
   }
 }

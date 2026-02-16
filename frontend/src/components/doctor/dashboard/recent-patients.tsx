@@ -4,107 +4,94 @@
 import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PatientDetailDialog } from "@/components/shared/dialogs/patient-detail-dialog";
+import { useDataStore } from "@/hooks/use-data-store"
 
 export function RecentPatients() {
-  const [patients, setPatients] = React.useState([
-    {
-      id: 1,
-      name: "Anna Martinez",
-      avatar:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&h=80&fit=crop&crop=face",
-      initials: "AM",
-      condition: "Hypertension",
-      lastVisit: "Today",
-    },
-    {
-      id: 2,
-      name: "David Lee",
-      avatar:
-        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=80&h=80&fit=crop&crop=face",
-      initials: "DL",
-      condition: "Arrhythmia",
-      lastVisit: "Yesterday",
-    },
-    {
-      id: 3,
-      name: "Lisa Wang",
-      avatar:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop&crop=face",
-      initials: "LW",
-      condition: "Post-surgery",
-      lastVisit: "2 days ago",
-    },
-    {
-      id: 4,
-      name: "Thomas Clark",
-      avatar:
-        "https://images.unsplash.com/photo-1463453091185-61582044d556?w=80&h=80&fit=crop&crop=face",
-      initials: "TC",
-      condition: "Chest Pain",
-      lastVisit: "3 days ago",
-    },
-    {
-      id: 5,
-      name: "Maria Garcia",
-      avatar:
-        "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=80&h=80&fit=crop&crop=face",
-      initials: "MG",
-      condition: "Heart Murmur",
-      lastVisit: "4 days ago",
-    },
-  ]);
+  const { appointments, users } = useDataStore()
+  const [selectedPatient, setSelectedPatient] = React.useState<any>(null);
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
-  // API Endpoints Suggestion:
-  // GET: /doctor/patients/recent -> Fetch recently visited patients for the doctor
-  /*
-    React.useEffect(() => {
-      const fetchRecentPatients = async () => {
-        try {
-          // const response = await apiClient.get('/doctor/patients/recent');
-          // setPatients(response.data);
-        } catch (error) {
-          console.error('Failed to fetch recent patients', error);
-        }
-      };
-      fetchRecentPatients();
-    }, []);
-  */
+  const handlePatientClick = (patient: any) => {
+    setSelectedPatient(patient);
+    setIsDialogOpen(true);
+  };
+
+  // Derive recent patients from appointments
+  const allAppointments = appointments
+  const uniquePatientIds = Array.from(new Set(allAppointments.map(app => app.patientId)))
+  
+  const patients = users
+    .filter(user => uniquePatientIds.includes(user.id))
+    .slice(0, 5)
+    .map(p => {
+      // Find the last appointment or condition for this patient
+      const patientApps = allAppointments.filter(app => app.patientId === p.id)
+      const lastApp = patientApps[0] // Since it's sorted or just pick one
+      return {
+        ...p,
+        initials: p.name.split(" ").map(n => n[0]).join("").toUpperCase(),
+        condition: lastApp?.type || "General Checkup",
+        lastVisit: lastApp?.date || "Recent"
+      }
+    })
+
   return (
-    <Card className="border-none shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg font-semibold">Recent Patients</CardTitle>
+    <>
+    <Card className="border-sidebar-border bg-card/50 shadow-sm">
+      <CardHeader className="pb-3 border-b border-sidebar-border/50">
+        <CardTitle className="text-xl font-bold">Recent Encounters</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-col gap-4">
-          {patients.map((patient) => (
-            <div
-              key={patient.id}
-              className="flex items-center gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted/50 cursor-pointer"
-            >
-              <Avatar className="size-9">
-                <AvatarImage
-                  src={patient.avatar || "/placeholder.svg"}
-                  alt={patient.name}
-                />
-                <AvatarFallback className="bg-muted text-xs">
-                  {patient.initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-                <span className="text-sm font-medium truncate">
-                  {patient.name}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {patient.condition}
-                </span>
+      <CardContent className="pt-4">
+        {patients.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground text-sm">
+             No recent patient encounters found in registry.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {patients.map((patient) => (
+              <div
+                key={patient.id}
+                className="flex items-center gap-4 rounded-xl p-3 transition-all hover:bg-muted/50 cursor-pointer group"
+                onClick={() => handlePatientClick(patient)}
+              >
+                <Avatar className="h-10 w-10 border border-sidebar-border">
+                  <AvatarImage
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${patient.name}`}
+                    alt={patient.name}
+                  />
+                  <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
+                    {patient.initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-1 flex-col gap-0.5 min-w-0">
+                  <span className="font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                    {patient.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground flex items-center gap-2">
+                    {patient.condition}
+                    <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                    <span className="italic">{patient.email}</span>
+                  </span>
+                </div>
+                <div className="text-right">
+                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Last Visit</p>
+                   <span className="text-xs font-semibold text-foreground whitespace-nowrap">
+                    {patient.lastVisit}
+                  </span>
+                </div>
               </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {patient.lastVisit}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
+
+    <PatientDetailDialog 
+      open={isDialogOpen}
+      onOpenChange={setIsDialogOpen}
+      patient={selectedPatient}
+    />
+    </>
   );
 }

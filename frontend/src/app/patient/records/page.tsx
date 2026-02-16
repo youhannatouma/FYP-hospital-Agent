@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useDataStore } from "@/hooks/use-data-store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -16,121 +17,24 @@ import {
   Bot,
   Stethoscope,
   Filter,
+  CalendarPlus,
 } from "lucide-react"
-
-const specialties = [
-  "All Specialties",
-  "Cardiology",
-  "Dermatology",
-  "Endocrinology",
-  "General Practice",
-  "Neurology",
-  "Orthopedics",
-  "Pediatrics",
-  "Psychiatry",
-]
-
-const doctors = [
-  {
-    id: 1,
-    name: "Dr. Michael Chen",
-    specialty: "Cardiology",
-    rating: 4.9,
-    reviews: 324,
-    location: "Downtown Medical Center",
-    distance: "2.3 mi",
-    nextSlot: "Today, 3:00 PM",
-    fee: "$150",
-    avatar: "MC",
-    availableToday: true,
-    videoConsult: true,
-    experience: "15 years",
-  },
-  {
-    id: 2,
-    name: "Dr. Emily Watson",
-    specialty: "General Practice",
-    rating: 4.8,
-    reviews: 512,
-    location: "Westside Clinic",
-    distance: "1.5 mi",
-    nextSlot: "Tomorrow, 10:00 AM",
-    fee: "$100",
-    avatar: "EW",
-    availableToday: false,
-    videoConsult: true,
-    experience: "12 years",
-  },
-  {
-    id: 3,
-    name: "Dr. Raj Patel",
-    specialty: "Endocrinology",
-    rating: 4.7,
-    reviews: 198,
-    location: "Central Hospital",
-    distance: "4.1 mi",
-    nextSlot: "Jan 18, 9:00 AM",
-    fee: "$175",
-    avatar: "RP",
-    availableToday: false,
-    videoConsult: false,
-    experience: "20 years",
-  },
-  {
-    id: 4,
-    name: "Dr. Sarah Kim",
-    specialty: "Dermatology",
-    rating: 4.9,
-    reviews: 287,
-    location: "Skin Health Clinic",
-    distance: "3.0 mi",
-    nextSlot: "Today, 4:30 PM",
-    fee: "$200",
-    avatar: "SK",
-    availableToday: true,
-    videoConsult: true,
-    experience: "10 years",
-  },
-  {
-    id: 5,
-    name: "Dr. James Rodriguez",
-    specialty: "Orthopedics",
-    rating: 4.6,
-    reviews: 145,
-    location: "Sports Medicine Center",
-    distance: "5.2 mi",
-    nextSlot: "Jan 20, 11:00 AM",
-    fee: "$180",
-    avatar: "JR",
-    availableToday: false,
-    videoConsult: false,
-    experience: "18 years",
-  },
-  {
-    id: 6,
-    name: "Dr. Linda Nguyen",
-    specialty: "Neurology",
-    rating: 4.8,
-    reviews: 203,
-    location: "Brain & Spine Institute",
-    distance: "6.8 mi",
-    nextSlot: "Jan 19, 2:00 PM",
-    fee: "$225",
-    avatar: "LN",
-    availableToday: false,
-    videoConsult: true,
-    experience: "22 years",
-  },
-]
+import { useToast } from "@/hooks/use-toast"
+import { BookAppointmentDialog } from "@/components/patient/appointments/book-appointment-dialog"
 
 export default function FindDoctorPage() {
+  const { toast } = useToast()
+  const { getDoctors } = useDataStore()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSpecialty, setSelectedSpecialty] = useState("All Specialties")
+
+  const doctors = getDoctors()
+  const specialties = ["All Specialties", ...new Set(doctors.map(d => d.specialty).filter(Boolean))]
 
   const filteredDoctors = doctors.filter((doc) => {
     const matchesSearch =
       doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.specialty.toLowerCase().includes(searchQuery.toLowerCase())
+      (doc.specialty && doc.specialty.toLowerCase().includes(searchQuery.toLowerCase()))
     const matchesSpecialty =
       selectedSpecialty === "All Specialties" || doc.specialty === selectedSpecialty
     return matchesSearch && matchesSpecialty
@@ -139,32 +43,40 @@ export default function FindDoctorPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Find a Doctor</h1>
+        <h1 className="text-2xl font-bold text-foreground">Find a Specialist</h1>
         <p className="text-sm text-muted-foreground">
-          Search for specialists and book appointments
+          Search for verified physicians and book clinical consultations
         </p>
       </div>
 
       {/* AI Symptom Checker */}
-      <Card className="border-primary/20 bg-primary/5">
+      <Card className="border-primary/20 bg-primary/5 shadow-inner">
         <CardContent className="flex items-center gap-4 p-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary shadow-sm">
             <Bot className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="flex-1">
             <h3 className="font-semibold text-card-foreground">
-              AI Symptom Checker
+              Clinical Alriage
             </h3>
             <p className="text-sm text-muted-foreground">
-              Describe your symptoms and our AI will recommend the right specialist
+              Describe symptoms for an automated specialist recommendation
             </p>
           </div>
           <Input
-            placeholder="e.g., I have chest pain and shortness of breath..."
-            className="max-w-md bg-background"
+            placeholder="e.g., persistent joint pain in knees..."
+            className="max-w-md bg-background border-primary/20"
           />
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-            Check Symptoms
+          <Button
+            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+            onClick={() => {
+              toast({
+                title: "AI Analysis Initiated",
+                description: "Reviewing symptoms against clinical database...",
+              })
+            }}
+          >
+            Check Now
           </Button>
         </CardContent>
       </Card>
@@ -190,7 +102,7 @@ export default function FindDoctorPage() {
           </SelectTrigger>
           <SelectContent>
             {specialties.map((s) => (
-              <SelectItem key={s} value={s}>
+              <SelectItem key={s} value={s!}>
                 {s}
               </SelectItem>
             ))}
@@ -206,17 +118,6 @@ export default function FindDoctorPage() {
             <SelectItem value="week">This Week</SelectItem>
           </SelectContent>
         </Select>
-        <Select defaultValue="rating">
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Sort By" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="rating">Top Rated</SelectItem>
-            <SelectItem value="distance">Nearest</SelectItem>
-            <SelectItem value="price-low">Price: Low</SelectItem>
-            <SelectItem value="price-high">Price: High</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Doctor Cards Grid */}
@@ -224,34 +125,32 @@ export default function FindDoctorPage() {
         {filteredDoctors.map((doctor) => (
           <Card
             key={doctor.id}
-            className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow"
+            className="border border-border bg-card shadow-sm hover:shadow-lg transition-all duration-200 group"
           >
-            <CardContent className="p-5">
+            <CardContent className="p-5 flex flex-col h-full">
               <div className="flex items-start gap-4">
-                <Avatar className="h-14 w-14 ring-2 ring-primary/10">
-                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                    {doctor.avatar}
+                <Avatar className="h-14 w-14 ring-2 ring-primary/5 group-hover:ring-primary/20 transition-all">
+                  <AvatarImage src={doctor.avatar} />
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                    {doctor.name.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-semibold text-card-foreground">
+                      <h3 className="font-bold text-card-foreground group-hover:text-primary transition-colors">
                         {doctor.name}
                       </h3>
-                      <p className="text-sm text-primary">{doctor.specialty}</p>
+                      <p className="text-sm text-primary font-medium">{doctor.specialty || 'General Practitioner'}</p>
                     </div>
-                    <span className="text-lg font-bold text-card-foreground">
-                      {doctor.fee}
-                    </span>
                   </div>
                   <div className="mt-1 flex items-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                    <span className="text-sm font-medium text-card-foreground">
-                      {doctor.rating}
+                    <span className="text-sm font-bold text-card-foreground">
+                      {doctor.rating || '4.8'}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      ({doctor.reviews} reviews)
+                      ({doctor.reviewCount || '120'}+ reviews)
                     </span>
                   </div>
                 </div>
@@ -259,50 +158,58 @@ export default function FindDoctorPage() {
 
               <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5" />
-                  <span>
-                    {doctor.location} - {doctor.distance}
+                  <MapPin className="h-3.5 w-3.5 text-primary" />
+                  <span className="truncate">
+                    {doctor.clinicAddress || 'Medical Plaza, Ste 402'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>Next: {doctor.nextSlot}</span>
+                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  <span>Next: Today, 2:30 PM</span>
                 </div>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge variant="secondary" className="text-xs">
-                  {doctor.experience}
+                <Badge variant="secondary" className="text-[10px] font-semibold bg-primary/5 text-primary border-0">
+                  {doctor.yearsOfExperience || '10'}+ Yrs Exp
                 </Badge>
-                {doctor.availableToday && (
-                  <Badge className="bg-emerald-500/10 text-emerald-600 text-xs border-0">
-                    Available Today
+                {doctor.status === 'Active' && (
+                  <Badge className="bg-emerald-500/10 text-emerald-600 text-[10px] border-0 font-semibold px-2">
+                    Online Now
                   </Badge>
                 )}
-                {doctor.videoConsult && (
-                  <Badge className="bg-blue-500/10 text-blue-600 text-xs border-0">
-                    <Video className="mr-1 h-3 w-3" />
-                    Video
-                  </Badge>
-                )}
+                <Badge className="bg-blue-500/10 text-blue-600 text-[10px] border-0 font-semibold px-2">
+                  <Video className="mr-1 h-3 w-3" />
+                  Virtual Consultation
+                </Badge>
               </div>
 
-              <Button className="mt-4 w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                Book Now
-              </Button>
+              <div className="mt-auto pt-6">
+                <BookAppointmentDialog 
+                  initialDoctorId={doctor.id}
+                  trigger={
+                    <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2 shadow-sm font-semibold">
+                      <CalendarPlus className="h-4 w-4" />
+                      Book Consultation
+                    </Button>
+                  }
+                />
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {filteredDoctors.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Stethoscope className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-semibold text-foreground">
-            No doctors found
+        <div className="flex flex-col items-center justify-center py-20 text-center bg-muted/20 rounded-2xl border border-dashed border-border">
+          <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mb-4">
+            <Stethoscope className="h-8 w-8 text-muted-foreground/30" />
+          </div>
+          <h3 className="text-lg font-bold text-foreground">
+            No Specialists Found
           </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Try adjusting your search criteria or filters
+          <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
+            Try adjusting your search terms or selecting a different clinical specialty.
           </p>
         </div>
       )}

@@ -214,10 +214,12 @@ export function DoctorsSection() {
           ))}
         </div>
         <div className="mt-10 text-center">
-          <Button variant="ghost" className="gap-2 text-primary hover:text-primary/80">
-            Sign up to see all doctors
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+          <Link href="/sign-up">
+            <Button variant="ghost" className="gap-2 text-primary hover:text-primary/80">
+              Sign up to see all doctors
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </div>
       </div>
     </section>

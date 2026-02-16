@@ -21,8 +21,13 @@ import {
   XCircle,
   Package,
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { RefillRequestDialog } from "@/components/patient/medicines/refill-dialog"
+import { OrderMedicineDialog } from "@/components/patient/medicines/order-dialog"
+import { UploadPrescriptionDialog } from "@/components/patient/medicines/upload-dialog"
 
 export default function MedicinesPage() {
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [activePrescriptions, setActivePrescriptions] = useState([
     {
@@ -212,16 +217,13 @@ export default function MedicinesPage() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <Button className="bg-amber-500 text-white hover:bg-amber-600 gap-1.5 w-full sm:w-auto">
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Request Refill
-                    </Button>
-                    {rx.refillsLeft <= 2 && (
-                      <div className="flex items-center gap-1 text-xs text-amber-600">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>Low refills remaining</span>
-                      </div>
-                    )}
+                    <RefillRequestDialog 
+                      medicationName={rx.name} 
+                      prescriptionId={rx.id.toString()} 
+                    />
+                    <div className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground">
+                      {rx.refillsLeft} refills left
+                    </div>
                   </div>
                 </div>
 
@@ -289,9 +291,7 @@ export default function MedicinesPage() {
                   Upload a photo of your prescription to find pharmacies
                 </p>
               </div>
-              <Button variant="outline" className="border-primary text-primary hover:bg-primary/10">
-                Choose File
-              </Button>
+              <UploadPrescriptionDialog />
             </CardContent>
           </Card>
 
@@ -355,14 +355,20 @@ export default function MedicinesPage() {
                     </div>
 
                     <div className="mt-4 flex gap-2">
-                      <Button
-                        className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
-                        disabled={!pharmacy.inStock}
+                      <OrderMedicineDialog 
+                        pharmacyName={pharmacy.name} 
+                        price={pharmacy.price} 
+                      />
+                      <Button 
+                        variant="outline"  
+                        className="flex-1 border-border text-foreground"
+                        onClick={() => {
+                          toast({
+                            title: "Reserved",
+                            description: "Medication reserved at " + pharmacy.name + " for 24 hours.",
+                          })
+                        }}
                       >
-                        <ShoppingCart className="h-3.5 w-3.5" />
-                        Order
-                      </Button>
-                      <Button variant="outline" className="flex-1 border-border text-foreground">
                         Reserve
                       </Button>
                     </div>

@@ -1,32 +1,56 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import {  Phone } from "lucide-react"
+import { Phone } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { StatCards } from "@/components/doctor/dashboard/stat-cards"
 import { DoctorMedicalTimeline } from "@/components/doctor/dashboard/doctor-history-timeline"
-import { AIHealthAvatar } from "@/components/patient/dashboard/ai-health-avatar"
+import { DoctorAIAvatar } from "@/components/doctor/dashboard/ai-avatar"
 import { UpcomingVisits } from "@/components/doctor/dashboard/upcoming-visits"
-import { MessagesSection } from "@/components/patient/dashboard/messages-section"
+import { DoctorMessagesSection } from "@/components/doctor/dashboard/messages-section"
 import { RecentPatients } from "@/components/doctor/dashboard/recent-patients"
-import {AppointmentsTable} from "@/components/doctor/dashboard/appointement-table"
-import {VitalsTracking} from "@/components/doctor/dashboard/vitals-tracking"
+import { AppointmentsTable } from "@/components/doctor/dashboard/appointement-table"
+import { VitalsTracking } from "@/components/doctor/dashboard/vitals-tracking"
+import { useUser } from "@clerk/nextjs"
+import { useDataStore } from "@/hooks/use-data-store"
+import { format } from "date-fns"
 
+export default function DoctorDashboardPage() {
+  const { isHydrating } = useDataStore()
+  const { toast } = useToast()
+  const { user } = useUser()
 
-export default function PatientDashboardPage() {
+  if (isHydrating) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8 animate-in fade-in duration-700">
       {/* Welcome Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground lg:text-3xl">
-            Welcome dr, Sarah
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Welcome, Dr. {user?.lastName || "Provider"}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {"Here's your health overview for January 15, 2024"}
+          <p className="text-muted-foreground mt-1">
+            {"Current clinical overview for " + format(new Date(), "MMMM dd, yyyy")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => {
+              toast({
+                title: "Internal Request",
+                description: "Opening secure channel to administration...",
+              })
+            }}
+          >
             <Phone className="h-4 w-4" />
             Contact Admin
           </Button>
@@ -36,35 +60,27 @@ export default function PatientDashboardPage() {
       {/* Stat Cards */}
       <StatCards />
 
-      {/* Medical History Timeline + AI Avatar + Upcoming Visits */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        {/* Left Column - Core Clinical View */}
+        <div className="lg:col-span-2 space-y-8">
           <DoctorMedicalTimeline />
+          <RecentPatients />
+          <AppointmentsTable />
         </div>
-        <div className="flex flex-col gap-6">
-          <AIHealthAvatar />
+
+        {/* Right Column - AI & Quick Actions */}
+        <div className="flex flex-col gap-8">
+          <DoctorAIAvatar />
           <UpcomingVisits />
+          <VitalsTracking />
         </div>
       </div>
 
-      <div className="mt-6">
-        <RecentPatients />
-
+      {/* Bottom Section - Full Width/Communication */}
+      <div className="border-t border-sidebar-border pt-8">
+        <DoctorMessagesSection />
       </div>
-        <div className="mt-6">
-        <VitalsTracking />
-      </div>
-      <div  className="mt-6">
-
-        <AppointmentsTable />
-      </div>
-      {/* Current Medications + Recent Lab Results */}
-      
-
-      {/* Messages & Communication */}
-      <MessagesSection />
-
-      {/* Health Education */}
     </div>
-  );
+  )
 }
