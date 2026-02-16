@@ -1,43 +1,41 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import Image from "next/image"
 import { X } from "lucide-react"
+import ThreeAvatar from "./ThreeAvatar"
 
 export function FloatingAvatar() {
   const [expanded, setExpanded] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [initialized, setInitialized] = useState(false)
+
   const dragRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasDragged = useRef(false)
 
-  // Initialize position to bottom-right on mount
-  useEffect(() => {
+  // Initialize bottom-right position
+useEffect(() => {
+  requestAnimationFrame(() => {
     setPosition({
       x: window.innerWidth - 80,
       y: window.innerHeight - 80,
     })
     setInitialized(true)
-  }, [])
+  })
+}, [])
 
-  const startDrag = useCallback(
-    (clientX: number, clientY: number) => {
-      if (!dragRef.current) return
-      hasDragged.current = false
-      const rect = dragRef.current.getBoundingClientRect()
-      offsetRef.current = {
-        x: clientX - rect.left,
-        y: clientY - rect.top,
-      }
-      longPressTimer.current = setTimeout(() => {
-        setIsDragging(true)
-      }, 300)
-    },
-    [],
-  )
+
+  const startDrag = useCallback((clientX: number, clientY: number) => {
+    if (!dragRef.current) return
+    hasDragged.current = false
+    const rect = dragRef.current.getBoundingClientRect()
+    offsetRef.current = { x: clientX - rect.left, y: clientY - rect.top }
+    longPressTimer.current = setTimeout(() => {
+      setIsDragging(true)
+    }, 300)
+  }, [])
 
   const onDrag = useCallback(
     (clientX: number, clientY: number) => {
@@ -46,15 +44,15 @@ export function FloatingAvatar() {
       const avatarSize = expanded ? 128 : 64
       const newX = Math.min(
         Math.max(0, clientX - offsetRef.current.x),
-        window.innerWidth - avatarSize,
+        window.innerWidth - avatarSize
       )
       const newY = Math.min(
         Math.max(0, clientY - offsetRef.current.y),
-        window.innerHeight - avatarSize,
+        window.innerHeight - avatarSize
       )
       setPosition({ x: newX, y: newY })
     },
-    [isDragging, expanded],
+    [isDragging, expanded]
   )
 
   const stopDrag = useCallback(() => {
@@ -69,7 +67,6 @@ export function FloatingAvatar() {
     if (!hasDragged.current) {
       setExpanded((prev) => {
         const next = !prev
-        // Adjust position to keep avatar in viewport when expanding
         if (next) {
           setPosition((pos) => ({
             x: Math.min(pos.x, window.innerWidth - 128),
@@ -85,7 +82,6 @@ export function FloatingAvatar() {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => onDrag(e.clientX, e.clientY)
     const handleMouseUp = () => stopDrag()
-
     if (isDragging) {
       window.addEventListener("mousemove", handleMouseMove)
       window.addEventListener("mouseup", handleMouseUp)
@@ -105,7 +101,6 @@ export function FloatingAvatar() {
       onDrag(touch.clientX, touch.clientY)
     }
     const handleTouchEnd = () => stopDrag()
-
     if (isDragging) {
       window.addEventListener("touchmove", handleTouchMove, { passive: false })
       window.addEventListener("touchend", handleTouchEnd)
@@ -118,7 +113,7 @@ export function FloatingAvatar() {
 
   if (!initialized) return null
 
-  const size = expanded ? 128 : 64
+  const size = expanded ? 300 : 120
 
   return (
     <div
@@ -129,7 +124,9 @@ export function FloatingAvatar() {
         top: position.y,
         width: size,
         height: size,
-        transition: isDragging ? "none" : "width 0.3s ease, height 0.3s ease, left 0.3s ease, top 0.3s ease",
+        transition: isDragging
+          ? "none"
+          : "width 0.3s ease, height 0.3s ease, left 0.3s ease, top 0.3s ease",
         cursor: isDragging ? "grabbing" : "pointer",
       }}
       onMouseDown={(e) => {
@@ -156,29 +153,10 @@ export function FloatingAvatar() {
         }
       }}
     >
-      {/* Glow ring */}
-      <div
-        className={`absolute inset-0 rounded-full bg-primary/20 ${isDragging ? "" : "animate-pulse-slow"}`}
-        style={{
-          transform: "scale(1.15)",
-          borderRadius: "50%",
-        }}
-      />
 
       {/* Avatar container */}
       <div className="relative h-full w-full overflow-hidden rounded-full border-2 border-primary/60 bg-card shadow-xl">
-        <Image
-          src="/images/ai-doctor-avatar.jpg"
-          alt="AI Healthcare Assistant"
-          width={size}
-          height={size}
-          className="h-full w-full object-cover"
-          draggable={false}
-          priority
-        />
-
-        {/* Online indicator */}
-        <div className="absolute right-0 bottom-0 h-4 w-4 rounded-full border-2 border-card bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+        <ThreeAvatar size={size}/>
       </div>
 
       {/* Close hint when expanded */}
