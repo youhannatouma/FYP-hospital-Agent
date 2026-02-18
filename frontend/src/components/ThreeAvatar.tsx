@@ -1,91 +1,126 @@
 "use client"
 
-import { Canvas, useFrame } from "@react-three/fiber"
+import { Canvas, useFrame, useGraph } from "@react-three/fiber"
 import { useGLTF } from "@react-three/drei"
-import { useRef, useMemo, useEffect } from "react"
+import { useRef, useEffect, useMemo } from "react"
 import * as THREE from "three"
+import { SkeletonUtils } from "three-stdlib"
 
 interface Props {
   size: number
-  speaking?: number
+  textToSpeak?: string
 }
 
-function Head({ speaking = 0 }: { speaking?: number }) {
-  const group = useRef<THREE.Group>(null)
-  const { scene } = useGLTF("/models/charlize_theron_head.glb")
-  const clonedScene = useMemo(() => scene.clone(), [scene])
-
-  // Store mouse position relative to canvas
+export function Head({ textToSpeak = "" }: { textToSpeak?: string }) {
+  const { scene } = useGLTF("/models/avatar.glb")
+  const clone = useMemo(() => SkeletonUtils.clone(scene), [scene])
+  const { nodes } = useGraph(clone)
+  
+  const groupRef = useRef<THREE.Group>(null!)
+  const headMeshRef = useRef<THREE.SkinnedMesh | null>(null)
+  const teethMeshRef = useRef<THREE.SkinnedMesh | null>(null)
+  const jawIndex = useRef<number | null>(null)
+  const speakingIntensity = useRef(0)
+  
+  // Re-defining the missing 'mouse' ref
   const mouse = useRef({ x: 0, y: 0 })
 
-  // Track mouse movements
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      const canvas = document.querySelector("canvas")
-      if (!canvas) return
-
-      const rect = canvas.getBoundingClientRect()
-      // normalize between -1 and 1 relative to canvas center
-      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+      mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1
+      mouse.current.y = -(e.clientY / window.innerHeight) * 2 + 1
     }
-
     window.addEventListener("mousemove", handleMouseMove)
     return () => window.removeEventListener("mousemove", handleMouseMove)
   }, [])
 
-  useFrame(() => {
-    if (!group.current) return
+  useEffect(() => {
+    // Hide body parts
+    const partsToKeep = ["Wolf3D_Head", "Wolf3D_Teeth", "EyeLeft", "EyeRight"]
+    Object.keys(nodes).forEach((key) => {
+      const node = nodes[key]
+      if ((node as THREE.SkinnedMesh).isSkinnedMesh) {
+        node.visible = partsToKeep.includes(key)
+      }
+    })
 
-    const baseTilt = -0.2 // radians, starts slightly looking upward
-
-    // Sensitivity multipliers
-    const horizontalSensitivity = 0.15 // smaller = less movement
-    const verticalSensitivity = 0.025
-
-    // Target rotations
-    let targetY = mouse.current.x * horizontalSensitivity
-    let targetX = -mouse.current.y * verticalSensitivity + baseTilt
-
-    // Clamp rotations to prevent over-rotation
-    targetY = THREE.MathUtils.clamp(targetY, -0.3, 0.3) // ~17° left/right
-    targetX = THREE.MathUtils.clamp(targetX, -0.15 + baseTilt, 0.15 + baseTilt) // very minimal vertical
-
-    // Smooth interpolation
-    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.05)
-    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, targetX, 0.05)
-
-    // Mouth animation
-    const mouth = group.current.getObjectByName("Mouth") as THREE.Mesh | null
-    if (mouth) {
-      mouth.scale.y = 1 + speaking * 0.35
+    // Assign refs for the frame loop to use directly
+    const head = nodes["Wolf3D_Head"] as THREE.SkinnedMesh
+    const teeth = nodes["Wolf3D_Teeth"] as THREE.SkinnedMesh
+    
+    if (head) {
+      headMeshRef.current = head
+      if (head.morphTargetDictionary && head.morphTargetDictionary["jawOpen"] !== undefined) {
+        jawIndex.current = head.morphTargetDictionary["jawOpen"]
+      }
     }
+    if (teeth) teethMeshRef.current = teeth
+  }, [nodes])
+
+  // Speech Logic
+  useEffect(() => {
+    if (!textToSpeak) return
+    const utterance = new SpeechSynthesisUtterance(textToSpeak)
+    let interval: NodeJS.Timeout
+
+    utterance.onstart = () => {
+      interval = setInterval(() => {
+        speakingIntensity.current = Math.random() * 0.7
+      }, 100)
+    }
+    utterance.onend = () => {
+      clearInterval(interval)
+      speakingIntensity.current = 0
+    }
+
+    window.speechSynthesis.speak(utterance)
+    return () => {
+      window.speechSynthesis.cancel()
+      clearInterval(interval)
+    }
+  }, [textToSpeak])
+
+  useFrame((state) => {
+    if (!groupRef.current) return
+
+    // 1. Movement
+    const targetY = THREE.MathUtils.clamp(mouse.current.x * 0.5, -0.6, 0.6)
+    const targetX = THREE.MathUtils.clamp(-mouse.current.y * 0.3, -0.4, 0.4)
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetY, 0.1)
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetX, 0.1)
+
+    // 2. Jaw Morph (Applying to the Ref, which usually bypasses the "nodes" immutability check)
+    if (headMeshRef.current && jawIndex.current !== null) {
+      const influence = headMeshRef.current.morphTargetInfluences!
+      const target = jawIndex.current
+      
+      influence[target] = THREE.MathUtils.lerp(influence[target], speakingIntensity.current, 0.2)
+
+      // Sync teeth
+      if (teethMeshRef.current?.morphTargetInfluences) {
+        teethMeshRef.current.morphTargetInfluences[target] = influence[target]
+      }
+    }
+    
+    // 3. Gentle Float Animation (Optional)
+    groupRef.current.position.y = -1.5 + Math.sin(state.clock.elapsedTime) * 0.02
   })
 
   return (
-    <primitive
-      ref={group}
-      object={clonedScene}
-      scale={0.1}
-      position={[0, -1.5, 0]}
-      rotation={[0, 0, 0]}
-    />
+    <group ref={groupRef} position={[0, -1.5, 0]}>
+      <primitive object={clone} />
+    </group>
   )
 }
 
-export default function ThreeAvatar({ size, speaking = 0 }: Props) {
+export default function ThreeAvatar({ size, textToSpeak = "" }: Props) {
   return (
-    <Canvas
-      style={{ width: size, height: size }}
-      camera={{ position: [0, 1.4, 3], fov: 45 }}
-      gl={{ antialias: true }}
-    >
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[2, 5, 2]} intensity={2} />
-      <Head speaking={speaking} />
-    </Canvas>
+    <div style={{ width: size, height: size }}>
+      <Canvas camera={{ position: [0, 0.2, 0.8], fov: 35 }}>
+        <ambientLight intensity={2} />
+        <pointLight position={[2, 2, 2]} intensity={5} />
+        <Head textToSpeak={textToSpeak} />
+      </Canvas>
+    </div>
   )
 }
-
-// Preload model
-useGLTF.preload("/models/charlize_theron_head.glb")
