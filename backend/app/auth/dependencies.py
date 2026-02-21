@@ -1,13 +1,39 @@
 from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
-from app.config import SECRET_KEY, ALGORITHM
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from clerk_backend_api import Clerk
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models.user import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+security = HTTPBearer()
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+CLERK_SECRET_KEY = "YOUR_CLERK_SECRET"
+clerk = Clerk(bearer_auth=CLERK_SECRET_KEY)
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except jwt.JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        session = clerk.sessions.verify_session(token)
+        clerk_user_id = session.user_id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Clerk token")
+
+    user = db.query(User).filter(User.clerk_id == clerk_user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
+
+
+def require_role(role: str):
+    def role_checker(user: User = Depends(get_current_user)):
+        if user.role.value != role:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        return user
+    return role_checker
