@@ -1,19 +1,22 @@
+import os
+
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from clerk_backend_api import Clerk
 from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app.models.user import User
 
 security = HTTPBearer()
 
-CLERK_SECRET_KEY = "YOUR_CLERK_SECRET"
+CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY", "YOUR_CLERK_SECRET")
 clerk = Clerk(bearer_auth=CLERK_SECRET_KEY)
 
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     token = credentials.credentials
 
@@ -33,7 +36,9 @@ def get_current_user(
 
 def require_role(role: str):
     def role_checker(user: User = Depends(get_current_user)):
-        if user.role.value != role:
+        # user.role is stored as a plain string (e.g. "doctor", "patient", "admin")
+        if user.role != role:
             raise HTTPException(status_code=403, detail="Not authorized")
         return user
+
     return role_checker

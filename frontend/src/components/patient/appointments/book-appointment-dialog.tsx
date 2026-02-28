@@ -23,6 +23,8 @@ import { CalendarPlus, CheckCircle2, Clock, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useDataStore } from "@/hooks/use-data-store"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@clerk/nextjs"
+import apiClient from "@/lib/api-client"
 
 interface BookAppointmentDialogProps {
   patientId?: string
@@ -45,6 +47,7 @@ export function BookAppointmentDialog({
 }: BookAppointmentDialogProps) {
   const { toast } = useToast()
   const { getDoctors, addAppointment } = useDataStore()
+  const { getToken } = useAuth()
   const [step, setStep] = useState(1)
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
@@ -81,36 +84,61 @@ export function BookAppointmentDialog({
     "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM"
   ]
 
-  const handleBook = () => {
+  const handleBook = async () => {
     if (!selectedDoctor || !date || !selectedTime) return
 
     const formattedDate = date.toISOString().split('T')[0]
-    addAppointment({
-      patientId,
-      patientName,
-      doctorId: selectedDoctor.id,
-      doctorName: selectedDoctor.name,
-      specialty: selectedDoctor.specialty,
-      date: formattedDate,
-      time: selectedTime,
-      status: 'Scheduled',
-      type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
-      price: 150,
-      isVirtual: appointmentType === "Video",
-    })
+    try {
+      const token = await getToken()
+      await apiClient.post(
+        "/appointments/bookings",
+        {
+          doctor_id: selectedDoctor.id,
+          day: formattedDate,
+          time: selectedTime,
+          appointment_type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
+          fee: 150,
+          is_virtual: appointmentType === "Video",
+        },
+        token
+          ? { headers: { Authorization: `Bearer ${token}` } }
+          : undefined
+      )
 
-    toast({
-      title: "Appointment Booked!",
-      description: `Your appointment with ${selectedDoctor.name} on ${date.toDateString()} at ${selectedTime} has been confirmed.`,
-    })
-    setOpen(false)
-    onBooked?.()
-    setTimeout(() => {
-      setStep(1)
-      setSelectedTime(null)
-      setSelectedDoctorId(null)
-      setSelectedSpecialty(null)
-    }, 500)
+      // Also update local mock store so the UI reflects the new appointment immediately
+      addAppointment({
+        patientId,
+        patientName,
+        doctorId: selectedDoctor.id,
+        doctorName: selectedDoctor.name,
+        specialty: selectedDoctor.specialty,
+        date: formattedDate,
+        time: selectedTime,
+        status: 'Scheduled',
+        type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
+        price: 150,
+        isVirtual: appointmentType === "Video",
+      })
+
+      toast({
+        title: "Appointment Booked!",
+        description: `Your appointment with ${selectedDoctor.name} on ${date.toDateString()} at ${selectedTime} has been confirmed.`,
+      })
+      setOpen(false)
+      onBooked?.()
+      setTimeout(() => {
+        setStep(1)
+        setSelectedTime(null)
+        setSelectedDoctorId(null)
+        setSelectedSpecialty(null)
+      }, 500)
+    } catch (error) {
+      toast({
+        title: "Unable to book appointment",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (

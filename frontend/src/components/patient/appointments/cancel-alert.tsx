@@ -1,4 +1,4 @@
-"use client"
+\"use client\"
 
 import {
   AlertDialog,
@@ -14,7 +14,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useDataStore } from "@/hooks/use-data-store"
+import { useAuth } from "@clerk/nextjs"
+import apiClient from "@/lib/api-client"
 
 interface CancelAppointmentAlertProps {
   appointmentId: string
@@ -24,18 +25,34 @@ interface CancelAppointmentAlertProps {
 
 export function CancelAppointmentAlert({ appointmentId, doctorName, onCancelled }: CancelAppointmentAlertProps) {
   const { toast } = useToast()
-  const { updateAppointmentStatus } = useDataStore()
+  const { getToken } = useAuth()
 
-  const handleCancel = () => {
-    updateAppointmentStatus(appointmentId, 'Cancelled')
-    toast({
-      title: "Appointment Cancelled",
-      description: doctorName
-        ? `Your appointment with ${doctorName} has been cancelled.`
-        : "Your appointment has been cancelled successfully.",
-      variant: "destructive",
-    })
-    onCancelled?.()
+  const handleCancel = async () => {
+    try {
+      const token = await getToken()
+      await apiClient.patch(
+        `/appointments/${appointmentId}/cancel`,
+        {},
+        token
+          ? { headers: { Authorization: `Bearer ${token}` } }
+          : undefined
+      )
+
+      toast({
+        title: "Appointment Cancelled",
+        description: doctorName
+          ? `Your appointment with ${doctorName} has been cancelled.`
+          : "Your appointment has been cancelled successfully.",
+        variant: "destructive",
+      })
+      onCancelled?.()
+    } catch (error) {
+      toast({
+        title: "Unable to cancel appointment",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (

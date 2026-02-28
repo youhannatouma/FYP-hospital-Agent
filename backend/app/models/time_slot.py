@@ -1,8 +1,9 @@
 import uuid
-from sqlalchemy import Column, TIMESTAMP, Boolean
+from sqlalchemy import Column, TIMESTAMP, Boolean, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.database import Base
+
 
 class TimeSlot(Base):
     __tablename__ = "time_slot"
@@ -12,14 +13,20 @@ class TimeSlot(Base):
         primary_key=True,
         default=uuid.uuid4,
         unique=True,
-        nullable=False
+        nullable=False,
+    )
+
+    doctor_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("usr.user_id", ondelete="CASCADE"),
+        nullable=False,
     )
 
     start_time = Column(TIMESTAMP, nullable=False)
     end_time = Column(TIMESTAMP, nullable=False)
 
     is_available = Column(Boolean, default=True)
-    recurring_pattern = Column(Text, nullable=True) 
+    recurring_pattern = Column(Text, nullable=True)
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())

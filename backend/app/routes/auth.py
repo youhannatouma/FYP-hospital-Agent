@@ -31,7 +31,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     
     token_data = {
         "user_id": str(db_user.user_id),
-        "role": db_user.role.value
+        "role": db_user.role if isinstance(db_user.role, str) else db_user.role.value
     }
     token = create_token(token_data)
     return {"access_token": token}

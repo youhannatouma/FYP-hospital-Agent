@@ -1,7 +1,13 @@
-from pydantic import BaseModel
-from datetime import datetime
+from datetime import date
+from typing import Optional
 
-class AppointmentCreate(BaseModel):
-    doctor_id: int
-    patient_id: int
-    date: datetime
+from pydantic import BaseModel
+
+
+class BookingCreate(BaseModel):
+    doctor_id: str  # UUID as string
+    day: date
+    time: str
+    appointment_type: Optional[str] = None
+    fee: Optional[float] = None
+    is_virtual: bool = False

@@ -14,7 +14,8 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useDataStore } from "@/hooks/use-data-store"
+import { useAuth } from "@clerk/nextjs"
+import apiClient from "@/lib/api-client"
 
 interface RescheduleDialogProps {
   appointmentId: string
@@ -24,7 +25,7 @@ interface RescheduleDialogProps {
 
 export function RescheduleDialog({ appointmentId, doctorName, onRescheduled }: RescheduleDialogProps) {
   const { toast } = useToast()
-  const { rescheduleAppointment } = useDataStore()
+  const { getToken } = useAuth()
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -35,16 +36,36 @@ export function RescheduleDialog({ appointmentId, doctorName, onRescheduled }: R
     "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM"
   ]
 
-  const handleReschedule = () => {
+  const handleReschedule = async () => {
     if (!date || !selectedTime) return
-    const formattedDate = date.toISOString().split('T')[0]
-    rescheduleAppointment(appointmentId, formattedDate, selectedTime)
-    toast({
-      title: "Appointment Rescheduled",
-      description: `Your appointment with ${doctorName} has been moved to ${date.toDateString()} at ${selectedTime}.`,
-    })
-    setOpen(false)
-    onRescheduled?.()
+
+    try {
+      const token = await getToken()
+      await apiClient.patch(
+        `/appointments/${appointmentId}/reschedule`,
+        {
+          // In a future iteration we can send these and have the backend update slot/date/time.
+          date: date.toISOString().split("T")[0],
+          time: selectedTime,
+        },
+        token
+          ? { headers: { Authorization: `Bearer ${token}` } }
+          : undefined
+      )
+
+      toast({
+        title: "Appointment Rescheduled",
+        description: `Your appointment with ${doctorName} has been moved to ${date.toDateString()} at ${selectedTime}.`,
+      })
+      setOpen(false)
+      onRescheduled?.()
+    } catch (error) {
+      toast({
+        title: "Unable to reschedule appointment",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (

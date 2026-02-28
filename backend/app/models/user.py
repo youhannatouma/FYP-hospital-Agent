@@ -1,23 +1,21 @@
-from sqlalchemy import Column, Text, Date, DateTime, Integer, ARRAY, Enum, CheckConstraint
+from sqlalchemy import Column, Text, Date, DateTime, Integer, ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 import uuid
-import enum
 
-Base = declarative_base()
+from app.database import Base
+from app.models.enums import UserRole
 
-class UserRole(enum.Enum):
-    admin = "admin"
-    doctor = "patient"
 
 class User(Base):
     __tablename__ = "usr"
 
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
-    # Clerk authentication
-    clerk_id = Column(Text, unique=True, nullable=False)
+
+    # Auth: Clerk (optional) or email/password
+    clerk_id = Column(Text, unique=True, nullable=True)
+    password_hash = Column(Text, nullable=True)
 
     email = Column(Text, unique=True, nullable=False)
     first_name = Column(Text)
@@ -25,7 +23,7 @@ class User(Base):
     phone_number = Column(Text)
     preferred_language = Column(Text)
 
-    role = Column(Enum(UserRole), nullable=False)
+    role = Column(Text, nullable=False)  # 'admin' | 'doctor' | 'patient'
 
     permissions = Column(ARRAY(Text))          # for admins
     
@@ -46,14 +44,3 @@ class User(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime)
-
-    __table_args__ = (
-        CheckConstraint(
-            "(role = 'doctor' AND specialty IS NOT NULL AND license_number IS NOT NULL) OR role != 'doctor'",
-            name='chk_doctor_fields'
-        ),
-        CheckConstraint(
-            "(role = 'patient' AND date_of_birth IS NOT NULL) OR role != 'patient'",
-            name='chk_patient_dob'
-        ),
-    )
