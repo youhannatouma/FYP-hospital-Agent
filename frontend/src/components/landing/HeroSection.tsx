@@ -14,7 +14,7 @@ export function HeroSection() {
     <section
       id="home"
       ref={ref}
-      className="relative overflow-hidden pt-28 pb-20 lg:pt-36 lg:pb-28 mesh-gradient"
+      className="relative overflow-hidden pt-28 pb-20 lg:pt-36 lg:pb-28 bg-gradient-to-br from-blue-50 to-teal-50 dark:from-gray-900 dark:to-gray-800"
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <m.div

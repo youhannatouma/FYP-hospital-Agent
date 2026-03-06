@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, ReactNode } from "react";
-import { m } from "framer-motion";
 import { IntroOverlay } from "./IntroOverlay";
 
 const INTRO_STORAGE_KEY = "intro_seen";
@@ -32,14 +31,6 @@ export function LandingIntro({ children }: { children: ReactNode }) {
     return <IntroOverlay onFinish={handleFinish} />;
   }
 
-  // state === 'idle' -> render page content with a subtle fade to avoid flicker
-  return (
-    <m.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25 }}
-    >
-      {children}
-    </m.div>
-  );
+  // state === 'idle' -> render page content
+  return children;
 }

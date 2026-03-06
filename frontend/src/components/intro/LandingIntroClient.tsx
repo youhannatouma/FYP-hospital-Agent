@@ -5,7 +5,6 @@ import { ReactNode } from "react";
 
 const LandingIntro = dynamic(
   () => import("./LandingIntro").then((m) => m.LandingIntro),
-  { ssr: false },
 );
 
 interface LandingIntroClientProps {
