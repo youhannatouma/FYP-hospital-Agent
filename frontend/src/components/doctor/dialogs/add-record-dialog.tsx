@@ -40,7 +40,7 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
   const [details, setDetails] = React.useState("")
   const [date, setDate] = React.useState(new Date().toISOString().split('T')[0])
 
-  const patients = users.filter(u => u.role === 'Patient')
+  const patients = users.filter((u: any) => u.role === 'Patient')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +51,7 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
 
     setLoading(true)
     
-    const patient = patients.find(p => p.id === selectedPatientId)
+    const patient = patients.find((p: any) => p.id === selectedPatientId)
     
     try {
       addRecord({
@@ -97,7 +97,7 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
                 <SelectValue placeholder="Select a patient..." />
               </SelectTrigger>
               <SelectContent>
-                {patients.map((p) => (
+                {patients.map((p: any) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>

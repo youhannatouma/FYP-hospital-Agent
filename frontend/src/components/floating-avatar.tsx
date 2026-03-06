@@ -1,55 +1,61 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
+import Image from "next/image"
+import { X } from "lucide-react"
 import ThreeAvatar from "./ThreeAvatar"
 
 export function FloatingAvatar() {
+  const [expanded, setExpanded] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [initialized, setInitialized] = useState(false)
-
   const dragRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasDragged = useRef(false)
 
-  // Initialize bottom-right position
+  // Initialize position to bottom-right on mount
   useEffect(() => {
-    requestAnimationFrame(() => {
-      setPosition({
-        x: window.innerWidth - 120, // fixed starting size
-        y: window.innerHeight - 120,
-      })
-      setInitialized(true)
+    setPosition({
+      x: window.innerWidth - 80,
+      y: window.innerHeight - 80,
     })
+    setInitialized(true)
   }, [])
 
-  const startDrag = useCallback((clientX: number, clientY: number) => {
-    if (!dragRef.current) return
-    hasDragged.current = false
-    const rect = dragRef.current.getBoundingClientRect()
-    offsetRef.current = { x: clientX - rect.left, y: clientY - rect.top }
-    longPressTimer.current = setTimeout(() => {
-      setIsDragging(true)
-    }, 300)
-  }, [])
+  const startDrag = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!dragRef.current) return
+      hasDragged.current = false
+      const rect = dragRef.current.getBoundingClientRect()
+      offsetRef.current = {
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+      }
+      longPressTimer.current = setTimeout(() => {
+        setIsDragging(true)
+      }, 300)
+    },
+    [],
+  )
 
   const onDrag = useCallback(
     (clientX: number, clientY: number) => {
       if (!isDragging) return
       hasDragged.current = true
-      const avatarSize = 120 // fixed size
+      const avatarSize = expanded ? 128 : 64
       const newX = Math.min(
         Math.max(0, clientX - offsetRef.current.x),
-        window.innerWidth - avatarSize
+        window.innerWidth - avatarSize,
       )
       const newY = Math.min(
         Math.max(0, clientY - offsetRef.current.y),
-        window.innerHeight - avatarSize
+        window.innerHeight - avatarSize,
       )
       setPosition({ x: newX, y: newY })
     },
-    [isDragging]
+    [isDragging, expanded],
   )
 
   const stopDrag = useCallback(() => {
@@ -60,10 +66,27 @@ export function FloatingAvatar() {
     setIsDragging(false)
   }, [])
 
+  const handleClick = useCallback(() => {
+    if (!hasDragged.current) {
+      setExpanded((prev) => {
+        const next = !prev
+        // Adjust position to keep avatar in viewport when expanding
+        if (next) {
+          setPosition((pos) => ({
+            x: Math.min(pos.x, window.innerWidth - 128),
+            y: Math.min(pos.y, window.innerHeight - 128),
+          }))
+        }
+        return next
+      })
+    }
+  }, [])
+
   // Mouse events
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => onDrag(e.clientX, e.clientY)
     const handleMouseUp = () => stopDrag()
+
     if (isDragging) {
       window.addEventListener("mousemove", handleMouseMove)
       window.addEventListener("mouseup", handleMouseUp)
@@ -83,6 +106,7 @@ export function FloatingAvatar() {
       onDrag(touch.clientX, touch.clientY)
     }
     const handleTouchEnd = () => stopDrag()
+
     if (isDragging) {
       window.addEventListener("touchmove", handleTouchMove, { passive: false })
       window.addEventListener("touchend", handleTouchEnd)
@@ -95,7 +119,7 @@ export function FloatingAvatar() {
 
   if (!initialized) return null
 
-  const size = 120 // fixed avatar size
+  const size = expanded ? 128 : 64
 
   return (
     <div
@@ -106,18 +130,14 @@ export function FloatingAvatar() {
         top: position.y,
         width: size,
         height: size,
-        transition: isDragging
-          ? "none"
-          : "left 0.3s ease, top 0.3s ease",
+        transition: isDragging ? "none" : "width 0.3s ease, height 0.3s ease, left 0.3s ease, top 0.3s ease",
         cursor: isDragging ? "grabbing" : "pointer",
       }}
       onMouseDown={(e) => {
         e.preventDefault()
         startDrag(e.clientX, e.clientY)
       }}
-      onMouseUp={() => {
-        if (!hasDragged.current) stopDrag()
-      }}
+      onMouseUp={handleClick}
       onTouchStart={(e) => {
         const touch = e.touches[0]
         startDrag(touch.clientX, touch.clientY)
@@ -125,14 +145,43 @@ export function FloatingAvatar() {
       onTouchEnd={(e) => {
         e.preventDefault()
         stopDrag()
+        handleClick()
       }}
       role="button"
       tabIndex={0}
+      aria-label={expanded ? "Collapse avatar" : "Expand avatar"}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          setExpanded((prev) => !prev)
+        }
+      }}
     >
+      <div
+        className={`absolute inset-0 rounded-full bg-primary/20 ${isDragging ? "" : "animate-pulse-slow"}`}
+        style={{
+          transform: "scale(1.15)",
+          borderRadius: "50%",
+          willChange: "opacity, transform"
+        }}
+      />
+
       {/* Avatar container */}
-      <div className="relative h-full w-full overflow-hidden rounded-full border-2 border-primary/60 bg-card shadow-xl">
-        <ThreeAvatar size={size} />
+      <div className="relative h-full w-full overflow-hidden rounded-full border-2 border-primary/60 bg-card shadow-xl flex items-center justify-center">
+        <div className="translate-y-4">
+          <ThreeAvatar size={size * 1.5} />
+        </div>
+
+        {/* Online indicator */}
+        <div className="absolute right-0 bottom-0 h-4 w-4 rounded-full border-2 border-card bg-emerald-500 shadow-sm shadow-emerald-500/50" />
       </div>
+
+      {/* Close hint when expanded */}
+      {expanded && (
+        <div className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border shadow-md">
+          <X className="h-3 w-3 text-muted-foreground" />
+        </div>
+      )}
     </div>
   )
 }

@@ -1,11 +1,8 @@
 "use client"
 
-import { useState } from "react"
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   FlaskConical,
   Download,
@@ -16,249 +13,220 @@ import {
   CalendarDays,
   AlertTriangle,
   CheckCircle2,
+  ChevronRight,
+  ArrowRight,
+  Sparkles,
+  Search,
 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+
+import { useState } from "react"
+import { useToast } from "@/components/ui/use-toast"
+import { LabReportDetailDialog } from "@/components/patient/dialogs/lab-report-detail-dialog"
+import { m, AnimatePresence } from "framer-motion"
+import { cn } from "@/lib/utils"
 
 const labResults = [
   {
     id: 1,
-    testName: "Lipid Panel",
+    testName: "Comprehensive Lipid Panel",
     collectedDate: "Jan 8, 2024",
     orderedBy: "Dr. Michael Chen",
-    status: "Review Needed",
-    statusColor: "bg-amber-500/10 text-amber-600",
+    status: "Review Required",
+    statusColor: "bg-amber-500/10 text-amber-500",
+    icon: AlertTriangle,
     results: [
       { name: "Total Cholesterol", value: "245", unit: "mg/dL", range: "< 200", trend: "up", flag: "High" },
-      { name: "LDL", value: "165", unit: "mg/dL", range: "< 130", trend: "up", flag: "High" },
-      { name: "HDL", value: "48", unit: "mg/dL", range: "> 40", trend: "stable", flag: null },
+      { name: "LDL (Bad)", value: "165", unit: "mg/dL", range: "< 130", trend: "up", flag: "High" },
+      { name: "HDL (Good)", value: "48", unit: "mg/dL", range: "> 40", trend: "stable", flag: null },
       { name: "Triglycerides", value: "160", unit: "mg/dL", range: "< 150", trend: "up", flag: "Borderline" },
     ],
   },
   {
     id: 2,
-    testName: "Complete Blood Count",
+    testName: "CBC with Differential",
     collectedDate: "Dec 15, 2023",
     orderedBy: "Dr. Emily Watson",
-    status: "Normal",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
+    status: "Optimal",
+    statusColor: "bg-emerald-500/10 text-emerald-500",
+    icon: CheckCircle2,
     results: [
-      { name: "WBC", value: "7.2", unit: "K/uL", range: "4.5-11.0", trend: "stable", flag: null },
-      { name: "RBC", value: "4.8", unit: "M/uL", range: "4.5-5.5", trend: "stable", flag: null },
+      { name: "WBC Count", value: "7.2", unit: "K/uL", range: "4.5-11.0", trend: "stable", flag: null },
       { name: "Hemoglobin", value: "14.2", unit: "g/dL", range: "13.5-17.5", trend: "stable", flag: null },
-      { name: "Platelets", value: "250", unit: "K/uL", range: "150-400", trend: "stable", flag: null },
-    ],
-  },
-  {
-    id: 3,
-    testName: "Comprehensive Metabolic Panel",
-    collectedDate: "Nov 10, 2023",
-    orderedBy: "Dr. Emily Watson",
-    status: "Normal",
-    statusColor: "bg-emerald-500/10 text-emerald-600",
-    results: [
-      { name: "Glucose", value: "98", unit: "mg/dL", range: "70-100", trend: "stable", flag: null },
-      { name: "BUN", value: "15", unit: "mg/dL", range: "7-20", trend: "stable", flag: null },
-      { name: "Creatinine", value: "0.9", unit: "mg/dL", range: "0.7-1.3", trend: "stable", flag: null },
-      { name: "Sodium", value: "140", unit: "mEq/L", range: "136-145", trend: "stable", flag: null },
     ],
   },
 ]
 
-function TrendIcon({ trend }: { trend: string }) {
-  if (trend === "up") return <TrendingUp className="h-3.5 w-3.5 text-destructive" />
+function TrendIndicator({ trend }: { trend: string }) {
+  if (trend === "up") return <TrendingUp className="h-3.5 w-3.5 text-amber-500" />
   if (trend === "down") return <TrendingDown className="h-3.5 w-3.5 text-primary" />
-  return <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+  return <Minus className="h-3.5 w-3.5 text-muted-foreground opacity-30" />
 }
 
 export default function LabResultsPage() {
   const { toast } = useToast()
-  const [downloading, setDownloading] = useState<number | null>(null)
-  const [exportingAll, setExportingAll] = useState(false)
+  const [selectedReport, setSelectedReport] = useState<any | null>(null)
+  const [showDetail, setShowDetail] = useState(false)
+
+  const handleExportAll = () => {
+    toast({
+      title: "Archive Exported",
+      description: "A comprehensive analysis of your laboratory history is ready.",
+    })
+  }
+
+  const handleDownloadReport = (testName: string) => {
+    toast({
+      title: "Protocol Initialized",
+      description: `Downloading analysis for ${testName}.`,
+    })
+  }
+
+  const handleViewReport = (report: any) => {
+    setSelectedReport(report)
+    setShowDetail(true)
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Lab Results</h1>
-          <p className="text-sm text-muted-foreground">
-            View and track your laboratory test results
+    <m.div 
+      className="flex flex-col gap-10 max-w-[1200px] mx-auto pb-24"
+    >
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between px-2 pt-4">
+        <div className="space-y-4">
+          <Badge variant="outline" className="border-orange-500/20 text-orange-500 bg-orange-500/5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest leading-none">
+            Diagnostics Ledger
+          </Badge>
+          <h1 className="text-4xl font-black text-foreground tracking-tight leading-none lg:text-5xl">
+            Lab Analysis
+          </h1>
+          <p className="text-muted-foreground mt-4 font-medium text-lg max-w-lg leading-relaxed">
+            Evidence-based physiological monitoring. Track your biomarkers and metabolic trajectory.
           </p>
         </div>
-        <Button
+        <Button 
+          size="lg"
           variant="outline"
-          className="gap-2 border-border text-foreground"
-          disabled={exportingAll}
-          onClick={() => {
-            setExportingAll(true)
-            setTimeout(() => {
-              setExportingAll(false)
-              toast({
-                title: "Export Complete",
-                description: "All lab results exported as PDF.",
-              })
-            }, 1500)
-          }}
+          className="h-14 px-8 rounded-2xl border-border/50 transition-all font-black text-xs uppercase tracking-widest shadow-subtle group"
+          onClick={handleExportAll}
         >
-          {exportingAll ? (
-            <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {exportingAll ? "Exporting..." : "Export All Results"}
+          <Download className="h-5 w-5 mr-3 transition-transform group-hover:scale-110" />
+          Export All findings
         </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="border border-border bg-card">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-card-foreground">1</p>
-              <p className="text-xs text-muted-foreground">Needs Review</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border border-border bg-card">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-card-foreground">2</p>
-              <p className="text-xs text-muted-foreground">Normal Results</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border border-border bg-card">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-              <FlaskConical className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-card-foreground">3</p>
-              <p className="text-xs text-muted-foreground">Total Tests</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Analytics Summary */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 px-2">
+         {[
+           { label: "Action required", value: "1", icon: AlertTriangle, color: "text-amber-500", bg: "bg-amber-500/10" },
+           { label: "Normal Balance", value: "2", icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+           { label: "Data points", value: "32", icon: FlaskConical, color: "text-blue-500", bg: "bg-blue-500/10" }
+         ].map((stat, i) => (
+           <Card key={i} className="premium-card rounded-3xl border-none bg-card/30 shadow-premium p-6 flex items-center gap-5">
+              <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner-glow", stat.bg, stat.color)}>
+                 <stat.icon className="h-6 w-6" />
+              </div>
+              <div>
+                 <p className="text-3xl font-black text-foreground leading-none">{stat.value}</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-1 opacity-50">{stat.label}</p>
+              </div>
+           </Card>
+         ))}
       </div>
 
-      {/* Lab Results List */}
-      <div className="flex flex-col gap-4">
-        {labResults.map((lab) => (
-          <Card key={lab.id} className="border border-border bg-card shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <FlaskConical className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base text-card-foreground">
-                      {lab.testName}
-                    </CardTitle>
-                    <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        <span>{lab.collectedDate}</span>
+      {/* Lab Results Feed */}
+      <div className="flex flex-col gap-8 px-2">
+        <AnimatePresence mode="popLayout">
+          {labResults.map((lab, idx) => (
+            <m.div
+              key={lab.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.1 }}
+            >
+              <Card className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden group">
+                <div className="p-8 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                   <div className="flex items-center gap-5">
+                      <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-inner-glow">
+                         <FlaskConical className="h-7 w-7" />
                       </div>
-                      <span>{lab.orderedBy}</span>
-                    </div>
-                  </div>
+                      <div className="space-y-1">
+                         <h3 className="text-xl font-black text-foreground tracking-tight underline decoration-primary/20 underline-offset-4 group-hover:text-primary transition-colors">
+                           {lab.testName}
+                         </h3>
+                         <div className="flex items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                            <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> {lab.collectedDate}</span>
+                            <span className="w-1 h-1 rounded-full bg-border" />
+                            <span>{lab.orderedBy}</span>
+                         </div>
+                      </div>
+                   </div>
+                   <Badge className={cn("px-3 py-1 mx-auto md:mx-0 rounded-full border-none text-[10px] font-black uppercase tracking-widest", lab.statusColor)}>
+                      <lab.icon className="h-3 w-3 mr-2" />
+                      {lab.status}
+                   </Badge>
                 </div>
-                <Badge
-                  variant="secondary"
-                  className={`${lab.statusColor} border-0`}
-                >
-                  {lab.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <div className="grid grid-cols-5 gap-4 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
-                  <span>Test</span>
-                  <span>Result</span>
-                  <span>Unit</span>
-                  <span>Reference</span>
-                  <span>Trend</span>
-                </div>
-                {lab.results.map((result, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-5 gap-4 px-4 py-2.5 text-sm border-t border-border"
-                  >
-                    <span className="font-medium text-card-foreground">
-                      {result.name}
-                    </span>
-                    <span
-                      className={`font-semibold ${
-                        result.flag ? "text-destructive" : "text-card-foreground"
-                      }`}
-                    >
-                      {result.value}
-                      {result.flag && (
-                        <span className="ml-1 text-xs">({result.flag})</span>
-                      )}
-                    </span>
-                    <span className="text-muted-foreground">{result.unit}</span>
-                    <span className="text-muted-foreground">{result.range}</span>
-                    <div className="flex items-center">
-                      <TrendIcon trend={result.trend} />
-                    </div>
-                  </div>
-                ))}
-              </div>
 
-              <div className="mt-3 flex gap-2">
-                <Button
-                  size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
-                  disabled={downloading === lab.id}
-                  onClick={() => {
-                    setDownloading(lab.id)
-                    setTimeout(() => {
-                      setDownloading(null)
-                      toast({
-                        title: "Download Complete",
-                        description: `${lab.testName} report saved to your device.`,
-                      })
-                    }, 1000)
-                  }}
-                >
-                  {downloading === lab.id ? (
-                    <>
-                      <span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-3 w-3" />
-                      Download Report
-                    </>
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1 border-border text-foreground"
-                  onClick={() => {
-                    toast({
-                      title: `Viewing ${lab.testName}`,
-                      description: `Full report from ${lab.collectedDate} by ${lab.orderedBy}`,
-                    })
-                  }}
-                >
-                  <Eye className="h-3 w-3" />
-                  View Full Report
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <CardContent className="p-8 pt-6">
+                  <div className="rounded-[1.5rem] border border-border/30 overflow-hidden bg-muted/20">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b border-border/30">
+                      <span className="md:col-span-1">Biomarker</span>
+                      <span>Measurement</span>
+                      <span className="hidden md:block">Unit</span>
+                      <span className="hidden md:block">Ref. Range</span>
+                      <span className="hidden md:block">Trend</span>
+                    </div>
+                    {lab.results.map((result, rIdx) => (
+                      <div
+                        key={rIdx}
+                        className="grid grid-cols-2 md:grid-cols-5 gap-4 px-6 py-5 text-sm items-center border-t border-border/10 hover:bg-muted/30 transition-colors"
+                      >
+                        <span className="font-black text-foreground uppercase tracking-tight">
+                          {result.name}
+                        </span>
+                        <div className="flex flex-col md:block">
+                           <span className={cn("text-lg font-black", result.flag ? "text-amber-500" : "text-foreground")}>
+                            {result.value}
+                           </span>
+                           <span className="md:hidden text-[10px] font-bold text-muted-foreground uppercase">{result.unit} • {result.range}</span>
+                        </div>
+                        <span className="hidden md:block text-xs font-bold text-muted-foreground uppercase">{result.unit}</span>
+                        <span className="hidden md:block text-xs font-bold text-muted-foreground uppercase opacity-50">{result.range}</span>
+                        <div className="hidden md:flex items-center">
+                          <TrendIndicator trend={result.trend} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-8 flex flex-wrap gap-4">
+                    <Button 
+                      className="h-11 px-8 rounded-xl bg-slate-900 text-white hover:bg-slate-800 font-black text-[10px] uppercase tracking-widest shadow-glow gap-2 active:scale-95 transition-all"
+                      onClick={() => handleDownloadReport(lab.testName)}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Protocol PDF
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="h-11 px-8 rounded-xl border-border/50 font-black text-[10px] uppercase tracking-widest hover:bg-muted/50 transition-all gap-2"
+                      onClick={() => handleViewReport(lab)}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Deep Analysis
+                      <ArrowRight className="h-3.5 w-3.5 ml-1 opacity-30" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </m.div>
+          ))}
+        </AnimatePresence>
       </div>
-    </div>
+
+      <LabReportDetailDialog 
+        open={showDetail} 
+        onOpenChange={setShowDetail} 
+        report={selectedReport} 
+      />
+    </m.div>
   )
 }

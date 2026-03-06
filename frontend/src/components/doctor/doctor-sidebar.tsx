@@ -26,6 +26,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { m, AnimatePresence } from "framer-motion";
 import {
   Sidebar,
   SidebarContent,
@@ -41,8 +42,8 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useToast } from "@/hooks/use-toast";
-import { AvatarAssistant } from "@/components/patient/avatar-assistant"; // Update path if needed
+
+import ThreeAvatar from "../ThreeAvatar"
 
 const mainNavItems = [
   { label: "Dashboard", href: "/doctor", icon: LayoutDashboard },
@@ -85,10 +86,10 @@ const settingsNavItems = [
 export function DoctorSidebar() {
   const pathname = usePathname();
   const { state } = useSidebar();
-  const { toast } = useToast();
   const isCollapsed = state === "collapsed";
 
   const isActive = (href: string) => {
+    if (!pathname) return false;
     if (href === "/doctor") return pathname === "/doctor";
     return pathname.startsWith(href.split("?")[0]);
   };
@@ -131,21 +132,36 @@ export function DoctorSidebar() {
         <SidebarGroup>
           {!isCollapsed && <SidebarGroupLabel>Navigation</SidebarGroupLabel>}
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1 px-2">
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
                     isActive={isActive(item.href)}
                     tooltip={item.label}
+                    className={cn(
+                      "relative h-10 transition-all duration-300 rounded-lg group",
+                      isActive(item.href) ? "bg-primary/5 text-primary font-bold" : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                    )}
                   >
-                    <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.label}</span>
+                    <Link href={item.href} className="flex items-center gap-3 w-full px-3">
+                      <div className={cn(
+                        "relative flex items-center justify-center h-5 w-5 transition-transform duration-300",
+                        isActive(item.href) ? "scale-110" : "group-hover:scale-110"
+                      )}>
+                        <item.icon className="h-4 w-4" />
+                        {isActive(item.href) && (
+                          <m.div 
+                            layoutId="activeIndicator"
+                            className="absolute -left-3 w-1 h-5 bg-primary rounded-r-full"
+                          />
+                        )}
+                      </div>
+                      <span className="text-sm tracking-tight">{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
                   {item.badge && (
-                    <SidebarMenuBadge className="bg-primary/10 text-primary">
+                    <SidebarMenuBadge className="bg-primary/10 text-primary border-none text-[10px] font-black right-2">
                       {item.badge}
                     </SidebarMenuBadge>
                   )}
@@ -180,51 +196,59 @@ export function DoctorSidebar() {
         </SidebarGroup>
 
         {/* AI Assistant Widget */}
-        <div className={cn("px-3 pb-2", isCollapsed && "flex justify-center")}>
+        <div className={cn("px-4 pb-4 mt-2", isCollapsed && "flex justify-center px-2")}>
           <div
             className={cn(
-              "rounded-xl transition-all duration-300",
-              !isCollapsed &&
-                "bg-gradient-to-b from-blue-600 to-indigo-700 p-3 text-white",
+              "rounded-2xl transition-all duration-500 relative overflow-hidden group",
+              !isCollapsed ? 
+                "bg-slate-900 border border-slate-800 shadow-2xl p-4" : 
+                "p-1"
             )}
           >
-            <AvatarAssistant
-              position="sidebar"
-              className={isCollapsed ? "w-8 h-8" : "w-full"}
-            />
+            {!isCollapsed && (
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-indigo-500/10 opacity-50" />
+            )}
+            
+            <div className="flex items-center justify-center overflow-hidden rounded-2xl bg-white/5 border border-white/10">
+              <div className="translate-y-8">
+                <ThreeAvatar size={isCollapsed ? 32 : 160} />
+              </div>
+            </div>
 
             {!isCollapsed && (
-              <div className="mt-4 space-y-4">
-                <div className="rounded-lg bg-white/10 p-2">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Heart className="h-3 w-3 text-rose-300" />
-                    <span className="text-[10px] font-medium text-white">
-                      AI Assistant
-                    </span>
+              <div className="relative z-10">
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <h4 className="text-sm font-bold text-white tracking-tight">AI HEALTH ENGINE</h4>
+                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-0.5">Neural Core Active</p>
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-2.5 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-2">
+                       <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] font-bold text-slate-300 uppercase tracking-tight">
+                          System Status
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black text-emerald-500">95%</span>
+                    </div>
                     <Progress
                       value={95}
-                      className="h-1.5 flex-1 bg-white/20 [&>div]:bg-emerald-400"
+                      className="h-1 bg-white/10 [&>div]:bg-gradient-to-r [&>div]:from-emerald-500 [&>div]:to-teal-400"
                     />
-                    <span className="text-[10px] font-medium text-white">
-                      Active
-                    </span>
                   </div>
-                </div>
 
-                <Button
-                  asChild
-                  size="sm"
-                  className="w-full bg-blue-500 text-white hover:bg-blue-600 border-0 h-7 text-xs"
-                >
-                  <Link href="/doctor/ai-assistant">
-                    {" "}
-                    {/* Fixed route */}
-                    <MessageCircle className="mr-1.5 h-3 w-3" />
-                    Ask AI Assistant
-                  </Link>
-                </Button>
+                  <Button
+                    asChild
+                    size="sm"
+                    className="w-full bg-primary hover:bg-primary/90 text-white border-0 h-9 rounded-xl text-xs font-bold shadow-lg shadow-primary/20"
+                  >
+                    <Link href="/doctor/ai-assistant">
+                      <MessageCircle className="mr-2 h-3.5 w-3.5" />
+                      ASK AI ADVISOR
+                    </Link>
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -232,20 +256,24 @@ export function DoctorSidebar() {
 
         <SidebarSeparator />
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest font-black text-muted-foreground/50">Settings & Security</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1 px-2">
               {settingsNavItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
                     isActive={isActive(item.href)}
                     tooltip={item.label}
+                    className={cn(
+                      "h-9 rounded-lg transition-colors group",
+                      isActive(item.href) ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                    )}
                   >
-                    <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.label}</span>
+                    <Link href={item.href} className="flex items-center gap-3 px-3">
+                      <item.icon className="h-3.5 w-3.5" />
+                      <span className="text-xs font-semibold">{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -261,12 +289,6 @@ export function DoctorSidebar() {
             <SidebarMenuButton
               tooltip="Logout"
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={() => {
-                toast({
-                  title: "Logging Out",
-                  description: "Ending your clinical session and securing patient data...",
-                })
-              }}
             >
               <LogOut className="h-4 w-4" />
               <span>Logout</span>

@@ -66,17 +66,17 @@ export function BookAppointmentDialog({
   React.useEffect(() => {
     if (open && initialDoctorId) {
       setSelectedDoctorId(initialDoctorId)
-      const doc = getDoctors().find(d => d.id === initialDoctorId)
+      const doc = getDoctors().find((d: any) => d.id === initialDoctorId)
       if (doc) setSelectedSpecialty(doc.specialty || null)
     }
   }, [open, initialDoctorId, getDoctors])
 
   const allDoctors = getDoctors()
-  const specialties = [...new Set(allDoctors.map(d => d.specialty).filter(Boolean))]
+  const specialties = [...new Set(allDoctors.map((d: any) => d.specialty).filter(Boolean))] as string[]
   const filteredDoctors = selectedSpecialty
-    ? allDoctors.filter(d => d.specialty === selectedSpecialty)
+    ? allDoctors.filter((d: any) => d.specialty === selectedSpecialty)
     : allDoctors
-  const selectedDoctor = allDoctors.find(d => d.id === selectedDoctorId)
+  const selectedDoctor = allDoctors.find((d: any) => d.id === selectedDoctorId)
 
   const timeSlots = [
     "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM",
@@ -171,7 +171,7 @@ export function BookAppointmentDialog({
                     <SelectValue placeholder="Select specialty" />
                   </SelectTrigger>
                   <SelectContent>
-                    {specialties.map(s => (
+                    {specialties.map((s: string) => (
                       <SelectItem key={s} value={s!}>{s}</SelectItem>
                     ))}
                   </SelectContent>
@@ -184,7 +184,7 @@ export function BookAppointmentDialog({
                     <SelectValue placeholder="Select doctor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredDoctors.map(d => (
+                    {filteredDoctors.map((d: any) => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.name} {d.specialty ? `(${d.specialty})` : ""}
                       </SelectItem>
@@ -216,7 +216,7 @@ export function BookAppointmentDialog({
                   selected={date}
                   onSelect={setDate}
                   className="rounded-md border shadow-sm mx-auto"
-                  disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                  disabled={(d: Date) => d < new Date(new Date().setHours(0,0,0,0))}
                 />
               </div>
               <div className="grid grid-cols-3 gap-2">

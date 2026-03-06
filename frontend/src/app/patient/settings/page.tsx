@@ -1,17 +1,22 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useUser } from "@clerk/nextjs"
-import { useDataStore } from "@/hooks/use-data-store"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +25,7 @@ import {
   DialogTrigger,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   User,
   Camera,
@@ -35,61 +40,73 @@ import {
   X,
   Plus,
   AlertTriangle,
-  History,
-  Activity,
-} from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Loader2,
+} from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { m } from "framer-motion";
+
+const allergies = ["Penicillin", "Sulfa Drugs", "Latex"];
+const chronicDiseases = ["Hypertension", "Hyperlipidemia"];
 
 const vaccinations = [
-  { name: "COVID-19 (Pfizer)", dateAdministered: "Sep 15, 2023", nextDue: "Sep 15, 2024" },
-  { name: "Influenza", dateAdministered: "Oct 1, 2023", nextDue: "Oct 1, 2024" },
+  {
+    name: "COVID-19 (Pfizer)",
+    dateAdministered: "Sep 15, 2023",
+    nextDue: "Sep 15, 2024",
+  },
+  {
+    name: "Influenza",
+    dateAdministered: "Oct 1, 2023",
+    nextDue: "Oct 1, 2024",
+  },
   { name: "Tdap", dateAdministered: "Mar 10, 2020", nextDue: "Mar 10, 2030" },
   { name: "Hepatitis B", dateAdministered: "Jan 5, 2018", nextDue: "N/A" },
-]
+];
 
 const connectedDevices = [
-  { name: "iPhone 15 Pro", type: "Mobile", lastActive: "Active now", icon: Smartphone },
-  { name: "MacBook Pro", type: "Desktop", lastActive: "2 hours ago", icon: Monitor },
-  { name: "iPad Air", type: "Tablet", lastActive: "3 days ago", icon: Smartphone },
-]
+  {
+    name: "iPhone 15 Pro",
+    type: "Mobile",
+    lastActive: "Active now",
+    icon: Smartphone,
+  },
+  {
+    name: "MacBook Pro",
+    type: "Desktop",
+    lastActive: "2 hours ago",
+    icon: Monitor,
+  },
+  {
+    name: "iPad Air",
+    type: "Tablet",
+    lastActive: "3 days ago",
+    icon: Smartphone,
+  },
+];
 
 export default function SettingsPage() {
-  const { toast } = useToast()
-  const { user: clerkUser } = useUser()
-  const { getUserById, updateUser } = useDataStore()
-  const patient = getUserById("pat-1")
+  const { toast } = useToast();
+
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    phone: patient?.phone || "",
-    dateOfBirth: patient?.dateOfBirth || "",
-    bloodType: patient?.bloodType || "",
-    gender: patient?.gender || "",
-    address: patient?.address || "",
-    emergencyName: patient?.emergencyContact || "",
+    firstName: "Sarah",
+    lastName: "Johnson",
+    email: "sarah.johnson@email.com",
+    phone: "(555) 123-4567",
+    dateOfBirth: "1982-03-15",
+    bloodType: "O+",
+    gender: "Female",
+    address: "456 Elm Street, Suite 12, San Francisco, CA 94102",
+    emergencyName: "John Johnson",
     emergencyRelation: "Spouse",
-    emergencyPhone: patient?.emergencyPhone || "",
-    insuranceProvider: patient?.insuranceProvider || "",
-    insurancePlan: patient?.insurancePlan || "",
-    insuranceMemberId: patient?.insuranceMemberId || "",
-  })
+    emergencyPhone: "(555) 987-6543",
+    insuranceProvider: "BlueCross BlueShield",
+    insurancePlan: "Premium Health Plus",
+    insuranceMemberId: "BCB-4521-8837",
+  });
 
-  const [allergyList, setAllergyList] = useState<string[]>(patient?.allergies || [])
-  const [conditionList, setConditionList] = useState<string[]>(patient?.chronicConditions || [])
-  const [newAllergy, setNewAllergy] = useState("")
-  const [newCondition, setNewCondition] = useState("")
-  
-  const [familyHistory, setFamilyHistory] = useState([
-    "Father: Heart Disease", "Mother: Type 2 Diabetes", "Grandmother: Hypertension"
-  ])
-  const [newFamily, setNewFamily] = useState("")
-  
   const [notifications, setNotifications] = useState({
     emailAppointment: true,
     smsAppointment: true,
@@ -101,358 +118,385 @@ export default function SettingsPage() {
     smsMessages: false,
     pushMessages: true,
     reminderTiming: "24h",
-  })
+  });
 
   const [privacy, setPrivacy] = useState({
     shareWithDoctors: true,
     shareWithInsurance: true,
     shareForResearch: false,
     twoFactor: true,
-  })
+  });
 
-  const [deviceList, setDeviceList] = useState(connectedDevices)
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (patient) {
-      setProfileData({
-        phone: patient.phone || "",
-        dateOfBirth: patient.dateOfBirth || "",
-        bloodType: patient.bloodType || "",
-        gender: patient.gender || "",
-        address: patient.address || "",
-        emergencyName: patient.emergencyContact || "",
-        emergencyRelation: "Spouse",
-        emergencyPhone: patient.emergencyPhone || "",
-        insuranceProvider: patient.insuranceProvider || "",
-        insurancePlan: patient.insurancePlan || "",
-        insuranceMemberId: patient.insuranceMemberId || "",
-      })
-      setAllergyList(patient.allergies || [])
-      setConditionList(patient.chronicConditions || [])
-    }
-  }, [patient?.id])
-
-  // Alias for compatibility with the existing UI in current turn
-  const firstName = (clerkUser?.firstName || patient?.name?.split(" ")[0] || "Patient")
-  const lastName = (clerkUser?.lastName || patient?.name?.split(" ").slice(1).join(" ") || "")
-
-  const handleSave = async (section: string) => {
-    setLoading(true)
-    
-    updateUser("pat-1", {
-      ...profileData,
-      emergencyContact: profileData.emergencyName,
-      allergies: allergyList,
-      chronicConditions: conditionList
-    })
-
-    setTimeout(() => {
-      setLoading(false)
-      toast({
-        title: "Health Profile Synced",
-        description: `Your ${section} settings have been saved to your secure medical record.`,
-      })
-    }, 800)
-  }
+  const [allergyList, setAllergyList] = useState(allergies);
+  const [newAllergy, setNewAllergy] = useState("");
 
   const addAllergy = () => {
     if (newAllergy.trim() && !allergyList.includes(newAllergy.trim())) {
-      setAllergyList((prev) => [...prev, newAllergy.trim()])
-      setNewAllergy("")
+      setAllergyList((prev) => [...prev, newAllergy.trim()]);
+      setNewAllergy("");
     }
-  }
+  };
 
   const removeAllergy = (allergy: string) => {
-    setAllergyList((prev) => prev.filter((a) => a !== allergy))
-  }
+    setAllergyList((prev) => prev.filter((a) => a !== allergy));
+  };
+
+  const handleSaveProfile = () => {
+    setIsSavingProfile(true);
+    setTimeout(() => {
+      setIsSavingProfile(false);
+      toast({
+        title: "Profile Updated",
+        description:
+          "Your personal and medical information has been saved successfully.",
+      });
+    }, 800);
+  };
+
+  const handleSavePreferences = () => {
+    setIsSavingPrefs(true);
+    setTimeout(() => {
+      setIsSavingPrefs(false);
+      toast({
+        title: "Preferences Saved",
+        description:
+          "Your notification and AI assistant preferences have been updated.",
+      });
+    }, 800);
+  };
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground italic">Settings</h1>
-          <p className="text-sm text-muted-foreground font-medium">
-            Manage your personal identity, medical history, and clinical preferences
-          </p>
-        </div>
+    <m.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col gap-6"
+    >
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+        <p className="text-sm text-muted-foreground">
+          Manage your profile, medical history, and preferences
+        </p>
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="bg-muted/50 p-1 h-auto border">
-          <TabsTrigger value="profile">Identity & Contact</TabsTrigger>
-          <TabsTrigger value="medical">Clinical History</TabsTrigger>
-          <TabsTrigger value="preferences">System Settings</TabsTrigger>
-          <TabsTrigger value="privacy">Security</TabsTrigger>
+        <TabsList className="bg-muted flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="medical">Medical History</TabsTrigger>
+          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="privacy">Privacy & Security</TabsTrigger>
         </TabsList>
 
         {/* Profile Tab */}
-        <TabsContent value="profile" className="mt-4 flex flex-col gap-6 animate-in fade-in-50 duration-500">
+        <TabsContent value="profile" className="mt-4 flex flex-col gap-6">
           {/* Avatar */}
-          <Card className="border-border bg-card shadow-sm">
+          <Card className="border border-border bg-card">
             <CardContent className="flex items-center gap-6 p-6">
-              <div className="relative group">
-                <Avatar className="h-24 w-24 ring-4 ring-primary/10 transition-all group-hover:ring-primary/20">
-                  <AvatarImage src={clerkUser?.imageUrl || patient?.avatar || "/placeholder-user.jpg"} alt={clerkUser?.fullName || patient?.name} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
-                    {firstName[0]}{lastName[0] || ""}
+              <div className="relative">
+                <Avatar className="h-20 w-20 ring-2 ring-primary/20">
+                  <AvatarImage
+                    src="/placeholder-user.jpg"
+                    alt="Sarah Johnson"
+                  />
+                  <AvatarFallback className="bg-primary/10 text-primary text-xl font-semibold">
+                    SJ
                   </AvatarFallback>
                 </Avatar>
                 <Button
                   size="icon"
-                  className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-primary text-primary-foreground border-2 border-background shadow-lg hover:scale-110 transition-transform"
+                  className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-primary text-primary-foreground"
                 >
-                  <Camera className="h-4 w-4" />
+                  <Camera className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold text-card-foreground">
-                  {clerkUser?.fullName || patient?.name}
+              <div>
+                <h2 className="text-lg font-semibold text-card-foreground">
+                  {profileData.firstName} {profileData.lastName}
                 </h2>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground font-medium">Record ID: {patient?.id}</p>
-                  <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-0 text-[10px] font-bold uppercase tracking-wider">Verified Patient</Badge>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Patient ID: P-1842
+                </p>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-2 border-border text-foreground text-xs font-bold"
+                  className="mt-2 border-border text-foreground text-xs"
+                  onClick={() =>
+                    toast({
+                      title: "File Explorer Opened",
+                      description: "Select a new profile photo.",
+                    })
+                  }
                 >
-                  Update Photo
+                  Change Photo
                 </Button>
               </div>
             </CardContent>
           </Card>
 
           {/* Personal Info */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <User className="h-5 w-5 text-primary" />
-                Personal Information & Documents
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                Personal Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="firstName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">First Name</Label>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="firstName" className="text-sm text-foreground">
+                  First Name
+                </Label>
                 <Input
                   id="firstName"
-                  value={firstName}
-                  readOnly
-                  className="bg-muted focus-visible:ring-0 cursor-default font-medium"
+                  value={profileData.firstName}
+                  onChange={(e) =>
+                    setProfileData((p) => ({ ...p, firstName: e.target.value }))
+                  }
                 />
-                <p className="text-[10px] text-muted-foreground italic">Syncing from Clerk</p>
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="lastName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Last Name</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="lastName" className="text-sm text-foreground">
+                  Last Name
+                </Label>
                 <Input
                   id="lastName"
-                  value={lastName}
-                  readOnly
-                  className="bg-muted focus-visible:ring-0 cursor-default font-medium"
+                  value={profileData.lastName}
+                  onChange={(e) =>
+                    setProfileData((p) => ({ ...p, lastName: e.target.value }))
+                  }
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Secure Email</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="email" className="text-sm text-foreground">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
-                  value={clerkUser?.primaryEmailAddress?.emailAddress || patient?.email}
-                  readOnly
-                  className="bg-muted focus-visible:ring-0 cursor-default font-medium"
+                  value={profileData.email}
+                  onChange={(e) =>
+                    setProfileData((p) => ({ ...p, email: e.target.value }))
+                  }
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mobile Contact</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="phone" className="text-sm text-foreground">
+                  Phone
+                </Label>
                 <Input
                   id="phone"
                   value={profileData.phone}
-                  onChange={(e) => setProfileData((p) => ({ ...p, phone: e.target.value }))}
-                  className="font-medium"
+                  onChange={(e) =>
+                    setProfileData((p) => ({ ...p, phone: e.target.value }))
+                  }
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="dob" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Date of Birth</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="dob" className="text-sm text-foreground">
+                  Date of Birth
+                </Label>
                 <Input
                   id="dob"
                   type="date"
                   value={profileData.dateOfBirth}
-                  onChange={(e) => setProfileData((p) => ({ ...p, dateOfBirth: e.target.value }))}
-                  className="font-medium"
+                  onChange={(e) =>
+                    setProfileData((p) => ({
+                      ...p,
+                      dateOfBirth: e.target.value,
+                    }))
+                  }
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="bloodType" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Blood Type</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="bloodType" className="text-sm text-foreground">
+                  Blood Type
+                </Label>
                 <Select
                   value={profileData.bloodType}
-                  onValueChange={(val) => setProfileData((p) => ({ ...p, bloodType: val }))}
+                  onValueChange={(val) =>
+                    setProfileData((p) => ({ ...p, bloodType: val }))
+                  }
                 >
-                  <SelectTrigger id="bloodType" className="font-medium">
+                  <SelectTrigger id="bloodType">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bt) => (
-                      <SelectItem key={bt} value={bt}>{bt}</SelectItem>
-                    ))}
+                    {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
+                      (bt) => (
+                        <SelectItem key={bt} value={bt}>
+                          {bt}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="gender" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Legal Gender</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="gender" className="text-sm text-foreground">
+                  Gender
+                </Label>
                 <Select
                   value={profileData.gender}
-                  onValueChange={(val) => setProfileData((p) => ({ ...p, gender: val }))}
+                  onValueChange={(val) =>
+                    setProfileData((p) => ({ ...p, gender: val }))
+                  }
                 >
-                  <SelectTrigger id="gender" className="font-medium">
+                  <SelectTrigger id="gender">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Female">Female</SelectItem>
                     <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                    <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="address" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Primary Residential Address</Label>
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <Label htmlFor="address" className="text-sm text-foreground">
+                  Address
+                </Label>
                 <Input
                   id="address"
                   value={profileData.address}
-                  onChange={(e) => setProfileData((p) => ({ ...p, address: e.target.value }))}
-                  className="font-medium"
+                  onChange={(e) =>
+                    setProfileData((p) => ({ ...p, address: e.target.value }))
+                  }
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Emergency Contact */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground font-bold">
-                Emergency Contact (N.O.K)
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Emergency Contact
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Name</Label>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Name</Label>
                 <Input
                   value={profileData.emergencyName}
-                  onChange={(e) => setProfileData((p) => ({ ...p, emergencyName: e.target.value }))}
-                  className="font-medium"
+                  onChange={(e) =>
+                    setProfileData((p) => ({
+                      ...p,
+                      emergencyName: e.target.value,
+                    }))
+                  }
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Phone Number</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Relationship</Label>
+                <Input
+                  value={profileData.emergencyRelation}
+                  onChange={(e) =>
+                    setProfileData((p) => ({
+                      ...p,
+                      emergencyRelation: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Phone</Label>
                 <Input
                   value={profileData.emergencyPhone}
-                  onChange={(e) => setProfileData((p) => ({ ...p, emergencyPhone: e.target.value }))}
-                  className="font-medium"
+                  onChange={(e) =>
+                    setProfileData((p) => ({
+                      ...p,
+                      emergencyPhone: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Insurance */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground font-bold">
-                Healthcare Coverage & Billing
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Insurance Details
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Provider Name</Label>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Provider</Label>
                 <Input
                   value={profileData.insuranceProvider}
-                  onChange={(e) => setProfileData((p) => ({ ...p, insuranceProvider: e.target.value }))}
-                  className="font-medium"
+                  onChange={(e) =>
+                    setProfileData((p) => ({
+                      ...p,
+                      insuranceProvider: e.target.value,
+                    }))
+                  }
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Policy/Plan Type</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Plan</Label>
                 <Input
                   value={profileData.insurancePlan}
-                  onChange={(e) => setProfileData((p) => ({ ...p, insurancePlan: e.target.value }))}
-                  className="font-medium"
+                  onChange={(e) =>
+                    setProfileData((p) => ({
+                      ...p,
+                      insurancePlan: e.target.value,
+                    }))
+                  }
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Member/Policy Number</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Member ID</Label>
                 <Input
                   value={profileData.insuranceMemberId}
-                  onChange={(e) => setProfileData((p) => ({ ...p, insuranceMemberId: e.target.value }))}
-                  className="font-medium"
+                  onChange={(e) =>
+                    setProfileData((p) => ({
+                      ...p,
+                      insuranceMemberId: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-end pt-4 border-t">
-            <Button
-              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 font-bold shadow-lg px-8 py-6 h-auto"
-              onClick={() => handleSave("personal identity")}
-              disabled={loading}
-            >
-              {loading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" /> : <Save className="h-5 w-5" />}
-              {loading ? "Syncing Identity..." : "Commit Profile Changes"}
-            </Button>
-          </div>
+          <Button
+            className="w-fit bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+            onClick={handleSaveProfile}
+            disabled={isSavingProfile}
+          >
+            {isSavingProfile ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {isSavingProfile ? "Saving..." : "Save Changes"}
+          </Button>
         </TabsContent>
 
         {/* Medical History Tab */}
-        <TabsContent value="medical" className="mt-4 flex flex-col gap-6 animate-in fade-in-50 duration-500">
-          {/* Chronic Conditions */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <Activity className="h-5 w-5 text-primary" />
-                Active Clinical Conditions
+        <TabsContent value="medical" className="mt-4 flex flex-col gap-6">
+          {/* Chronic Diseases */}
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Chronic Conditions
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <div className="flex flex-wrap gap-2">
-                {conditionList.length > 0 ? (
-                  conditionList.map((disease) => (
-                    <Badge key={disease} className="bg-amber-500/10 text-amber-600 border border-amber-500/20 px-3 py-1 text-xs font-bold gap-2">
-                      {disease}
-                      <button
-                        onClick={() => setConditionList(prev => prev.filter(d => d !== disease))}
-                        className="hover:text-amber-800 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">No conditions reported.</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2 max-w-sm pt-2">
-                <Input
-                  placeholder="Add condition (e.g. Asthma)"
-                  value={newCondition}
-                  onChange={(e) => setNewCondition(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newCondition.trim()) {
-                      setConditionList(prev => [...prev, newCondition.trim()])
-                      setNewCondition("")
-                    }
-                  }}
-                  className="font-medium"
-                />
+                {chronicDiseases.map((disease) => (
+                  <Badge
+                    key={disease}
+                    className="bg-amber-500/10 text-amber-600 border-0 text-sm"
+                  >
+                    {disease}
+                  </Badge>
+                ))}
                 <Button
-                  size="sm"
                   variant="outline"
-                  onClick={() => {
-                    if (newCondition.trim()) {
-                      setConditionList(prev => [...prev, newCondition.trim()])
-                      setNewCondition("")
-                    }
-                  }}
-                  className="border-primary/20 text-primary hover:bg-primary/5 font-bold"
+                  size="sm"
+                  className="h-7 border-border text-foreground text-xs gap-1"
                 >
-                  <Plus className="h-4 w-4 mr-1" />
+                  <Plus className="h-3 w-3" />
                   Add
                 </Button>
               </div>
@@ -460,49 +504,43 @@ export default function SettingsPage() {
           </Card>
 
           {/* Allergies */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                Allergies & Contraindications
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Allergies
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
-                {allergyList.length > 0 ? (
-                  allergyList.map((allergy) => (
-                    <Badge
-                      key={allergy}
-                      className="bg-destructive/10 text-destructive border border-destructive/20 px-3 py-1 text-xs font-bold gap-2"
+                {allergyList.map((allergy) => (
+                  <Badge
+                    key={allergy}
+                    className="bg-destructive/10 text-destructive border-0 text-sm gap-1"
+                  >
+                    {allergy}
+                    <button
+                      onClick={() => removeAllergy(allergy)}
+                      className="ml-1 hover:text-destructive/80"
+                      aria-label={`Remove ${allergy}`}
                     >
-                      {allergy}
-                      <button
-                        onClick={() => removeAllergy(allergy)}
-                        className="hover:text-destructive/80 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">No allergies reported.</p>
-                )}
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
               </div>
-              <div className="flex items-center gap-2 max-w-sm pt-2">
+              <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Add allergy (e.g. Latex)"
+                  placeholder="Add new allergy..."
                   value={newAllergy}
                   onChange={(e) => setNewAllergy(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addAllergy()}
-                  className="font-medium"
+                  className="max-w-xs"
                 />
                 <Button
                   size="sm"
-                  variant="outline"
                   onClick={addAllergy}
-                  className="border-destructive/20 text-destructive hover:bg-destructive/5 font-bold"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  <Plus className="h-4 w-4 mr-1" />
                   Add
                 </Button>
               </div>
@@ -510,138 +548,97 @@ export default function SettingsPage() {
           </Card>
 
           {/* Vaccinations */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <Shield className="h-5 w-5 text-emerald-500" />
-                Immunization Registry
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Vaccination History
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="rounded-xl border border-border overflow-hidden shadow-sm">
-                <div className="grid grid-cols-3 gap-4 bg-muted/40 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b">
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="grid grid-cols-3 gap-4 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
                   <span>Vaccine</span>
-                  <span>Administered</span>
-                  <span>Next Due</span>
+                  <span>Date Administered</span>
+                  <span>Next Dose Due</span>
                 </div>
-                <div className="divide-y divide-border">
-                  {vaccinations.map((vax, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-3 gap-4 px-6 py-4 text-sm hover:bg-muted/20 transition-colors"
-                    >
-                      <span className="font-bold text-card-foreground">
-                        {vax.name}
-                      </span>
-                      <span className="text-muted-foreground font-medium italic">{vax.dateAdministered}</span>
-                      <span className="text-muted-foreground font-medium">
-                        {vax.nextDue !== "N/A" ? (
-                          <Badge variant="outline" className="text-[10px] font-bold border-border">{vax.nextDue}</Badge>
-                        ) : (
-                          <span className="text-xs italic opacity-50">Complete</span>
-                        )}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                {vaccinations.map((vax, idx) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-3 gap-4 px-4 py-2.5 text-sm border-t border-border"
+                  >
+                    <span className="font-medium text-card-foreground">
+                      {vax.name}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {vax.dateAdministered}
+                    </span>
+                    <span className="text-muted-foreground">{vax.nextDue}</span>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
 
           {/* Family History */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <History className="h-5 w-5 text-indigo-500" />
-                Hereditary & Family History
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Family Medical History
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
-                {familyHistory.map((item) => (
-                  <Badge key={item} variant="outline" className="bg-muted/50 border-border px-3 py-1 text-xs font-bold gap-2">
-                    {item}
-                    <button
-                      onClick={() => setFamilyHistory(prev => prev.filter(f => f !== item))}
-                      className="hover:text-muted-foreground transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
+                <Badge variant="secondary" className="text-sm">
+                  Father: Heart Disease
+                </Badge>
+                <Badge variant="secondary" className="text-sm">
+                  Mother: Type 2 Diabetes
+                </Badge>
+                <Badge variant="secondary" className="text-sm">
+                  Grandmother: Hypertension
+                </Badge>
               </div>
-              <div className="flex items-center gap-2 max-w-sm pt-2">
-                <Input
-                  placeholder="e.g., Father: Cardiac History"
-                  value={newFamily}
-                  onChange={(e) => setNewFamily(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newFamily.trim()) {
-                      setFamilyHistory(prev => [...prev, newFamily.trim()])
-                      setNewFamily("")
-                    }
-                  }}
-                  className="font-medium"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (newFamily.trim()) {
-                      setFamilyHistory(prev => [...prev, newFamily.trim()])
-                      setNewFamily("")
-                    }
-                  }}
-                  className="border-indigo-500/20 text-indigo-500 hover:bg-indigo-50 font-bold"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-fit border-border text-foreground text-xs gap-1"
+              >
+                <Plus className="h-3 w-3" />
+                Add Family History
+              </Button>
             </CardContent>
           </Card>
-
-          <div className="flex justify-end pt-4 border-t">
-            <Button
-              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 font-bold shadow-lg px-8 py-6 h-auto"
-              onClick={() => handleSave("clinical history")}
-              disabled={loading}
-            >
-              {loading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" /> : <Save className="h-5 w-5" />}
-              {loading ? "Syncing Record..." : "Sync Medical Record"}
-            </Button>
-          </div>
         </TabsContent>
 
         {/* Preferences Tab */}
-        <TabsContent value="preferences" className="mt-4 flex flex-col gap-6 animate-in fade-in-50 duration-500">
+        <TabsContent value="preferences" className="mt-4 flex flex-col gap-6">
           {/* Language */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <Globe className="h-5 w-5 text-primary" />
-                Localization & Interface
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground flex items-center gap-2">
+                <Globe className="h-4 w-4 text-primary" />
+                Language & Region
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Default Interface Language</Label>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Language</Label>
                 <Select defaultValue="en">
-                  <SelectTrigger className="font-medium">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">English (US)</SelectItem>
-                    <SelectItem value="ar">Arabic (UAE)</SelectItem>
-                    <SelectItem value="fr">French (FR)</SelectItem>
-                    <SelectItem value="es">Spanish (ES)</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="ar">Arabic</SelectItem>
+                    <SelectItem value="fr">French</SelectItem>
+                    <SelectItem value="es">Spanish</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Regional Timezone</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Timezone</Label>
                 <Select defaultValue="pst">
-                  <SelectTrigger className="font-medium">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -656,255 +653,300 @@ export default function SettingsPage() {
           </Card>
 
           {/* Notifications */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <Bell className="h-5 w-5 text-amber-500" />
-                Communication Channels
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground flex items-center gap-2">
+                <Bell className="h-4 w-4 text-primary" />
+                Notification Preferences
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 divide-x divide-border">
-                <div className="pr-4 space-y-6">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Appointments & Scheduling</h4>
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">Email Alerts</Label>
-                        <Switch
-                          checked={notifications.emailAppointment}
-                          onCheckedChange={(val) => setNotifications((n) => ({ ...n, emailAppointment: val }))}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">SMS notifications</Label>
-                        <Switch
-                          checked={notifications.smsAppointment}
-                          onCheckedChange={(val) => setNotifications((n) => ({ ...n, smsAppointment: val }))}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">Native Push</Label>
-                        <Switch
-                          checked={notifications.pushAppointment}
-                          onCheckedChange={(val) => setNotifications((n) => ({ ...n, pushAppointment: val }))}
-                        />
-                      </div>
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h4 className="text-sm font-medium text-foreground mb-3">
+                    Appointments
+                  </h4>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-muted-foreground">
+                        Email notifications
+                      </Label>
+                      <Switch
+                        checked={notifications.emailAppointment}
+                        onCheckedChange={(val) =>
+                          setNotifications((n) => ({
+                            ...n,
+                            emailAppointment: val,
+                          }))
+                        }
+                      />
                     </div>
-                  </div>
-
-                  <div className="pt-4">
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Medical Lab Results</h4>
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">Secure Email</Label>
-                        <Switch
-                          checked={notifications.emailResults}
-                          onCheckedChange={(val) => setNotifications((n) => ({ ...n, emailResults: val }))}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">Mobile Push</Label>
-                        <Switch
-                          checked={notifications.pushResults}
-                          onCheckedChange={(val) => setNotifications((n) => ({ ...n, pushResults: val }))}
-                        />
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-muted-foreground">
+                        SMS notifications
+                      </Label>
+                      <Switch
+                        checked={notifications.smsAppointment}
+                        onCheckedChange={(val) =>
+                          setNotifications((n) => ({
+                            ...n,
+                            smsAppointment: val,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-muted-foreground">
+                        Push notifications
+                      </Label>
+                      <Switch
+                        checked={notifications.pushAppointment}
+                        onCheckedChange={(val) =>
+                          setNotifications((n) => ({
+                            ...n,
+                            pushAppointment: val,
+                          }))
+                        }
+                      />
                     </div>
                   </div>
                 </div>
 
-                <div className="pl-8 space-y-6">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Proactive Reminder Optimization</h4>
-                    <div className="space-y-4">
-                      <p className="text-xs text-muted-foreground italic leading-relaxed">Select how far in advance you want to receive appointment reminders from your care team.</p>
-                      <Select
-                        value={notifications.reminderTiming}
-                        onValueChange={(val) => setNotifications((n) => ({ ...n, reminderTiming: val }))}
-                      >
-                        <SelectTrigger className="w-full font-medium">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1h">1 hour before</SelectItem>
-                          <SelectItem value="3h">3 hours before</SelectItem>
-                          <SelectItem value="24h">24 hours before</SelectItem>
-                          <SelectItem value="48h">48 hours before</SelectItem>
-                        </SelectContent>
-                      </Select>
+                <div>
+                  <h4 className="text-sm font-medium text-foreground mb-3">
+                    Lab Results
+                  </h4>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-muted-foreground">
+                        Email notifications
+                      </Label>
+                      <Switch
+                        checked={notifications.emailResults}
+                        onCheckedChange={(val) =>
+                          setNotifications((n) => ({ ...n, emailResults: val }))
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-muted-foreground">
+                        Push notifications
+                      </Label>
+                      <Switch
+                        checked={notifications.pushResults}
+                        onCheckedChange={(val) =>
+                          setNotifications((n) => ({ ...n, pushResults: val }))
+                        }
+                      />
                     </div>
                   </div>
-                  <div className="bg-primary/5 p-4 rounded-lg border border-primary/10">
-                    <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Expert Tip</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed italic">Most patients prefer 24-hour reminders for clinical appointments to ensure adequate travel planning.</p>
-                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-medium text-foreground mb-3">
+                    Reminder Timing
+                  </h4>
+                  <Select
+                    value={notifications.reminderTiming}
+                    onValueChange={(val) =>
+                      setNotifications((n) => ({ ...n, reminderTiming: val }))
+                    }
+                  >
+                    <SelectTrigger className="max-w-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1h">1 hour before</SelectItem>
+                      <SelectItem value="3h">3 hours before</SelectItem>
+                      <SelectItem value="24h">24 hours before</SelectItem>
+                      <SelectItem value="48h">48 hours before</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* AI Preferences */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <Smartphone className="h-5 w-5 text-indigo-500" />
-                Care Assistant (AI) Calibration
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                AI Assistant Preferences
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Voice Profile</Label>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">Voice Type</Label>
                 <Select defaultValue="female">
-                  <SelectTrigger className="font-medium">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="female">Serenity (Female)</SelectItem>
-                    <SelectItem value="male">Horizon (Male)</SelectItem>
-                    <SelectItem value="neutral">Ether (Neutral)</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="neutral">Neutral</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interaction Style</Label>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm text-foreground">
+                  Communication Style
+                </Label>
                 <Select defaultValue="friendly">
-                  <SelectTrigger className="font-medium">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="professional">Clinical & Objective</SelectItem>
-                    <SelectItem value="friendly">Warm & Empathetic</SelectItem>
-                    <SelectItem value="concise">Direct & Brief</SelectItem>
+                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="friendly">Friendly</SelectItem>
+                    <SelectItem value="concise">Concise</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-end pt-4 border-t">
-            <Button
-              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 font-bold shadow-lg px-8 py-6 h-auto"
-              onClick={() => handleSave("system preferences")}
-              disabled={loading}
-            >
-              {loading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" /> : <Save className="h-5 w-5" />}
-              {loading ? "Optimizing..." : "Update System Settings"}
-            </Button>
-          </div>
+          <Button
+            className="w-fit bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+            onClick={handleSavePreferences}
+            disabled={isSavingPrefs}
+          >
+            {isSavingPrefs ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {isSavingPrefs ? "Saving..." : "Save Preferences"}
+          </Button>
         </TabsContent>
 
         {/* Privacy & Security Tab */}
-        <TabsContent value="privacy" className="mt-4 flex flex-col gap-6 animate-in fade-in-50 duration-500">
+        <TabsContent value="privacy" className="mt-4 flex flex-col gap-6">
           {/* Data Sharing */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground flex items-center gap-2 font-bold">
-                <Shield className="h-5 w-5 text-primary" />
-                Data Governance & Privacy
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground flex items-center gap-2">
+                <Shield className="h-4 w-4 text-primary" />
+                Data Sharing Permissions
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-6">
-              <div className="flex items-center justify-between group">
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-bold text-foreground">Inter-Provider Coordination</Label>
-                  <p className="text-xs text-muted-foreground font-medium italic">Allow authorized clinicians to access your longitudinal health record</p>
+                  <Label className="text-sm font-medium text-foreground">
+                    Share with Doctors
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Allow your doctors to access your health data
+                  </p>
                 </div>
                 <Switch
                   checked={privacy.shareWithDoctors}
-                  onCheckedChange={(val) => setPrivacy((p) => ({ ...p, shareWithDoctors: val }))}
+                  onCheckedChange={(val) =>
+                    setPrivacy((p) => ({ ...p, shareWithDoctors: val }))
+                  }
                 />
               </div>
-              <div className="flex items-center justify-between group border-t pt-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-bold text-foreground">Insurance Verification</Label>
-                  <p className="text-xs text-muted-foreground font-medium italic">Allow your insurance provider to access clinical summaries for claims</p>
+                  <Label className="text-sm font-medium text-foreground">
+                    Share with Insurance
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Allow insurance provider to access claims data
+                  </p>
                 </div>
                 <Switch
                   checked={privacy.shareWithInsurance}
-                  onCheckedChange={(val) => setPrivacy((p) => ({ ...p, shareWithInsurance: val }))}
+                  onCheckedChange={(val) =>
+                    setPrivacy((p) => ({ ...p, shareWithInsurance: val }))
+                  }
                 />
               </div>
-              <div className="flex items-center justify-between group border-t pt-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-bold text-foreground">Scientific Research (Anonymized)</Label>
-                  <p className="text-xs text-muted-foreground font-medium italic">Contribute de-identified data to genomic and epidemiological studies</p>
+                  <Label className="text-sm font-medium text-foreground">
+                    Anonymized Research
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Contribute anonymized data to medical research
+                  </p>
                 </div>
                 <Switch
                   checked={privacy.shareForResearch}
-                  onCheckedChange={(val) => setPrivacy((p) => ({ ...p, shareForResearch: val }))}
+                  onCheckedChange={(val) =>
+                    setPrivacy((p) => ({ ...p, shareForResearch: val }))
+                  }
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Two-Factor Authentication */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground font-bold flex items-center gap-2">
-                <Smartphone className="h-5 w-5 text-indigo-500" />
-                Access Control & Security
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Two-Factor Authentication
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-foreground">Multi-Factor Authentication (MFA)</p>
-                  <p className="text-xs text-muted-foreground font-medium italic">
-                    Require an additional verification step when accessing from new devices
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Enable 2FA
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Add extra security to your account with two-factor
+                    authentication
                   </p>
                 </div>
                 <Switch
                   checked={privacy.twoFactor}
-                  onCheckedChange={(val) => setPrivacy((p) => ({ ...p, twoFactor: val }))}
+                  onCheckedChange={(val) =>
+                    setPrivacy((p) => ({ ...p, twoFactor: val }))
+                  }
                 />
               </div>
               {privacy.twoFactor && (
-                <div className="mt-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-                  <Shield className="h-4 w-4" />
-                  <span className="text-xs font-bold uppercase tracking-wider">MFA Protocol Active</span>
-                </div>
+                <Badge className="mt-3 bg-emerald-500/10 text-emerald-600 border-0">
+                  2FA is active
+                </Badge>
               )}
             </CardContent>
           </Card>
 
           {/* Connected Devices */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground font-bold">
-                Active Session Management
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Connected Devices
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {deviceList.map((device, idx) => (
+            <CardContent className="flex flex-col gap-3">
+              {connectedDevices.map((device, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between rounded-xl border border-border p-4 bg-muted/5 transition-all hover:border-primary/20"
+                  className="flex items-center justify-between rounded-lg border border-border p-3"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted border border-border">
-                      <device.icon className="h-6 w-6 text-primary" />
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                      <device.icon className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-card-foreground">{device.name}</p>
-                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                        {device.type} • {device.lastActive}
+                      <p className="text-sm font-medium text-card-foreground">
+                        {device.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {device.type} - {device.lastActive}
                       </p>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/5 text-xs font-bold"
-                    onClick={() => {
-                      setDeviceList(prev => prev.filter((_, i) => i !== idx))
-                      toast({
-                        title: "Session Terminated",
-                        description: `${device.name} has been signed out.`,
-                      })
-                    }}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 text-xs"
                   >
-                    Logout
+                    Remove
                   </Button>
                 </div>
               ))}
@@ -912,74 +954,80 @@ export default function SettingsPage() {
           </Card>
 
           {/* Data Management */}
-          <Card className="border-border bg-card shadow-sm overflow-hidden">
-            <CardHeader className="pb-4 border-b mb-4">
-              <CardTitle className="text-lg text-card-foreground font-bold">
-                Account & Data Transparency
+          <Card className="border border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-base text-card-foreground">
+                Data Management
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-fit border-slate-300 text-slate-700 bg-white hover:bg-slate-50 gap-2 font-bold shadow-sm"
-                  onClick={() => {
-                    toast({
-                      title: "Preparing Export",
-                      description: "Your secure health record archive is being generated.",
-                    })
-                  }}
-                >
-                  <Download className="h-4 w-4" />
-                  Request Full Health Data Export (PDF/JSON)
-                </Button>
-              </div>
+            <CardContent className="flex flex-col gap-3">
+              <Button
+                variant="outline"
+                className="w-fit border-border text-foreground gap-2"
+                onClick={() =>
+                  toast({
+                    title: "Downloading...",
+                    description: "Preparing your health data archive.",
+                  })
+                }
+              >
+                <Download className="h-4 w-4" />
+                Download My Data
+              </Button>
 
-              <div className="bg-destructive/5 p-4 rounded-lg border border-destructive/10">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full sm:w-fit border-destructive/30 text-destructive hover:bg-destructive/10 gap-2 font-bold"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Deactivate Hospital Account
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2 text-destructive font-bold text-xl">
-                        <AlertTriangle className="h-6 w-6" />
-                        Account Deactivation
-                      </DialogTitle>
-                      <DialogDescription className="pt-2 font-medium leading-relaxed">
-                        This action is irreversible. Your medical records, appointment history, and genomic data will be archived according to regulatory requirements, but your active account will be purged.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="mt-6 flex gap-2">
-                      <Button variant="outline" className="border-border font-bold">Abort Process</Button>
-                      <Button variant="destructive" className="font-bold px-6">
-                        Confirm Deactivation
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-fit border-destructive/30 text-destructive hover:bg-destructive/10 gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Account
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-5 w-5" />
+                      Delete Account
+                    </DialogTitle>
+                    <DialogDescription>
+                      This action cannot be undone. This will permanently delete
+                      your account and remove all your data from our servers,
+                      including medical records, appointments, and messages.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="border-border text-foreground"
+                      >
+                        Cancel
                       </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
+                    </DialogTrigger>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        onClick={() =>
+                          toast({
+                            title: "Account Deleted",
+                            description:
+                              "Your account deletion request has been processed.",
+                            variant: "destructive",
+                          })
+                        }
+                      >
+                        Delete Account
+                      </Button>
+                    </DialogTrigger>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
-
-          <div className="flex justify-end pt-4 border-t">
-            <Button
-              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 font-bold shadow-lg px-8 py-6 h-auto"
-              onClick={() => handleSave("security settings")}
-              disabled={loading}
-            >
-              {loading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" /> : <Save className="h-5 w-5" />}
-              {loading ? "Securing Account..." : "Confirm Security Overhaul"}
-            </Button>
-          </div>
         </TabsContent>
       </Tabs>
-    </div>
-  )
+    </m.div>
+  );
 }

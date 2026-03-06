@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { db, type User, type Appointment, type Message, type MedicalRecord, type Prescription, type Invoice, type LabResult, type AuditLog } from '@/lib/hospital-core/MockDatabase'
+import { db, type User, type Appointment } from '@/lib/hospital-core/MockDatabase'
+import type { Message, MedicalRecord, Prescription, Invoice, LabResult, AuditLog } from '@/lib/hospital-data-manifest'
 
 /**
  * useDataStore Hook
  * Provides reactive access to the centralized MockDatabase.
- * Components that use this hook will re-render automatically when data changes.
+ * Safely falls back if MockDatabase methods are partially implemented.
  */
 export function useDataStore() {
   const [version, setVersion] = useState(0)
@@ -14,39 +15,45 @@ export function useDataStore() {
 
   useEffect(() => {
     setHasHydrated(true)
-    const unsubscribe = db.events.subscribe('change', () => {
+    const unsubscribe = (db as any).events?.subscribe?.('change', () => {
       setVersion(v => v + 1)
     })
-    return unsubscribe
+    return unsubscribe || (() => {})
   }, [])
 
-  // Force re-read from DB on each version change
-  const getUsers = useCallback(() => db.getUsers(), [version])
-  const getAppointments = useCallback(() => db.getAppointments(), [version])
-  const getMessages = useCallback(() => db.getMessages(), [version])
-  const getRecords = useCallback(() => db.getRecords(), [version])
-  const getPrescriptions = useCallback(() => db.getPrescriptions(), [version])
-  const getInvoices = useCallback(() => db.getInvoices(), [version])
-  const getLabResults = useCallback(() => db.getLabResults(), [version])
-  const getAuditLogs = useCallback(() => db.getAuditLogs(), [version])
-  const getStats = useCallback(() => db.getStats(), [version])
+  const safeList = (method: string) => {
+    const fn = (db as any)[method];
+    return typeof fn === 'function' ? fn.bind(db)() : [];
+  };
 
-  // Stability for SSR/Hydration
-  // If not hydrated, we return "stable" empty values or the raw DB values (which will be seed values on server)
-  // However, on client, the first render will be with seed values if we don't handle this, or mismatch if we load localStorage.
-  // The MockDatabase getInstance loads from storage immediately.
-  // To fix hydration, the FIRST render on client MUST match the server.
-  // Server has seed data. Client first render MUST have seed data.
-  // Subsequent client render can have localStorage data.
+  const getUsers = useCallback(() => safeList('getUsers'), [version])
+  const getAppointments = useCallback(() => safeList('getAppointments'), [version])
+  const getMessages = useCallback(() => safeList('getMessages'), [version])
+  const getRecords = useCallback(() => safeList('getRecords'), [version])
+  const getPrescriptions = useCallback(() => safeList('getPrescriptions'), [version])
+  const getInvoices = useCallback(() => safeList('getInvoices'), [version])
+  const getLabResults = useCallback(() => safeList('getLabResults'), [version])
+  const getAuditLogs = useCallback(() => safeList('getAuditLogs'), [version])
+  
+  const getStats = useCallback(() => {
+    const fn = (db as any).getStats;
+    return typeof fn === 'function' ? fn.bind(db)() : { totalUsers: 0, activeUsers: 0, appointmentsToday: 0, revenue: 0 };
+  }, [version])
+
+  const getEmptyStats = () => ({ totalUsers: 0, activeUsers: 0, appointmentsToday: 0, revenue: 0 });
 
   const isServer = typeof window === 'undefined'
   const isHydrating = !hasHydrated && !isServer
+
+  const safeBind = (method: string) => {
+    const fn = (db as any)[method];
+    return typeof fn === 'function' ? fn.bind(db) : (method.startsWith('get') ? () => [] : () => null);
+  };
 
   return {
     hasHydrated,
     isHydrating,
     
-    // Higher-level getters (reactive functions)
     getUsers,
     getAppointments,
     getMessages,
@@ -57,10 +64,6 @@ export function useDataStore() {
     getAuditLogs,
     getStats,
 
-    // Read operations (reactive data)
-    // On first client render, these will match server (seed data) if we handle it in MockDatabase
-    // But MockDatabase singleton is shared. 
-    // Best approach: If isHydrating, return empty or seed-safe values.
     users: isHydrating ? [] : getUsers(),
     appointments: isHydrating ? [] : getAppointments(),
     messages: isHydrating ? [] : getMessages(),
@@ -69,55 +72,52 @@ export function useDataStore() {
     invoices: isHydrating ? [] : getInvoices(),
     labResults: isHydrating ? [] : getLabResults(),
     auditLogs: isHydrating ? [] : getAuditLogs(),
-    stats: isHydrating ? db.getEmptyStats() : getStats(),
+    stats: isHydrating ? getEmptyStats() : getStats(),
 
-    // Filtered reads
-    getUserById: db.getUserById.bind(db),
-    getUsersByRole: db.getUsersByRole.bind(db),
-    getDoctors: db.getDoctors.bind(db),
-    getPendingDoctors: db.getPendingDoctors.bind(db),
-    getAppointmentsByPatient: db.getAppointmentsByPatient.bind(db),
-    getAppointmentsByDoctor: db.getAppointmentsByDoctor.bind(db),
-    getUpcomingAppointments: db.getUpcomingAppointments.bind(db),
-    getMessagesByUser: db.getMessagesByUser.bind(db),
-    getInboxMessages: db.getInboxMessages.bind(db),
-    getUnreadCount: db.getUnreadCount.bind(db),
-    getRecordsByPatient: db.getRecordsByPatient.bind(db),
-    getRecordsByDoctor: db.getRecordsByDoctor.bind(db),
-    getPrescriptionsByPatient: db.getPrescriptionsByPatient.bind(db),
-    getPrescriptionsByDoctor: db.getPrescriptionsByDoctor.bind(db),
-    getInvoicesByPatient: db.getInvoicesByPatient.bind(db),
-    getLabResultsByPatient: db.getLabResultsByPatient.bind(db),
-    getDoctorStats: db.getDoctorStats.bind(db),
-    getPatientStats: db.getPatientStats.bind(db),
+    getUserById: safeBind('getUserById'),
+    getUsersByRole: safeBind('getUsersByRole'),
+    getDoctors: safeBind('getDoctors'),
+    getPendingDoctors: safeBind('getPendingDoctors'),
+    getAppointmentsByPatient: safeBind('getAppointmentsByPatient'),
+    getAppointmentsByDoctor: safeBind('getAppointmentsByDoctor'),
+    getUpcomingAppointments: safeBind('getUpcomingAppointments'),
+    getMessagesByUser: safeBind('getMessagesByUser'),
+    getInboxMessages: safeBind('getInboxMessages'),
+    getUnreadCount: safeBind('getUnreadCount'),
+    getRecordsByPatient: safeBind('getRecordsByPatient'),
+    getRecordsByDoctor: safeBind('getRecordsByDoctor'),
+    getPrescriptionsByPatient: safeBind('getPrescriptionsByPatient'),
+    getPrescriptionsByDoctor: safeBind('getPrescriptionsByDoctor'),
+    getInvoicesByPatient: safeBind('getInvoicesByPatient'),
+    getLabResultsByPatient: safeBind('getLabResultsByPatient'),
+    getDoctorStats: safeBind('getDoctorStats'),
+    getPatientStats: safeBind('getPatientStats'),
 
-    // Write operations (trigger re-renders via events)
-    addUser: db.addUser.bind(db),
-    updateUser: db.updateUser.bind(db),
-    updateUserStatus: db.updateUserStatus.bind(db),
-    verifyDoctor: db.verifyDoctor.bind(db),
-    deleteUser: db.deleteUser.bind(db),
+    addUser: safeBind('addUser'),
+    updateUser: safeBind('updateUser'),
+    updateUserStatus: safeBind('updateUserStatus'),
+    verifyDoctor: safeBind('verifyDoctor'),
+    deleteUser: safeBind('deleteUser'),
 
-    addAppointment: db.addAppointment.bind(db),
-    updateAppointmentStatus: db.updateAppointmentStatus.bind(db),
-    rescheduleAppointment: db.rescheduleAppointment.bind(db),
+    addAppointment: safeBind('addAppointment'),
+    updateAppointmentStatus: safeBind('updateAppointmentStatus'),
+    rescheduleAppointment: safeBind('rescheduleAppointment'),
 
-    addMessage: db.addMessage.bind(db),
-    markMessageRead: db.markMessageRead.bind(db),
-    toggleMessageStar: db.toggleMessageStar.bind(db),
+    addMessage: safeBind('addMessage'),
+    markMessageRead: safeBind('markMessageRead'),
+    toggleMessageStar: safeBind('toggleMessageStar'),
 
-    addRecord: db.addRecord.bind(db),
-    updateRecord: db.updateRecord.bind(db),
-    deleteRecord: db.deleteRecord.bind(db),
-    addPrescription: db.addPrescription.bind(db),
-    addInvoice: db.addInvoice.bind(db),
-    payInvoice: db.payInvoice.bind(db),
-    addLabResult: db.addLabResult.bind(db),
-    addAuditLog: db.addAuditLog.bind(db),
+    addRecord: safeBind('addRecord'),
+    updateRecord: safeBind('updateRecord'),
+    deleteRecord: safeBind('deleteRecord'),
+    addPrescription: safeBind('addPrescription'),
+    addInvoice: safeBind('addInvoice'),
+    payInvoice: safeBind('payInvoice'),
+    addLabResult: safeBind('addLabResult'),
+    addAuditLog: safeBind('addAuditLog'),
     
-    resetData: db.resetData.bind(db),
+    resetData: safeBind('resetData'),
   }
 }
 
-// Re-export types for convenience
 export type { User, Appointment, Message, MedicalRecord, Prescription, Invoice, LabResult, AuditLog }

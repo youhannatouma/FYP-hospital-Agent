@@ -40,7 +40,7 @@ export function DoctorNewMessageDialog({ open, onOpenChange }: DoctorNewMessageD
   const [subject, setSubject] = useState("")
   const [content, setContent] = useState("")
 
-  const patients = users.filter(u => u.role === 'Patient')
+  const patients = users.filter((u: any) => u.role === 'Patient')
 
   const handleSend = () => {
     if (!selectedPatientId || !subject || !content) {
@@ -52,7 +52,7 @@ export function DoctorNewMessageDialog({ open, onOpenChange }: DoctorNewMessageD
       return
     }
 
-    const patient = patients.find(p => p.id === selectedPatientId)
+    const patient = patients.find((p: any) => p.id === selectedPatientId)
     if (!patient) return
 
     setSending(true)
@@ -111,7 +111,7 @@ export function DoctorNewMessageDialog({ open, onOpenChange }: DoctorNewMessageD
                 <SelectValue placeholder="Select patient" />
               </SelectTrigger>
               <SelectContent>
-                {patients.map(p => (
+                {patients.map((p: any) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name} {p.customId ? `(${p.customId})` : ""}
                   </SelectItem>

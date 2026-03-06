@@ -41,10 +41,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useToast } from "@/hooks/use-toast"
-import { ReportDetailModal, type Report } from "@/components/patient/report-detail-dialog"
-import { UploadReportDialog } from "@/components/patient/reports/upload-dialog"
-import { ShareReportDialog } from "@/components/patient/reports/share-dialog"
+
+interface Report {
+  id: number
+  name: string
+  type: string
+  typeIcon: typeof FileText
+  typeColor: string
+  uploadDate: string
+  fileSize: string
+  aiSummary: string
+  aiFindings: string[]
+  doctor: string
+  status: string
+  statusColor: string
+}
 
 const reports: Report[] = [
   {
@@ -184,8 +195,75 @@ const reports: Report[] = [
   },
 ]
 
+function ReportDetailModal({ report }: { report: Report }) {
+  return (
+    <DialogContent className="max-w-lg">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2 text-foreground">
+          <report.typeIcon className="h-5 w-5 text-primary" />
+          {report.name}
+        </DialogTitle>
+      </DialogHeader>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <CalendarDays className="h-4 w-4" />
+          <span>{report.uploadDate}</span>
+          <span className="text-border">|</span>
+          <HardDrive className="h-4 w-4" />
+          <span>{report.fileSize}</span>
+        </div>
+
+        <div>
+          <Badge
+            variant="secondary"
+            className={`${report.statusColor} border-0`}
+          >
+            {report.status}
+          </Badge>
+        </div>
+
+        <div className="rounded-lg bg-primary/5 border border-primary/20 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Bot className="h-4 w-4 text-primary" />
+            <h4 className="font-semibold text-sm text-foreground">AI Summary</h4>
+          </div>
+          <p className="text-sm text-muted-foreground">{report.aiSummary}</p>
+        </div>
+
+        <div>
+          <h4 className="font-semibold text-sm text-foreground mb-2">Key Findings</h4>
+          <ul className="flex flex-col gap-1.5">
+            {report.aiFindings.map((finding, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                {finding}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {report.doctor !== "N/A" && (
+          <p className="text-sm text-muted-foreground">
+            Ordered by: <span className="font-medium text-foreground">{report.doctor}</span>
+          </p>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5">
+            <Download className="h-4 w-4" />
+            Download
+          </Button>
+          <Button variant="outline" className="flex-1 border-border text-foreground gap-1.5">
+            <Share2 className="h-4 w-4" />
+            Share with Doctor
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  )
+}
+
 export default function ReportsPage() {
-  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
 
@@ -225,7 +303,9 @@ export default function ReportsPage() {
               Supports PDF, JPG, PNG, DICOM (max 20MB)
             </p>
           </div>
-          <UploadReportDialog />
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+            Choose Files
+          </Button>
         </CardContent>
       </Card>
 
@@ -274,37 +354,18 @@ export default function ReportsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          toast({
-                            title: "View Document",
-                            description: "Opening document viewer for " + report.name,
-                          })
-                        }}
-                      >
+                      <DropdownMenuItem>
                         <Eye className="mr-2 h-4 w-4" />
                         View
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          toast({
-                            title: "Downloading...",
-                            description: report.name + " download started.",
-                          })
-                        }}
-                      >
+                      <DropdownMenuItem>
                         <Download className="mr-2 h-4 w-4" />
                         Download
                       </DropdownMenuItem>
-                      <ShareReportDialog 
-                        reportName={report.name}
-                        trigger={
-                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                            <Share2 className="mr-2 h-4 w-4" />
-                            Share with Doctor
-                          </DropdownMenuItem>
-                        } 
-                      />
+                      <DropdownMenuItem>
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Share with Doctor
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -319,15 +380,7 @@ export default function ReportsPage() {
                 </div>
 
                 <DialogTrigger asChild>
-                  <Button 
-                    className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
-                    onClick={() => {
-                      toast({
-                        title: "Downloading...",
-                        description: report.name + " (" + report.fileSize + ")",
-                      })
-                    }}
-                  >
+                  <Button className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
                     <Download className="mr-1.5 h-3.5 w-3.5" />
                     Download
                   </Button>

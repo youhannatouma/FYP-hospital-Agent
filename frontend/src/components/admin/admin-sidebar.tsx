@@ -59,6 +59,7 @@ export function AdminSidebar() {
   const isCollapsed = state === "collapsed"
 
   const isActive = (href: string) => {
+    if (!pathname) return false
     if (href === "/admin") return pathname === "/admin"
     return pathname.startsWith(href.split("?")[0])
   }

@@ -5,13 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Mail, Plus, Bot, Bell, CreditCard, CalendarDays } from "lucide-react"
-import Link from "next/link"
-import { NewMessageDialog } from "@/components/patient/dashboard/dialogs/new-message-dialog"
-import { PayInvoiceDialog } from "@/components/patient/dashboard/dialogs/pay-invoice-dialog"
-import { useToast } from "@/hooks/use-toast"
+import { Mail, Plus, Bot, Bell, CreditCard, CalendarDays, Sparkles } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
 
-export function MessagesSection() {
+export interface MessagesSectionProps {
+  onNewMessage?: () => void
+  onAction?: (action: string, message: any) => void
+}
+
+export function MessagesSection({ onNewMessage, onAction }: MessagesSectionProps) {
   const { toast } = useToast()
   const [filter, setFilter] = useState<"unread" | "all">("unread")
   const [messages, setMessages] = useState([
@@ -75,164 +78,146 @@ export function MessagesSection() {
     },
   ])
 
-  // API Endpoints Suggestion:
-  // GET: /patient/messages -> Fetch messages for the logged-in patient
-  /*
-    useEffect(() => {
-      const fetchMessages = async () => {
-        try {
-          // const response = await apiClient.get('/patient/messages');
-          // setMessages(response.data);
-        } catch (error) {
-          console.error('Failed to fetch messages', error);
-        }
-      };
-      fetchMessages();
-    }, []);
-  */
-
   const filtered = filter === "unread" ? messages.filter((m) => m.unread) : messages
+  const unreadCount = messages.filter((m) => m.unread).length
 
   return (
-    <Card className="border border-border bg-card shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-card-foreground">
-          <Mail className="h-5 w-5 text-blue-500" />
+    <Card className="premium-card rounded-[2.5rem] border-none shadow-premium overflow-hidden">
+      <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6">
+        <CardTitle className="flex items-center gap-2 text-xl font-black text-card-foreground">
+          <Mail className="h-6 w-6 text-blue-500" />
           Messages & Communication
         </CardTitle>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border/50">
             <Button
               variant={filter === "unread" ? "default" : "ghost"}
               size="sm"
               onClick={() => setFilter("unread")}
-              className={
+              className={cn(
+                "rounded-lg px-4 font-bold text-[10px] uppercase tracking-widest",
                 filter === "unread"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground"
-              }
+                  ? "bg-primary text-white shadow-lg"
+                  : "text-muted-foreground hover:bg-transparent"
+              )}
             >
-              Unread (5)
+              Unread ({unreadCount})
             </Button>
             <Button
               variant={filter === "all" ? "default" : "ghost"}
               size="sm"
               onClick={() => setFilter("all")}
-              className={
+              className={cn(
+                "rounded-lg px-4 font-bold text-[10px] uppercase tracking-widest",
                 filter === "all"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground"
-              }
+                  ? "bg-primary text-white shadow-lg"
+                  : "text-muted-foreground hover:bg-transparent"
+              )}
             >
               All
             </Button>
           </div>
-          <NewMessageDialog />
+          <Button 
+            size="sm" 
+            className="bg-slate-900 text-white hover:bg-slate-800 rounded-xl px-4 font-black text-[10px] uppercase tracking-widest shadow-glow gap-2 h-9"
+            onClick={() => {
+              if (onNewMessage) onNewMessage()
+              else toast({ title: "New Session", description: "Opening message composition..." })
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            New Session
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((msg) => (
             <div
               key={msg.id}
-              className={`rounded-lg border p-4 transition-colors ${
-                msg.unread ? "border-primary/30 bg-primary/5" : "border-border"
-              }`}
+              className={cn(
+                "rounded-2xl border p-5 transition-all hover:shadow-lg group/msg active:scale-98 cursor-pointer",
+                msg.unread 
+                  ? "border-primary/20 bg-primary/[0.02] dark:bg-primary/[0.01]" 
+                  : "border-border/50 bg-card/30"
+              )}
+              onClick={() => {
+                if (onAction) onAction(msg.action.label, msg)
+                else toast({ title: "Action Initiated", description: `${msg.action.label} for ${msg.sender}` })
+              }}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-4">
                 {msg.avatar ? (
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback className={msg.avatarBg}>
+                  <Avatar className="h-11 w-11 shadow-sm border border-border/50">
+                    <AvatarFallback className={cn("font-bold text-sm", msg.avatarBg)}>
                       {msg.avatar}
                     </AvatarFallback>
                   </Avatar>
                 ) : (
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ${msg.iconBg}`}>
-                    {msg.icon && <msg.icon className={`h-4 w-4 ${msg.iconColor}`} />}
+                  <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl shadow-sm border border-border/50", msg.iconBg)}>
+                    {msg.icon && <msg.icon className={cn("h-5 w-5", msg.iconColor)} />}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-semibold text-card-foreground truncate">
+                    <h4 className="text-sm font-black text-card-foreground truncate leading-tight group-hover/msg:text-primary transition-colors">
                       {msg.sender}
                     </h4>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap opacity-60">
                       {msg.time}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                  <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2 leading-relaxed font-medium">
                     {msg.message}
                   </p>
-                  {msg.action.label === "Pay Now" ? (
-                    <PayInvoiceDialog amount="$45.00">
-                      <Button
-                        size="sm"
-                        variant={msg.action.variant}
-                        className={`mt-2 h-7 text-xs ${
-                          msg.action.variant === "default"
-                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {msg.action.label}
-                      </Button>
-                    </PayInvoiceDialog>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant={msg.action.variant}
-                      className={`mt-2 h-7 text-xs ${
-                        msg.action.variant === "default"
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                          : "text-muted-foreground"
-                      }`}
-                      onClick={() => {
-                        toast({
-                          title: msg.action.label === "Reply" ? "Reply Sent" :
-                                 msg.action.label === "Mark as Read" ? "Marked as Read" :
-                                 msg.action.label === "Confirm" ? "Appointment Confirmed" :
-                                 "Details",
-                          description: msg.action.label === "Reply" ? "Your reply has been sent to " + msg.sender + "." :
-                                       msg.action.label === "Mark as Read" ? "Message from " + msg.sender + " marked as read." :
-                                       msg.action.label === "Confirm" ? "Your appointment has been confirmed." :
-                                       "Viewing details for this notification.",
-                        })
-                      }}
-                    >
-                      {msg.action.label}
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant={msg.action.variant}
+                    className={cn(
+                      "mt-4 h-8 px-4 font-black text-[9px] uppercase tracking-widest rounded-lg transition-all",
+                      msg.action.variant === "default"
+                        ? "bg-primary text-white hover:bg-primary/90 shadow-glow"
+                        : "text-muted-foreground border-border/50 hover:bg-muted/50"
+                    )}
+                  >
+                    {msg.action.label}
+                  </Button>
                 </div>
               </div>
             </div>
           ))}
 
           {/* AI Assistant Card */}
-          <div className="rounded-lg border border-amber-300/50 bg-amber-50 dark:bg-amber-500/5 dark:border-amber-500/20 p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500">
-                <Bot className="h-4 w-4 text-white" />
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.03] p-5 relative overflow-hidden group/ai active:scale-98 cursor-pointer shadow-sm hover:shadow-lg transition-all duration-500">
+            <div className="flex items-start gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20 shadow-lg">
+                <Bot className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
-                <h4 className="text-sm font-semibold text-card-foreground">
+                <h4 className="text-sm font-black text-card-foreground leading-tight group-hover/ai:text-amber-500 transition-colors">
                   AI Assistant Available
                 </h4>
-                <p className="text-xs text-muted-foreground">
-                  Get instant answers 24/7
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest opacity-70">
+                  Instant Pulse 24/7
                 </p>
-                <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                  Have questions about your medications, symptoms, or health goals? Our AI assistant is here to help!
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed font-medium italic">
+                  Have questions about diagnostic protocols, medication interactions, or triage guidelines?
                 </p>
-                <Link href="/patient/ai-assistant">
-                  <Button
-                    size="sm"
-                    className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
-                  >
-                    <Bot className="mr-1 h-3 w-3" />
-                    Start AI Chat
-                  </Button>
-                </Link>
+                <Button
+                  size="sm"
+                  className="mt-4 w-full bg-amber-500 text-white hover:bg-amber-600 font-black text-[9px] uppercase tracking-widest rounded-lg shadow-lg shadow-amber-500/10 active:scale-95 transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toast({ title: "AI Sync", description: "Initializing AI Assistant..." })
+                  }}
+                >
+                  <Bot className="mr-2 h-3.5 w-3.5" />
+                  Initialize AI Sync
+                </Button>
               </div>
+            </div>
+            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:ai:opacity-5 transition-opacity">
+              <Sparkles className="h-12 w-12 text-amber-500 rotate-12" />
             </div>
           </div>
         </div>

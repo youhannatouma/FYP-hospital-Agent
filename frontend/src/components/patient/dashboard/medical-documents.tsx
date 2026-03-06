@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FolderOpen, Download, MoreVertical, Plus, Search, FileText, Stethoscope, ShieldCheck } from "lucide-react"
-import { DocumentActionsMenu, DocumentDownloadButton } from "@/components/patient/dashboard/dialogs/document-preview-dialog"
-import { UploadReportDialog } from "@/components/patient/reports/upload-dialog"
 
 import { FlaskConical } from "lucide-react"
 
@@ -134,7 +132,9 @@ export function MedicalDocuments() {
                 >
                   <doc.icon className={`h-5 w-5 ${doc.iconColor}`} />
                 </div>
-                <DocumentActionsMenu doc={doc} />
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
+                  <MoreVertical className="h-3 w-3" />
+                </Button>
               </div>
               <h4 className="text-sm font-semibold text-card-foreground mb-1 truncate">
                 {doc.title}
@@ -142,12 +142,23 @@ export function MedicalDocuments() {
               <p className="text-xs text-muted-foreground">
                 {doc.date} - {doc.size}
               </p>
-              <DocumentDownloadButton title={doc.title} />
+              <Button
+                size="sm"
+                className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
+              >
+                <Download className="h-3 w-3" />
+                Download
+              </Button>
             </div>
           ))}
 
           {/* Upload Card */}
-          <UploadReportDialog />
+          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-4 text-center hover:border-primary/50 transition-colors cursor-pointer">
+            <Plus className="h-8 w-8 text-muted-foreground mb-2" />
+            <p className="text-sm font-medium text-muted-foreground">
+              Upload Document
+            </p>
+          </div>
         </div>
       </CardContent>
     </Card>

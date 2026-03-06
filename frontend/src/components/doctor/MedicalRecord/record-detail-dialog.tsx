@@ -17,12 +17,16 @@ interface RecordDetailDialogProps {
   record: MedicalRecord | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit?: (record: MedicalRecord) => void;
+  onDownload?: (record: MedicalRecord) => void;
 }
 
 export function RecordDetailDialog({
   record,
   open,
   onOpenChange,
+  onEdit,
+  onDownload,
 }: RecordDetailDialogProps) {
   if (!record) return null;
 
@@ -64,7 +68,7 @@ export function RecordDetailDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => console.log("Edit record:", record.id)}
+                onClick={() => onEdit?.(record)}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
@@ -72,7 +76,7 @@ export function RecordDetailDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => console.log("Download record:", record.id)}
+                onClick={() => onDownload?.(record)}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download

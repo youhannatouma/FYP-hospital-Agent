@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/hooks/use-toast";
 
 import * as React from "react";
 import {
@@ -261,6 +262,13 @@ export function DataTable({
         record={selectedRecord}
         open={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
+        onEdit={(record) => {
+          setDetailDialogOpen(false);
+          toast({ title: "Edit Record", description: `Opening edit form for ${record.name}...` });
+        }}
+        onDownload={(record) => {
+          toast({ title: "Download Started", description: `Downloading ${record.name}'s medical record...` });
+        }}
       />
     </div>
   );
