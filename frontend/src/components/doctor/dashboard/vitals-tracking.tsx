@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Activity } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 import {
   LineChart,
   Line,
@@ -28,24 +27,20 @@ const vitalsData = [
 ]
 
 export function VitalsTracking() {
-  const { toast } = useToast()
   const [period] = useState("7d")
 
   return (
-    <Card className="border border-border bg-card shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-card-foreground">
-          <Activity className="h-5 w-5 text-primary" />
+    <Card className="premium-card rounded-[2.5rem] border-none shadow-premium overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between pb-6">
+        <CardTitle className="flex items-center gap-2 text-xl font-black text-card-foreground">
+          <Activity className="h-6 w-6 text-primary" />
           Vitals Tracking
         </CardTitle>
-        <Select defaultValue={period} onValueChange={(val) => toast({
-          title: "Period Updated",
-          description: `Loading vitals data for the last ${val === '7d' ? '7 days' : val === '30d' ? '30 days' : '90 days'}.`,
-        })}>
-          <SelectTrigger className="w-32 h-8 text-xs">
+        <Select defaultValue={period}>
+          <SelectTrigger className="w-36 h-10 rounded-xl bg-muted/50 border-border/50 font-bold text-xs uppercase tracking-widest">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="rounded-xl border-border/50">
             <SelectItem value="7d">Last 7 Days</SelectItem>
             <SelectItem value="30d">Last 30 Days</SelectItem>
             <SelectItem value="90d">Last 90 Days</SelectItem>
@@ -53,50 +48,65 @@ export function VitalsTracking() {
         </Select>
       </CardHeader>
       <CardContent>
-        <div className="h-64">
+        <div className="h-80 w-full pr-4">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={vitalsData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <LineChart data={vitalsData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/30" />
               <XAxis
                 dataKey="date"
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 700 }}
+                dy={10}
               />
               <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 700 }}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                  fontSize: "12px",
+                  backgroundColor: "rgba(255, 255, 255, 0.8)",
+                  backdropFilter: "blur(20px)",
+                  border: "1px solid rgba(0, 0, 0, 0.1)",
+                  borderRadius: "16px",
+                  fontSize: "11px",
+                  fontWeight: "bold",
+                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
                 }}
               />
-              <Legend wrapperStyle={{ fontSize: "12px" }} />
+              <Legend 
+                verticalAlign="top" 
+                align="right" 
+                height={36}
+                iconType="circle"
+                wrapperStyle={{ fontSize: "10px", fontWeight: "black", textTransform: "uppercase", letterSpacing: "0.05em" }} 
+              />
               <Line
                 type="monotone"
                 dataKey="systolic"
                 stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                strokeWidth={4}
+                dot={false}
+                activeDot={{ r: 6, strokeWidth: 0 }}
                 name="Systolic"
               />
               <Line
                 type="monotone"
                 dataKey="diastolic"
-                stroke="hsl(var(--chart-3))"
-                strokeWidth={2}
-                dot={{ r: 4, fill: "hsl(var(--chart-3))" }}
+                stroke="hsl(var(--accent))"
+                strokeWidth={4}
+                dot={false}
+                activeDot={{ r: 6, strokeWidth: 0 }}
                 name="Diastolic"
               />
               <Line
                 type="monotone"
                 dataKey="heartRate"
                 stroke="hsl(var(--destructive))"
-                strokeWidth={2}
-                dot={{ r: 4, fill: "hsl(var(--destructive))" }}
+                strokeWidth={4}
+                dot={false}
+                activeDot={{ r: 6, strokeWidth: 0 }}
                 name="Heart Rate"
               />
             </LineChart>

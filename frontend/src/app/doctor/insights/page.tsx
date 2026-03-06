@@ -1,245 +1,277 @@
 "use client"
 
-import * as React from "react"
-import { TrendingUp, TrendingDown, Users, Activity, Brain, PieChart as PieChartIcon, BarChart3, Target, Calendar, ArrowUpRight } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  LineChart, 
-  Line, 
-  PieChart, 
-  Pie, 
-  Cell 
-} from "recharts"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { toast } from "@/hooks/use-toast"
+import { useState } from "react"
+import { ReviewInsightDialog } from "@/components/doctor/dialogs/review-insight-dialog"
+import { cn } from "@/lib/utils"
+import {
+  TrendingUp,
+  TrendingDown,
+  Brain,
+  Users,
+  Activity,
+  AlertTriangle,
+  Download,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+} from "lucide-react"
+import { m, AnimatePresence } from "framer-motion"
 
-const diagnosisData = [
-  { name: 'Hypertension', value: 35 },
-  { name: 'Diabetes', value: 25 },
-  { name: 'Heart Disease', value: 20 },
-  { name: 'Asthma', value: 15 },
-  { name: 'Other', value: 5 },
+const patientMetrics = [
+  { label: "Total Patients", value: "248", trend: "+12", trendUp: true, icon: Users, color: "bg-blue-500/10 text-blue-600", primary: true },
+  { label: "High-Risk", value: "18", trend: "+3", trendUp: true, icon: AlertTriangle, color: "bg-destructive/10 text-destructive" },
+  { label: "Recovery", value: "94%", trend: "+2%", trendUp: true, icon: TrendingUp, color: "bg-emerald-500/10 text-emerald-600" },
+  { label: "Load", value: "12/day", trend: "-1", trendUp: false, icon: Activity, color: "bg-amber-500/10 text-amber-600" },
 ]
 
-const activityData = [
-  { name: 'Mon', visits: 12, ai_assists: 8 },
-  { name: 'Tue', visits: 15, ai_assists: 12 },
-  { name: 'Wed', visits: 10, ai_assists: 7 },
-  { name: 'Thu', visits: 18, ai_assists: 15 },
-  { name: 'Fri', visits: 22, ai_assists: 19 },
-  { name: 'Sat', visits: 8, ai_assists: 5 },
-  { name: 'Sun', visits: 5, ai_assists: 2 },
+const aiInsights = [
+  {
+    id: 1,
+    category: "High Risk",
+    title: "3 patients show elevated cardiovascular risk indicators",
+    description: "Patients John Doe, Emily Davis, and Robert Brown have combined risk scores above threshold. Consider scheduling priority follow-ups.",
+    severity: "high",
+  },
+  {
+    id: 2,
+    category: "Medication",
+    title: "Potential drug interaction flagged for 2 patients",
+    description: "Cross-reference of current prescriptions reveals a possible interaction between Lisinopril and NSAID usage in 2 patients.",
+    severity: "medium",
+  },
+  {
+    id: 3,
+    category: "Preventive",
+    title: "12 patients are overdue for annual screenings",
+    description: "Based on appointment history, 12 patients have not had their annual physical or relevant screenings in over 12 months.",
+    severity: "low",
+  },
 ]
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+const severityColors: Record<string, string> = {
+  high: "bg-destructive/10 text-destructive",
+  medium: "bg-amber-500/10 text-amber-600",
+  low: "bg-blue-500/10 text-blue-600",
+}
 
-export default function HealthInsightsPage() {
-  const { toast } = useToast()
+const diagnosisTrends = [
+  { diagnosis: "Hypertension", count: 48, trend: "up" },
+  { diagnosis: "Type 2 Diabetes", count: 32, trend: "stable" },
+  { diagnosis: "Hypercholesterolemia", count: 27, trend: "up" },
+  { diagnosis: "Asthma", count: 15, trend: "down" },
+  { diagnosis: "Anxiety / Depression", count: 22, trend: "up" },
+]
+
+function TrendIcon({ trend }: { trend: string }) {
+  if (trend === "up") return <ArrowUp className="h-3.5 w-3.5 text-destructive" />
+  if (trend === "down") return <ArrowDown className="h-3.5 w-3.5 text-emerald-600" />
+  return <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+}
+
+export default function DoctorInsightsPage() {
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
+  const [selectedInsight, setSelectedInsight] = useState<any>(null)
+
+  const handleReview = (insight: any) => {
+    setSelectedInsight(insight)
+    setIsReviewOpen(true)
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <m.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="flex flex-col gap-10 max-w-[1200px] mx-auto pb-20"
+    >
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between px-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Health Insights</h1>
-          <p className="text-muted-foreground text-sm">Advanced clinical analytics and patient population trends.</p>
+          <Badge variant="outline" className="mb-4 border-primary/20 text-primary bg-primary/5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest leading-none">
+            Population Analytics
+          </Badge>
+          <h1 className="text-4xl font-black text-foreground tracking-tight leading-none">
+            Health Insights
+          </h1>
+          <p className="text-muted-foreground mt-3 font-medium text-lg max-w-lg">
+            AI-powered clinical intelligence identifying risks and opportunities across your patient directory.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            className="gap-2"
-            onClick={() => toast({ title: "Custom Range", description: "Opening calendar for custom date range selection..." })}
-          >
-            <Calendar className="h-4 w-4" /> Last 30 Days
-          </Button>
-          <Button 
-            className="gap-2"
-            onClick={() => toast({ title: "Report Generation", description: "Aggregating clinical data for your monthly report..." })}
-          >
-            Generate Report
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          className="gap-3 border-border/50 text-foreground h-11 px-6 rounded-xl hover:bg-muted/50 transition-all font-bold"
+          onClick={() => toast({ title: "Export", description: "Generating insights report..." })}
+        >
+          <Download className="h-4 w-4" />
+          Export Report
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Total Patients", value: "1,284", trend: "+12.5%", positive: true, icon: Users },
-          { label: "Avg. Daily Visits", value: "18.2", trend: "+5.2%", positive: true, icon: Activity },
-          { label: "Success Rate", value: "94.2%", trend: "-0.5%", positive: false, icon: Target },
-          { label: "AI Insights", value: "48", trend: "+24.3%", positive: true, icon: Brain },
-        ].map((stat, i) => (
-          <Card 
-            key={i} 
-            className="border-none shadow-sm hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer"
-            onClick={() => toast({ title: stat.label, description: `Filtering trends and historical data for ${stat.label.toLowerCase()}...` })}
+      {/* Asymmetric Metric Cards */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:grid-cols-4 px-2">
+         {patientMetrics.map((metric, idx) => (
+          <m.div
+            key={metric.label}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: idx * 0.1, duration: 0.5 }}
+            className={cn(
+               "premium-card p-6 rounded-3xl relative overflow-hidden group min-h-[160px] flex flex-col justify-between",
+               metric.primary ? "md:col-span-2 lg:col-span-2 bg-slate-900 text-white border-slate-800 shadow-2xl" : "bg-card shadow-sm"
+            )}
           >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between space-y-0 pb-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{stat.label}</p>
-                <stat.icon className="h-4 w-4 text-primary" />
+            {metric.primary && (
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-indigo-500/10 opacity-50" />
+            )}
+            
+            <div className="relative z-10 flex justify-between items-start">
+              <div className={cn(
+                "w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3",
+                metric.primary ? "bg-white/10" : metric.color
+              )}>
+                <metric.icon className="h-6 w-6" />
               </div>
-              <div className="flex items-baseline gap-3">
-                <h3 className="text-2xl font-bold">{stat.value}</h3>
-                <span className={`text-[10px] font-bold flex items-center gap-0.5 ${stat.positive ? 'text-emerald-500' : 'text-rose-500'}`}>
-                   {stat.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                   {stat.trend}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+              <Badge 
+                variant="secondary" 
+                className={cn(
+                  "border-none text-[10px] font-black px-2 py-0.5 rounded-lg",
+                  metric.trendUp ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-600",
+                  metric.primary && "bg-white/10 text-white"
+                )}
+              >
+                {metric.trend}
+              </Badge>
+            </div>
+
+            <div className="relative z-10 mt-auto">
+              <p className={cn(
+                "text-sm font-bold uppercase tracking-widest",
+                metric.primary ? "text-slate-400" : "text-muted-foreground"
+              )}>
+                {metric.label}
+              </p>
+              <h3 className="text-4xl font-black mt-1 leading-none tracking-tighter">
+                {metric.value}
+              </h3>
+            </div>
+            
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          </m.div>
         ))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4 border-none shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Clinical Activity</CardTitle>
-            <CardDescription>Visits vs AI-assisted diagnoses over the last week.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={activityData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    cursor={{fill: 'transparent'}}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Bar dataKey="visits" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="ai_assists" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="px-2">
+        <Tabs defaultValue="insights" className="w-full">
+          <TabsList className="bg-muted/50 p-1.5 rounded-2xl mb-8 border border-border/50 max-w-fit">
+            <TabsTrigger value="insights" className="rounded-xl px-8 font-bold data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all">
+              Clinical Insights
+            </TabsTrigger>
+            <TabsTrigger value="trends" className="rounded-xl px-8 font-bold data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all">
+              Diagnosis Trends
+            </TabsTrigger>
+          </TabsList>
 
-        <Card className="lg:col-span-3 border-none shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Diagnosis Distribution</CardTitle>
-            <CardDescription>Population health breakdown by condition.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[250px] w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={diagnosisData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
+          <TabsContent value="insights" className="mt-0 outline-none">
+            <div className="grid gap-4">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {aiInsights.map((insight, idx) => (
+                  <m.div
+                    key={insight.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: idx * 0.1 }}
                   >
-                    {diagnosisData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+                    <Card className="premium-card rounded-2xl overflow-hidden hover:border-primary/30 group border-none shadow-premium">
+                      <CardContent className="p-0">
+                        <div className="flex flex-col sm:flex-row items-stretch">
+                          <div className={cn(
+                            "w-2 shrink-0 transition-colors duration-500",
+                            severityColors[insight.severity].split(" ").pop()
+                          )} />
+                          <div className="flex-1 p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between py-8">
+                            <div className="flex items-start gap-5">
+                              <div className={cn(
+                                "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-transform duration-500 group-hover:scale-110",
+                                severityColors[insight.severity]
+                              )}>
+                                <Brain className="h-7 w-7" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge className={cn("border-none text-[10px] font-black uppercase tracking-widest", severityColors[insight.severity])}>
+                                    {insight.category}
+                                  </Badge>
+                                </div>
+                                <h3 className="text-xl font-bold text-foreground leading-tight tracking-tight">{insight.title}</h3>
+                                <p className="mt-2 text-sm text-muted-foreground font-medium max-w-2xl">{insight.description}</p>
+                              </div>
+                            </div>
+                            <Button
+                              size="lg"
+                              variant="outline"
+                              className="border-border/50 text-foreground shrink-0 px-8 font-bold rounded-xl bg-muted/30 hover:bg-primary hover:text-white hover:border-primary transition-all duration-300"
+                              onClick={() => handleReview(insight)}
+                            >
+                              Take Action
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </m.div>
+                ))}
+              </AnimatePresence>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {diagnosisData.map((entry, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">{entry.name} ({entry.value}%)</span>
+          </TabsContent>
+
+          <TabsContent value="trends" className="mt-0 outline-none">
+            <Card className="premium-card rounded-3xl overflow-hidden min-h-[400px] border-none shadow-premium">
+              <CardHeader className="p-8 border-b border-border/50 bg-muted/10">
+                <CardTitle className="text-2xl font-black text-foreground tracking-tight">Diagnosis Velocity</CardTitle>
+                <p className="text-sm text-muted-foreground font-medium">Top findings across your practice in the last 90 days</p>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="flex flex-col gap-6">
+                  {diagnosisTrends.map((item, idx) => (
+                    <m.div 
+                      key={item.diagnosis} 
+                      className="flex items-center gap-6"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: idx * 0.1 }}
+                    >
+                      <span className="w-48 text-sm font-bold text-foreground shrink-0 uppercase tracking-tight">{item.diagnosis}</span>
+                      <div className="flex-1 h-3 rounded-full bg-muted/50 overflow-hidden relative inner-glow">
+                        <m.div
+                          className="h-full rounded-full bg-gradient-to-r from-primary/80 to-primary"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(item.count / 50) * 100}%` }}
+                          transition={{ duration: 1, delay: 0.5 + idx * 0.1, ease: "circOut" }}
+                        />
+                      </div>
+                      <div className="w-16 flex items-center justify-end gap-2">
+                         <span className="text-lg font-black text-foreground">{item.count}</span>
+                         <TrendIcon trend={item.trend} />
+                      </div>
+                    </m.div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border-none shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">High-Risk Patients</CardTitle>
-              <CardDescription>AI-flagged patients requiring immediate follow-up.</CardDescription>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="gap-2 text-primary"
-              onClick={() => toast({ title: "Risk Stratification", description: "Loading full high-risk patient dashboard..." })}
-            >
-              View All <ArrowUpRight className="h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { name: "Michael Johnson", risk: "Critical", reason: "Sustained high BP spikes", time: "2h ago" },
-                { name: "Sarah Thompson", risk: "High", reason: "Abnormal ECG patterns", time: "4h ago" },
-                { name: "Robert Brown", risk: "Elevated", reason: "Medication non-adherence", time: "6h ago" },
-              ].map((patient, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/5">
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-bold">{patient.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{patient.reason}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge variant="outline" className={
-                      patient.risk === "Critical" ? "bg-rose-500/10 text-rose-600 border-rose-200" :
-                      patient.risk === "High" ? "bg-amber-500/10 text-amber-600 border-amber-200" :
-                      "bg-blue-500/10 text-blue-600 border-blue-200"
-                    }>
-                      {patient.risk}
-                    </Badge>
-                    <span className="text-[9px] text-muted-foreground">{patient.time}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Operational Insights</CardTitle>
-            <CardDescription>Efficiency metrics and bottleneck identification.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-             <div className="space-y-2">
-               <div className="flex justify-between text-xs font-medium">
-                  <span>Avg. Consultation Time</span>
-                  <span className="text-primary">14.2 min</span>
-               </div>
-               <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                 <div className="h-full bg-primary w-[70%]" />
-               </div>
-             </div>
-             <div className="space-y-2">
-               <div className="flex justify-between text-xs font-medium">
-                  <span>Wait Time Efficiency</span>
-                  <span className="text-emerald-500">+15% vs Avg</span>
-               </div>
-               <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                 <div className="h-full bg-emerald-500 w-[85%]" />
-               </div>
-             </div>
-             <div className="p-4 bg-muted/30 rounded-xl space-y-2">
-               <div className="flex items-center gap-2 text-xs font-bold uppercase text-muted-foreground">
-                 <Brain className="h-3 w-3" /> AI Recommendation
-               </div>
-               <p className="text-xs italic leading-relaxed">
-                 "Consider shifting 10% of follow-up visits to tele-health on Fridays to reduce peak corridor congestion and increase throughput by 4%."
-               </p>
-             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      <ReviewInsightDialog 
+        open={isReviewOpen}
+        onOpenChange={setIsReviewOpen}
+        insight={selectedInsight}
+      />
+    </m.div>
   )
 }

@@ -14,8 +14,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CreditCard, ShieldCheck, CheckCircle2, Loader2 } from "lucide-react"
 
-import { useDataStore } from "@/hooks/use-data-store"
-
 interface PaymentDialogProps {
   invoice: any
   open: boolean
@@ -29,21 +27,16 @@ export function PaymentDialog({
   onOpenChange,
   onSuccess
 }: PaymentDialogProps) {
-  const { payInvoice } = useDataStore()
   const [step, setStep] = useState<"form" | "processing" | "success">("form")
   
   if (!invoice) return null
 
   const handlePay = () => {
     setStep("processing")
-    
-    // Actually update the DB
-    payInvoice(invoice.id)
-
-    // Simulate network delay for UX
+    // Simulate API call
     setTimeout(() => {
       setStep("success")
-    }, 1500)
+    }, 2000)
   }
 
   const handleClose = () => {

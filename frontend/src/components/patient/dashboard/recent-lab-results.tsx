@@ -1,145 +1,126 @@
 "use client"
 
-import * as React from "react"
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { FlaskConical, Download, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { useToast } from "@/hooks/use-toast"
-import { Dialog, DialogTrigger } from "@/components/ui/dialog"
-import { ReportDetailModal, Report } from "../report-detail-dialog"
-import { FileText, FlaskConical } from "lucide-react"
+import { m, AnimatePresence } from "framer-motion"
+import { cn } from "@/lib/utils"
 
 export function RecentLabResults() {
-  const { toast } = useToast()
-  const [downloading, setDownloading] = useState<number | null>(null)
-  const [labResults, setLabResults] = React.useState([
+  const labResults = [
     {
       id: 1,
-      name: "Lipid Panel",
-      type: "Lab Report",
-      typeIcon: FileText,
-      typeColor: "text-amber-500",
-      uploadDate: "Jan 8, 2024",
-      fileSize: "1.2 MB",
-      aiSummary: "Lipid profile shows elevated LDL and total cholesterol levels.",
-      aiFindings: ["Total Cholesterol: 245 mg/dL (High)", "LDL: 165 mg/dL (High)", "HDL: 48 mg/dL (Low)"],
-      doctor: "Dr. Michael Chen",
-      status: "Review Needed",
-      statusColor: "bg-amber-500/10 text-amber-600",
-      borderColor: "border-amber-300/50",
-      downloadColor: "bg-amber-500 text-white hover:bg-amber-600",
+      title: "Comprehensive Lipid Panel",
       collected: "Collected: Jan 8, 2024",
+      status: "Review Required",
+      statusColor: "bg-amber-500/10 text-amber-500",
+      icon: AlertCircle,
       values: [
         { label: "Total Cholesterol", value: "245 mg/dL", flag: true },
-        { label: "LDL", value: "165 mg/dL", flag: true },
-        { label: "HDL", value: "48 mg/dL", flag: false },
+        { label: "LDL (Bad)", value: "165 mg/dL", flag: true },
+        { label: "HDL (Good)", value: "48 mg/dL", flag: false },
         { label: "Triglycerides", value: "160 mg/dL", flag: false },
       ],
+      premium: true,
     },
     {
       id: 2,
-      name: "Complete Blood Count",
-      type: "Lab Report",
-      typeIcon: FileText,
-      typeColor: "text-rose-500",
-      uploadDate: "Dec 15, 2023",
-      fileSize: "0.8 MB",
-      aiSummary: "CBC results are within normal ranges with no significant abnormalities.",
-      aiFindings: ["WBC, RBC, and Platelets all normal", "Hemoglobin stable"],
-      doctor: "Dr. Michael Chen",
-      status: "Normal",
-      statusColor: "bg-emerald-500/10 text-emerald-600",
-      borderColor: "border-border",
-      downloadColor: "bg-muted text-muted-foreground hover:bg-muted/80",
+      title: "CBC with Differential",
       collected: "Collected: Dec 15, 2023",
+      status: "Normal / Optimal",
+      statusColor: "bg-emerald-500/10 text-emerald-500",
+      icon: CheckCircle2,
       values: [
         { label: "WBC", value: "7.2 K/uL", flag: false },
-        { label: "RBC", value: "4.8 M/uL", flag: false },
         { label: "Hemoglobin", value: "14.2 g/dL", flag: false },
         { label: "Platelets", value: "250 K/uL", flag: false },
+        { label: "RBC", value: "4.8 M/uL", flag: false },
       ],
+      premium: false,
     },
-  ])
+  ]
 
-  const [selectedReport, setSelectedReport] = useState<any>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-
-  // API Endpoints Suggestion:
-  // GET: /patient/labs/recent -> Fetch recent lab results for the patient
-  /*
-    React.useEffect(() => {
-      const fetchLabResults = async () => {
-        try {
-          // const response = await apiClient.get('/patient/labs/recent');
-          // setLabResults(response.data);
-        } catch (error) {
-          console.error('Failed to fetch lab results', error);
-        }
-      };
-      fetchLabResults();
-    }, []);
-  */
   return (
-    <Card className="border border-border bg-card shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-card-foreground">
-          <FlaskConical className="h-5 w-5 text-rose-500" />
-          Recent Lab Results
-        </CardTitle>
-        <Link href="/patient/lab-results" className="text-sm text-primary hover:underline">
-          View All
-        </Link>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {labResults.map((result) => (
-          <div
-            key={result.id}
-            className={`rounded-lg border p-4 cursor-pointer hover:shadow-md transition-all ${result.borderColor}`}
-            onClick={() => {
-              setSelectedReport(result)
-              setDialogOpen(true)
-            }}
-          >
-            <div className="flex items-start justify-between mb-1">
-              <h4 className="text-sm font-semibold text-card-foreground">
-                {result.name}
-              </h4>
-              <Badge
-                variant="secondary"
-                className={`text-xs ${result.statusColor} border-0`}
-              >
-                {result.status}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3">
-              {result.collected}
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {result.values.map((val) => (
-                <div key={val.label}>
-                  <span className="text-[11px] text-muted-foreground">
-                    {val.label}
-                  </span>
-                  <p
-                    className={`text-sm font-semibold ${
-                      val.flag
-                        ? "text-amber-600"
-                        : "text-card-foreground"
-                    }`}
-                  >
-                    {val.value} {val.flag && <span className="text-xs">&#x2191;</span>}
+    <div className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden h-full flex flex-col">
+      <div className="p-8 pb-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-3">
+               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 shadow-inner-glow">
+                 <FlaskConical className="h-5 w-5" />
+               </div>
+               Diagnostics
+            </h2>
+          </div>
+          <Link href="/patient/lab-results" className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline underline-offset-4">
+            Full Archive
+          </Link>
+        </div>
+      </div>
+      
+      <div className="p-8 pt-4 flex flex-col gap-6 flex-1">
+        <AnimatePresence mode="popLayout">
+          {labResults.map((result, idx) => (
+            <m.div
+              key={result.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              className={cn(
+                "premium-card p-6 rounded-3xl border border-border/30 group transition-all duration-500 relative overflow-hidden",
+                result.premium ? "bg-muted/30" : "bg-transparent"
+              )}
+            >
+              <div className="flex items-start justify-between mb-4 relative z-10">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-foreground tracking-tight leading-tight">
+                    {result.title}
+                  </h3>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    {result.collected}
                   </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </CardContent>
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        {selectedReport && <ReportDetailModal report={selectedReport} />}
-      </Dialog>
-    </Card>
+                <Badge className={cn("border-none text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg", result.statusColor)}>
+                   <result.icon className="h-3 w-3 mr-1" />
+                   {result.status}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 relative z-10">
+                {result.values.map((val) => (
+                  <div key={val.label} className="space-y-1">
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">
+                      {val.label}
+                    </span>
+                    <p className={cn(
+                      "text-sm font-black flex items-center gap-1",
+                      val.flag ? "text-amber-500" : "text-foreground"
+                    )}>
+                      {val.value}
+                      {val.flag && <span className="text-xs animate-bounce">&#x2191;</span>}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                size="sm"
+                className="mt-6 w-full gap-2 rounded-xl h-10 bg-background border border-border/50 text-foreground hover:bg-primary hover:text-white hover:border-primary font-black text-[10px] uppercase tracking-widest transition-all shadow-subtle group-hover:scale-[1.02]"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Retrieve Full Analysis
+              </Button>
+            </m.div>
+          ))}
+        </AnimatePresence>
+        
+        <div className="mt-auto pt-4 text-center">
+           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">
+             End of recent findings
+           </p>
+        </div>
+      </div>
+    </div>
   )
 }

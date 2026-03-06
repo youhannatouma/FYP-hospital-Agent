@@ -4,79 +4,144 @@ import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CalendarDays, Clock, Video, ArrowRight } from "lucide-react"
+import { CalendarDays, Clock, Video, ChevronRight, MapPin } from "lucide-react"
 import Link from "next/link"
-import { JoinMeetingDialog } from "@/components/patient/dashboard/dialogs/join-meeting-dialog"
-import { AppointmentDetailsDialog } from "@/components/patient/dashboard/dialogs/appointment-details-dialog"
-import { useDataStore } from "@/hooks/use-data-store"
+import { VideoCallDialog } from "@/components/shared/video-call-dialog"
+import { m, AnimatePresence } from "framer-motion"
+import { cn } from "@/lib/utils"
 
 export function UpcomingVisits() {
-  const { appointments } = useDataStore()
+  const [visits] = React.useState([
+    {
+      id: 1,
+      title: "Cardiology Follow-up",
+      doctor: "Dr. Michael Chen",
+      specialty: "Senior Cardiologist",
+      date: "Jan 25, 2024",
+      time: "10:00 AM",
+      type: "Priority",
+      typeColor: "bg-primary/10 text-primary",
+      isVirtual: true,
+    },
+    {
+      id: 2,
+      title: "Annual Physical",
+      doctor: "Dr. Emily Watson",
+      specialty: "General Medicine",
+      date: "Feb 15, 2024",
+      time: "2:30 PM",
+      type: "Confirmed",
+      typeColor: "bg-muted/50 text-muted-foreground",
+      isVirtual: false,
+    },
+  ])
 
-  const upcomingVisits = appointments
-    .filter(app => app.status === 'Scheduled' || app.status === 'Pending')
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 3)
+  const [isOpen, setIsOpen] = React.useState(false)
+  const [activeDoctor, setActiveDoctor] = React.useState("")
+
+  const handleJoin = (name: string) => {
+    setActiveDoctor(name)
+    setIsOpen(true)
+  }
 
   return (
-    <Card className="border-sidebar-border bg-card/50 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg font-bold">
-          <CalendarDays className="h-5 w-5 text-primary" />
-          Upcoming Visits
-        </CardTitle>
+    <Card className="premium-card rounded-[2rem] border-none shadow-premium overflow-hidden bg-card">
+      <CardHeader className="p-8 pb-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-3 text-xl font-black text-foreground tracking-tight">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent shadow-inner-glow">
+              <CalendarDays className="h-5 w-5" />
+            </div>
+            Upcoming Visits
+          </CardTitle>
+          <Badge variant="outline" className="border-border/50 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg">
+            {visits.length} Events
+          </Badge>
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {upcomingVisits.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground text-sm border-2 border-dashed border-muted rounded-xl">
-             No upcoming clinical appointments.
-          </div>
-        ) : (
-          upcomingVisits.map((visit) => (
-            <div
-              key={visit.id}
-              className="rounded-xl border border-sidebar-border bg-background p-4 hover:border-primary/30 transition-all group"
-            >
-              <AppointmentDetailsDialog appointment={visit}>
-                <div className="flex items-start justify-between mb-2 cursor-pointer group-hover:text-primary transition-colors">
-                  <h4 className="font-bold truncate max-w-[150px]">
-                    {visit.doctorName}
-                  </h4>
-                  <Badge className={
-                    visit.status === 'Scheduled' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                  } variant="outline">
-                    {visit.status === 'Scheduled' ? 'Confirmed' : visit.status}
+      <CardContent className="p-8 pt-4 flex flex-col gap-6">
+        <div className="space-y-4">
+          <AnimatePresence mode="popLayout">
+            {visits.map((visit, idx) => (
+              <m.div
+                key={visit.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.1 }}
+                className={cn(
+                  "premium-card p-5 rounded-2xl relative overflow-hidden group border border-border/30 transition-all duration-300",
+                  idx === 0 ? "shadow-md bg-muted/20" : "bg-transparent shadow-none"
+                )}
+              >
+                <div className="flex items-start justify-between mb-4 relative z-10">
+                  <div className="flex flex-col">
+                    <h4 className="text-base font-black text-foreground tracking-tight leading-tight group-hover:text-primary transition-colors">
+                      {visit.title}
+                    </h4>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
+                      {visit.doctor} • {visit.specialty}
+                    </span>
+                  </div>
+                  <Badge className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border-none transition-transform group-hover:scale-105", visit.typeColor)}>
+                    {visit.type}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground font-medium mb-3 italic">
-                  {visit.type}
-                </p>
-                <div className="flex items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  <span className="flex items-center gap-1">
-                    <CalendarDays className="h-3 w-3 text-rose-500" />
-                    {visit.date}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {visit.time}
-                  </span>
+
+                <div className="flex items-center gap-6 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-lg bg-background flex items-center justify-center border border-border/50 shadow-sm">
+                      <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <span className="text-xs font-bold text-foreground">{visit.date}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-lg bg-background flex items-center justify-center border border-border/50 shadow-sm">
+                      <Clock className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <span className="text-xs font-bold text-foreground">{visit.time}</span>
+                  </div>
+                  {!visit.isVirtual && (
+                    <div className="flex items-center gap-2 ml-auto">
+                       <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Main Clinic</span>
+                    </div>
+                  )}
                 </div>
-              </AppointmentDetailsDialog>
-              
-              {visit.type?.toLowerCase().includes('virtual') && (
-                <div className="mt-4 pt-4 border-t border-sidebar-border">
-                   <JoinMeetingDialog />
+
+                {visit.isVirtual && (
+                  <Button
+                    size="sm"
+                    className="mt-5 w-full bg-primary text-white hover:bg-primary/90 rounded-xl h-10 font-bold text-xs uppercase tracking-widest shadow-glow active:scale-[0.98] transition-all"
+                    onClick={() => handleJoin(visit.doctor)}
+                  >
+                    <Video className="mr-2 h-4 w-4" />
+                    Join Digital Console
+                  </Button>
+                )}
+                
+                <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-5 transition-opacity">
+                   <ChevronRight className="w-12 h-12 rotate-[-15deg]" />
                 </div>
-              )}
-            </div>
-          ))
-        )}
-        <Button variant="ghost" className="w-full text-xs font-bold text-primary gap-2 mt-2" asChild>
-          <Link href="/patient/appointments">
-            Manage Appointments <ArrowRight className="h-3 w-3" />
-          </Link>
-        </Button>
+              </m.div>
+            ))}
+          </AnimatePresence>
+        </div>
+
+        <Link
+          href="/patient/appointments"
+          className="flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-border/50 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:border-solid transition-all"
+        >
+          View Full Directory
+          <ChevronRight className="h-3 w-3" />
+        </Link>
       </CardContent>
+
+      <VideoCallDialog 
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        remoteName={activeDoctor}
+        role="patient"
+      />
     </Card>
   )
 }

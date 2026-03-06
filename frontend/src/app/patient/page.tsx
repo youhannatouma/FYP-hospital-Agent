@@ -1,7 +1,10 @@
 "use client"
 
-import { BookAppointmentDialog } from "@/components/patient/appointments/book-appointment-dialog"
-import { ContactDoctorDialog } from "@/components/patient/dashboard/dialogs/contact-doctor-dialog"
+import { useState } from "react"
+import { m, AnimatePresence } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { CalendarPlus, Phone, Sparkles, ArrowRight } from "lucide-react"
 import { StatCards } from "@/components/patient/dashboard/stat-cards"
 import { MedicalHistoryTimeline } from "@/components/patient/dashboard/medical-history-timeline"
 import { AIHealthAvatar } from "@/components/patient/dashboard/ai-health-avatar"
@@ -15,77 +18,118 @@ import { HealthEducation } from "@/components/patient/dashboard/health-education
 import { CurrentMedications } from "@/components/patient/dashboard/current-medications"
 import { RecentLabResults } from "@/components/patient/dashboard/recent-lab-results"
 import { MedicalDocuments } from "@/components/patient/dashboard/medical-documents"
-import { useDataStore } from "@/hooks/use-data-store"
-import { useUser } from "@clerk/nextjs"
-import { format } from "date-fns"
+import { BookAppointmentDialog } from "@/components/patient/dialogs/book-appointment-dialog"
+import { ContactDoctorDialog } from "@/components/patient/dialogs/contact-doctor-dialog"
+import { cn } from "@/lib/utils"
 
 export default function PatientDashboardPage() {
-  const { isHydrating } = useDataStore()
-  const { user } = useUser()
-
-  if (isHydrating) {
-    return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
+  const [showBookAppointment, setShowBookAppointment] = useState(false)
+  const [showContactDoctor, setShowContactDoctor] = useState(false)
 
   return (
-    <div className="flex flex-col gap-8 animate-in fade-in duration-700">
-      {/* Welcome Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Welcome back, {user?.firstName || "Friend"}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {"Your health summary for " + format(new Date(), "MMMM dd, yyyy")}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <BookAppointmentDialog />
-          <ContactDoctorDialog />
-        </div>
-      </div>
-
-      {/* Stat Cards */}
-      <StatCards />
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Left Columns */}
-        <div className="lg:col-span-2 space-y-8">
-          <MedicalHistoryTimeline />
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            <CurrentMedications />
-            <RecentLabResults />
+    <AnimatePresence mode="wait">
+      <m.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="flex flex-col gap-12 max-w-[1400px] mx-auto pb-24 px-4 sm:px-6"
+      >
+        {/* Premium Header */}
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between pt-4">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest leading-none shadow-inner-glow">
+              <Sparkles className="h-3 w-3" />
+              Patient Ecosystem
+            </div>
+            <div>
+              <h1 className="text-4xl font-black text-foreground tracking-tight leading-none lg:text-5xl">
+                Welcome back, Sarah
+              </h1>
+              <p className="text-muted-foreground mt-4 font-medium text-lg max-w-lg leading-relaxed">
+                Your health telemetry is synchronized. Summary for <span className="text-foreground font-black underline decoration-primary/30 underline-offset-4">January 15, 2024</span>.
+              </p>
+            </div>
           </div>
-          <MedicalDocuments />
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <Button 
+              variant="outline" 
+              className="gap-3 border-border/50 text-foreground h-12 px-6 rounded-2xl hover:bg-muted/50 transition-all font-black text-xs uppercase tracking-widest shadow-subtle group"
+              onClick={() => setShowBookAppointment(true)}
+            >
+              <CalendarPlus className="h-4 w-4 transition-transform group-hover:scale-110" />
+              Book Session
+            </Button>
+            <Button 
+              className="gap-3 bg-slate-900 text-white hover:bg-slate-800 h-12 px-8 rounded-2xl transition-all font-black text-xs uppercase tracking-widest shadow-glow group"
+              onClick={() => setShowContactDoctor(true)}
+            >
+              <Phone className="h-4 w-4 transition-transform group-hover:rotate-12" />
+              Consult Specialist
+              <ArrowRight className="h-4 w-4 ml-2 opacity-30 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+            </Button>
+          </div>
         </div>
 
-        {/* Right Column */}
-        <div className="flex flex-col gap-8">
-          <AIHealthAvatar />
-          <UpcomingVisits />
-          <VitalsTracking />
-          <HealthGoals />
-        </div>
-      </div>
+        {/* Core Metrics Staggered */}
+        <div className="space-y-12">
+          {/* Stat Cards - Horizontal Layer */}
+          <section>
+            <StatCards />
+          </section>
 
-      {/* Insights Section */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-         <div className="lg:col-span-2">
+          {/* Asymmetric Core Grid: Timeline + AI Focus */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 items-start">
+            <div className="lg:col-span-2 order-2 lg:order-1">
+              <MedicalHistoryTimeline />
+            </div>
+            <div className="flex flex-col gap-8 order-1 lg:order-2">
+              <AIHealthAvatar />
+              <div className="hidden lg:block">
+                 <HealthTip />
+              </div>
+            </div>
+          </div>
+
+          {/* Rhythm Shift: Upcoming + Vitals */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <div className="order-2 lg:order-1">
+              <UpcomingVisits />
+            </div>
+            <div className="lg:col-span-2 order-1 lg:order-2">
+              <VitalsTracking />
+            </div>
+          </div>
+
+          {/* Secondary Intelligence: Medications + Labs + Goals */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+             <CurrentMedications />
+             <RecentLabResults />
+             <HealthGoals />
+          </div>
+
+          {/* Deep Insights Full Width */}
+          <section className="pt-8 border-t border-border/30">
             <AIHealthInsights />
-         </div>
-         <HealthTip />
-      </div>
+          </section>
 
-      {/* Bottom Section */}
-      <div className="border-t border-sidebar-border pt-8 space-y-8">
-        <MessagesSection />
-        <HealthEducation />
-      </div>
-    </div>
+          {/* Utility Sections Staggered */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+             <MessagesSection />
+             <div className="flex flex-col gap-8">
+                <MedicalDocuments />
+                <HealthEducation />
+             </div>
+          </div>
+        </div>
+
+        <div className="mt-12 lg:hidden">
+           <HealthTip />
+        </div>
+
+        <BookAppointmentDialog open={showBookAppointment} onOpenChange={setShowBookAppointment} />
+        <ContactDoctorDialog open={showContactDoctor} onOpenChange={setShowContactDoctor} />
+      </m.div>
+    </AnimatePresence>
   )
 }

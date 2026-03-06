@@ -96,9 +96,10 @@ export default function AIAssistantPage() {
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       }
       setMessages((prev) => [...prev, aiMessage]);
+      setIsTyping(false)
     } catch (error) {
       console.warn('[AI Assistant] API failed, using local simulation');
-      // Simulate AI response
+      // Simulate AI response — setIsTyping(false) must run AFTER the timeout resolves
       setTimeout(() => {
         const aiResponses: Record<string, string> = {
           cholesterol:
@@ -128,9 +129,8 @@ export default function AIAssistantPage() {
         }
 
         setMessages((prev) => [...prev, aiMessage])
+        setIsTyping(false)
       }, 1500)
-    } finally {
-      setIsTyping(false)
     }
   }
 

@@ -46,7 +46,7 @@ export function NewMessageDialog() {
       return
     }
 
-    const doctor = doctors.find(d => d.id === selectedDoctorId)
+    const doctor = doctors.find((d: any) => d.id === selectedDoctorId)
     if (!doctor) return
 
     setSending(true)
@@ -111,7 +111,7 @@ export function NewMessageDialog() {
                 <SelectValue placeholder="Select recipient" />
               </SelectTrigger>
               <SelectContent>
-                {doctors.map(doc => (
+                {doctors.map((doc: any) => (
                   <SelectItem key={doc.id} value={doc.id}>
                     {doc.name} - {doc.specialty}
                   </SelectItem>

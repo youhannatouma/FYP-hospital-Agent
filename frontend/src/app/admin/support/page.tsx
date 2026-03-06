@@ -2,19 +2,14 @@
 
 import * as React from "react"
 import { 
-  MessageSquare, 
   Send, 
-  Users, 
-  Mail, 
-  Ticket, 
-  Search, 
+  Clock, 
   Filter,
-  MoreVertical,
-  Clock,
-  ArrowUpRight,
-  BellRing,
-  Tag
+  Ticket,
+  ChevronRight
 } from "lucide-react"
+import { m } from "framer-motion"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -28,188 +23,185 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useToast } from "@/hooks/use-toast"
 
 const MOCK_TICKETS = [
-  { id: "TIC-402", subject: "Prescription Upload Error", user: "Michael Chen", priority: "High", status: "Open", assignedTo: "Admin Sarah", created: "2h ago" },
-  { id: "TIC-405", subject: "Refund Request #8821", user: "Elena Gilbert", priority: "Medium", status: "In Progress", assignedTo: "Admin Dave", created: "5h ago" },
-  { id: "TIC-410", subject: "Provider License Error", user: "Dr. Ben Alaba", priority: "Critical", status: "Open", assignedTo: "Unassigned", created: "12m ago" },
+  { id: "TIC-402", subject: "Cannot upload prescription", user: "Michael Chen", priority: "High", status: "Open", assignedTo: "Admin Sarah", created: "2 hours ago" },
+  { id: "TIC-405", subject: "Refund request for cancelled appointment", user: "Elena Gilbert", priority: "Medium", status: "In Progress", assignedTo: "Admin Dave", created: "5 hours ago" },
+  { id: "TIC-398", subject: "Login issue on mobile", user: "John Doe", priority: "Low", status: "Resolved", assignedTo: "Support Team", created: "1 day ago" },
 ]
 
 export default function CommunicationSupportPage() {
   const { toast } = useToast()
-
   return (
-    <div className="flex flex-col gap-8 animate-in fade-in duration-700">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <m.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col gap-8 p-8 max-w-[1600px] mx-auto min-h-screen bg-background text-foreground"
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-             Operations & Support
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-             Manage global broadcasts, resolve technical inquiries, and monitor engagement.
+          <h1 className="text-3xl font-extrabold tracking-tight">Comms & Support</h1>
+          <p className="text-muted-foreground mt-1">
+            Broadcast announcements and resolve user inquiries.
           </p>
         </div>
-        <Button className="gap-2" onClick={() => {
-          toast({ title: "Portal Alert", description: "Opening incident reporting interface..." })
-        }}>
-          <Ticket className="h-4 w-4" /> Raise Incident
+        <Button className="bg-primary text-primary-foreground" onClick={() => toast({ title: "New Ticket", description: "Opening ticket creation form..." })}>
+          <Ticket className="mr-2 h-4 w-4" />
+          New Internal Ticket
         </Button>
       </div>
 
       <Tabs defaultValue="messaging" className="space-y-6">
-        <TabsList className="bg-muted/50 p-1 rounded-xl h-12 w-full max-w-md justify-start gap-1">
-          <TabsTrigger value="messaging" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">Broadcast</TabsTrigger>
-          <TabsTrigger value="tickets" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">Service Queue</TabsTrigger>
+        <TabsList className="bg-muted/50 p-1 border border-border/50">
+          <TabsTrigger value="messaging" className="gap-2"><Send className="h-4 w-4" />Messaging</TabsTrigger>
+          <TabsTrigger value="tickets" className="gap-2"><Ticket className="h-4 w-4" />Tickets</TabsTrigger>
+          <TabsTrigger value="campaigns" className="gap-2"><Tag className="h-4 w-4" />Campaigns</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="messaging" className="space-y-6 animate-in slide-in-from-left-4 duration-500">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 border-sidebar-border bg-card/50">
+        <TabsContent value="messaging" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="col-span-2 border-border/50 bg-card/50">
               <CardHeader>
-                <CardTitle>Global Broadcast</CardTitle>
-                <CardDescription>Deliver announcements to role-specific system clusters.</CardDescription>
+                <CardTitle>Send Broadcast</CardTitle>
+                <CardDescription>Send instant notifications to a specific group of users.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Target Audience</Label>
                     <Select defaultValue="all">
-                      <SelectTrigger className="h-10 px-4"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="bg-muted/30"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Verified Userbase (All)</SelectItem>
+                        <SelectItem value="all">All Users</SelectItem>
                         <SelectItem value="patients">Patients Only</SelectItem>
-                        <SelectItem value="doctors">Clinical Staff Only</SelectItem>
+                        <SelectItem value="doctors">Doctors Only</SelectItem>
+                        <SelectItem value="pharmacies">Pharmacies Only</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Delivery Channel</Label>
+                    <Label>Channel</Label>
                     <div className="flex gap-2">
-                      <Button variant="secondary" className="flex-1 text-xs">In-App</Button>
-                      <Button variant="outline" className="flex-1 text-xs">Email</Button>
-                      <Button variant="outline" className="flex-1 text-xs">SMS</Button>
+                      <Button variant="outline" size="sm" className="flex-1 bg-primary/10 border-primary text-primary">In-App</Button>
+                      <Button variant="outline" size="sm" className="flex-1">Email</Button>
+                      <Button variant="outline" size="sm" className="flex-1">SMS</Button>
                     </div>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Message Title</Label>
-                  <Input placeholder="E.g. Scheduled Infrastructure Maintenance" className="h-10" />
+                  <Input placeholder="E.g. System Maintenance Update" className="bg-muted/30" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Core Content</Label>
-                  <Textarea placeholder="Type your broadcast message here..." className="min-h-[120px] bg-muted/20" />
+                  <Label>Content</Label>
+                  <Textarea placeholder="Type your broadcast message here..." className="min-h-[120px] bg-muted/30" />
                 </div>
-                <Button className="w-full h-11 gap-2" onClick={() => {
-                  toast({ title: "Broadcast Sent", description: "Message propagated to the selected audience." })
-                }}>
-                  <Send className="h-4 w-4" /> Dispatch Broadcast
+                <Button className="w-full" onClick={() => toast({ title: "Broadcast Sent", description: "Your message is being delivered to the target audience." })}>
+                  <Send className="mr-2 h-4 w-4" />
+                  Send Broadcast Now
                 </Button>
               </CardContent>
             </Card>
 
-            <div className="space-y-6">
-                <Card className="border-none bg-gradient-to-br from-primary to-indigo-600 text-white p-6 shadow-xl relative overflow-hidden group">
-                   <BellRing className="absolute bottom-0 right-0 h-24 w-24 opacity-10 -mr-4 -mb-4 transition-transform group-hover:scale-110" />
-                   <div className="relative z-10 space-y-4">
-                      <Badge className="bg-white/20 text-white border-none font-bold">ENGAGEMENT</Badge>
-                      <h3 className="text-2xl font-bold leading-tight">System Pulse</h3>
-                      <div className="space-y-2 pt-2">
-                           <div className="flex justify-between text-[10px] font-bold uppercase opacity-60">Interaction Density</div>
-                           <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
-                              <div className="h-full bg-white rounded-full w-[85%]" />
-                           </div>
-                           <p className="text-[10px] text-white/60">Engagement is up 14% this month.</p>
+            <Card className="border-border/50 bg-card/50">
+              <CardHeader>
+                <CardTitle>Quick Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">App Reach Today</p>
+                  <p className="text-2xl font-bold">4,520 Users</p>
+                  <div className="h-1 w-full bg-muted rounded-full">
+                    <div className="h-full w-[85%] bg-primary rounded-full" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Email Open Rate</p>
+                  <p className="text-2xl font-bold">32.4%</p>
+                  <div className="h-1 w-full bg-muted rounded-full">
+                    <div className="h-full w-[32%] bg-emerald-500 rounded-full" />
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-border">
+                  <h4 className="text-xs font-bold uppercase mb-3">Planned Alerts</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-2 text-xs">
+                      <Clock className="h-3 w-3 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="font-bold">Beta Feature Launch</p>
+                        <p className="text-muted-foreground">Scheduled for 6:00 PM</p>
                       </div>
-                   </div>
-                </Card>
-
-                <Card className="border-sidebar-border bg-card/50 p-6 space-y-4">
-                     <h4 className="text-xs font-bold uppercase text-muted-foreground">Scheduled Alerts</h4>
-                     <div className="space-y-3">
-                       {[
-                         { title: "Node Optimization", time: "Tonight 02:00" },
-                         { title: "V5.0 Rollout", time: "Friday 21:00" },
-                       ].map((alert, i) => (
-                          <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-sidebar-border group hover:bg-primary/5 cursor-pointer">
-                              <div>
-                                  <p className="text-sm font-semibold">{alert.title}</p>
-                                  <p className="text-[10px] text-muted-foreground">{alert.time}</p>
-                              </div>
-                              <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                          </div>
-                       ))}
-                     </div>
-                </Card>
-            </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="tickets" className="space-y-6 animate-in slide-in-from-right-4 duration-500">
-          <Card className="border-sidebar-border bg-card/50 shadow-sm overflow-hidden">
-            <CardHeader className="pb-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <CardTitle>Service Queue</CardTitle>
-                    <CardDescription>Manage active technical and provider support incidents.</CardDescription>
-                </div>
+        <TabsContent value="tickets" className="space-y-6">
+          <Card className="border-border/50 bg-card/50">
+            <CardHeader className="pb-3 border-b border-border/50">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <Ticket className="h-5 w-5 text-primary" />
+                  Support Queue
+                </CardTitle>
                 <div className="flex items-center gap-2">
-                  <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Filter tickets..." className="pl-9 h-9" />
-                  </div>
+                  <Input placeholder="Search tickets..." className="h-9 w-64 bg-muted/30" />
+                  <Button variant="outline" size="sm" className="h-9">
+                    <Filter className="h-4 w-4 mr-2" />
+                    Priority
+                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-                <div className="divide-y divide-sidebar-border">
-                  {MOCK_TICKETS.map((ticket) => (
-                    <div key={ticket.id} className="p-4 flex items-center justify-between hover:bg-muted/20 transition-all group cursor-pointer" onClick={() => toast({ title: "Incident Loaded", description: `Opening case ${ticket.id} for resolution.` })}>
-                      <div className="flex items-center gap-4">
-                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center font-bold ${
-                          ticket.priority === "Critical" ? "bg-rose-500 text-white" :
-                          ticket.priority === "High" ? "bg-rose-500/10 text-rose-600" : 
-                          "bg-blue-500/10 text-blue-600"
-                        }`}>
-                          {ticket.priority[0]}
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-base group-hover:text-primary transition-colors">{ticket.subject}</h4>
-                          <div className="flex items-center gap-2 mt-0.5">
-                               <Badge variant="outline" className="text-[10px] h-4 py-0 font-mono">{ticket.id}</Badge>
-                               <span className="text-[10px] text-muted-foreground font-medium">
-                                 {ticket.user} • {ticket.created}
-                               </span>
-                          </div>
-                        </div>
+              <div className="divide-y divide-border/50">
+                {MOCK_TICKETS.map((ticket) => (
+                  <div key={ticket.id} className="p-4 flex items-center justify-between hover:bg-muted/20 transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-xs ${
+                        ticket.priority === "High" ? "bg-rose-500/10 text-rose-500" : 
+                        ticket.priority === "Medium" ? "bg-amber-500/10 text-amber-500" : 
+                        "bg-blue-500/10 text-blue-500"
+                      }`}>
+                        {ticket.priority[0]}
                       </div>
-                      <div className="flex items-center gap-8">
-                        <div className="text-right hidden sm:block">
-                          <p className="text-[10px] uppercase font-bold text-muted-foreground opacity-40">Assignee</p>
-                          <p className="text-xs font-medium">{ticket.assignedTo}</p>
-                        </div>
-                        <Badge variant="outline" className={
-                          ticket.status === "Open" ? "border-rose-200 text-rose-600 bg-rose-50/50" : 
-                          ticket.status === "In Progress" ? "border-amber-200 text-amber-600 bg-amber-50/50" : 
-                          "border-emerald-200 text-emerald-600 bg-emerald-50/50"
-                        }>
-                          {ticket.status}
-                        </Badge>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all">
-                          <ArrowUpRight className="h-4 w-4" />
-                        </Button>
+                      <div>
+                        <h4 className="font-bold text-sm tracking-tight">{ticket.subject}</h4>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                          By {ticket.user} • {ticket.id} • {ticket.created}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Assigned To</p>
+                        <p className="text-xs font-bold">{ticket.assignedTo}</p>
+                      </div>
+                      <Badge className={
+                        ticket.status === "Open" ? "bg-rose-500/10 text-rose-500" : 
+                        ticket.status === "In Progress" ? "bg-amber-500/10 text-amber-500" : 
+                        "bg-emerald-500/10 text-emerald-500"
+                      }>
+                        {ticket.status}
+                      </Badge>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => toast({ title: "View Ticket", description: `Opening details for ${ticket.id}...` })}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </m.div>
   )
 }
 
-function Label({ children, className }: { children: React.ReactNode, className?: string }) {
-  return <label className={`text-xs font-bold uppercase tracking-wider text-muted-foreground ${className}`}>{children}</label>
+function Label({ children }: { children: React.ReactNode }) {
+  return <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{children}</label>
 }

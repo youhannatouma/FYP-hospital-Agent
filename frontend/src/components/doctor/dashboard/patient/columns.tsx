@@ -1,7 +1,9 @@
 "use client";
 
+import { toast } from "@/hooks/use-toast";
+
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal, Eye, Pill, MessageSquare } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, User, Mail, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,112 +14,118 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import * as React from "react";
-import { PatientProfileDialog } from "../../dialogs/patient-profile-dialog";
-import { PrescriptionDialog } from "../../dialogs/prescription-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 export type Patient = {
   id: string;
   name: string;
-  age: number;
-  gender: string;
-  condition: string;
-  lastVisit: string;
+  status: "active" | "inactive" | "pending";
   email: string;
-  status: string;
+  lastVisit: string;
+  avatar?: string;
 };
 
 export const columns: ColumnDef<Patient>[] = [
   {
     accessorKey: "name",
-    header: ({ column }) => {
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        className="font-black text-[10px] uppercase tracking-widest hover:bg-transparent p-0"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Subject
+        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const patient = row.original;
+      const initials = patient.name.split(' ').map(n => n[0]).join('');
       return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-3 py-1">
+          <Avatar className="h-9 w-9 border border-border/50">
+            <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-black uppercase">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="font-black text-sm text-foreground tracking-tight leading-none mb-1">{patient.name}</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider opacity-50">ID: {patient.id.slice(0, 8)}</span>
+          </div>
+        </div>
       );
     },
   },
   {
-    accessorKey: "age",
-    header: "Age",
-  },
-  {
-    accessorKey: "gender",
-    header: "Gender",
-  },
-  {
-    accessorKey: "condition",
-    header: "Condition",
-  },
-  {
     accessorKey: "status",
-    header: "Status",
+    header: () => <span className="font-black text-[10px] uppercase tracking-widest">Protocol Status</span>,
     cell: ({ row }) => {
       const status = row.getValue("status") as string;
       return (
-        <Badge variant="outline" className={
-          status === "Active" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
-          status === "Recovering" ? "bg-primary/10 text-primary border-primary/20" :
-          "bg-amber-500/10 text-amber-600 border-amber-500/20"
-        }>
+        <Badge className={cn(
+          "border-none text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg",
+          status === "active" ? "bg-emerald-500/10 text-emerald-500" :
+          status === "pending" ? "bg-amber-500/10 text-amber-500" :
+          "bg-muted text-muted-foreground"
+        )}>
           {status}
         </Badge>
       );
     },
   },
   {
+    accessorKey: "email",
+    header: () => <span className="font-black text-[10px] uppercase tracking-widest">Contact Information</span>,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground tabular-nums">
+        <Mail className="h-3 w-3 opacity-30" />
+        {row.getValue("email")}
+      </div>
+    ),
+  },
+  {
     accessorKey: "lastVisit",
-    header: "Last Visit",
+    header: () => <span className="font-black text-[10px] uppercase tracking-widest text-right block">Recent Activity</span>,
+    cell: ({ row }) => (
+      <div className="text-right text-xs font-bold text-foreground/70 uppercase tracking-tighter tabular-nums flex items-center justify-end gap-2">
+        <Calendar className="h-3 w-3 opacity-30" />
+        {row.getValue("lastVisit")}
+      </div>
+    ),
   },
   {
     id: "actions",
     cell: ({ row }) => {
       const patient = row.original;
-      const [isProfileOpen, setIsProfileOpen] = React.useState(false);
-      const [isPrescriptionOpen, setIsPrescriptionOpen] = React.useState(false);
-
       return (
-        <>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setIsProfileOpen(true)}>
-              <Eye className="h-4 w-4" /> View Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setIsPrescriptionOpen(true)}>
-              <Pill className="h-4 w-4" /> New Prescription
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 cursor-pointer">
-              <MessageSquare className="h-4 w-4" /> Send Message
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <PatientProfileDialog 
-          open={isProfileOpen}
-          onOpenChange={setIsProfileOpen}
-          patient={patient}
-        />
-
-        <PrescriptionDialog 
-          open={isPrescriptionOpen}
-          onOpenChange={setIsPrescriptionOpen}
-          patient={patient}
-        />
-        </>
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted/50 rounded-lg">
+                <MoreHorizontal className="h-4 w-4 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl border-border/50 p-1">
+              <DropdownMenuLabel className="font-black text-[10px] uppercase tracking-widest opacity-50 px-2 py-1.5">Administrative Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-border/50" />
+              <DropdownMenuItem 
+                className="rounded-lg font-bold text-xs"
+                onClick={() => toast({ title: "Opening Record", description: `Viewing record for ${patient.name}` })}
+              >View Patient Record</DropdownMenuItem>
+              <DropdownMenuItem 
+                className="rounded-lg font-bold text-xs text-primary"
+                onClick={() => toast({ title: "Scheduling Session", description: `Initializing calendar for ${patient.name}` })}
+              >Schedule Session</DropdownMenuItem>
+              <DropdownMenuItem 
+                className="rounded-lg font-bold text-xs"
+                onClick={() => toast({ title: "Modifying Subject Data", description: `Opening edit form for ${patient.name}` })}
+              >Modify Subject Data</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       );
     },
   },
 ];
+

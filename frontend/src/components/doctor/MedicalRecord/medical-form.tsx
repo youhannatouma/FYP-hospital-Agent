@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,7 +71,7 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
     e.preventDefault();
 
     if (!lastVisitDate) {
-      alert("Please select a date for the last visit");
+      toast({ title: "Validation Error", description: "Please select a date for the last visit", variant: "destructive" });
       return;
     }
 
@@ -99,6 +100,7 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
     };
 
     onAddRecord(newRecord);
+    toast({ title: "Record Added", description: "New medical record created successfully." });
 
     // Reset form
     setFormData({

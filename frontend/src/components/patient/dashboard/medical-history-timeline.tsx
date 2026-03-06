@@ -1,199 +1,236 @@
 "use client"
 
+import { useToast } from "@/components/ui/use-toast"
+
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Stethoscope, FileText, Pill, ClipboardCheck, AlertTriangle, ChevronDown, ChevronUp, Clock, CalendarDays, MapPin } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { useDataStore, type Appointment } from "@/hooks/use-data-store"
-import { AppointmentDetailsDialog } from "./dialogs/appointment-details-dialog"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Stethoscope, FileText, Pill, ClipboardCheck, AlertTriangle, ChevronRight } from "lucide-react"
+import { m, AnimatePresence } from "framer-motion"
+import { cn } from "@/lib/utils"
 
-const filterTabs = ["All", "Visits", "Records", "Prescriptions"]
+const filterTabs = ["All", "Visits", "Labs", "Medications"]
+
+const timelineItems = [
+  {
+    id: 1,
+    type: "visit",
+    title: "Follow-up Cardiology Visit",
+    date: "Jan 10, 2024",
+    description: "Dr. Michael Chen - Routine checkup and medication review",
+    status: "Completed",
+    statusColor: "bg-emerald-500/10 text-emerald-500",
+    dotColor: "bg-primary",
+    icon: Stethoscope,
+    extra: [
+      { label: "Notes Available", type: "info" },
+      { label: "View Details", type: "link" },
+    ],
+  },
+  {
+    id: 2,
+    type: "lab",
+    title: "Lab Results - Lipid Panel",
+    date: "Jan 8, 2024",
+    description: null,
+    status: "Needs Review",
+    statusColor: "bg-amber-500/10 text-amber-500",
+    dotColor: "bg-amber-500",
+    icon: FileText,
+    labValues: [
+      { label: "Total Cholesterol", value: "245 mg/dL" },
+      { label: "LDL", value: "165 mg/dL" },
+      { label: "HDL", value: "48 mg/dL" },
+    ],
+    extra: [
+      { label: "Needs Review", type: "warning" },
+      { label: "Download Report", type: "link" },
+    ],
+  },
+  {
+    id: 3,
+    type: "medication",
+    title: "Medication Adjustment",
+    date: "Dec 20, 2023",
+    description: "Lisinopril dosage increased to 10mg daily",
+    status: "Active",
+    statusColor: "bg-blue-500/10 text-blue-500",
+    dotColor: "bg-blue-500",
+    icon: Pill,
+    extra: [
+      { label: "Active", type: "info" },
+      { label: "Current Medication", type: "tag" },
+    ],
+  },
+  {
+    id: 4,
+    type: "visit",
+    title: "Annual Physical Exam",
+    date: "Nov 15, 2023",
+    description: "Comprehensive health assessment - All vitals within normal range.",
+    status: "Completed",
+    statusColor: "bg-emerald-500/10 text-emerald-500",
+    dotColor: "bg-emerald-500",
+    icon: ClipboardCheck,
+    extra: [
+      { label: "Completed", type: "success" },
+    ],
+  },
+]
 
 export function MedicalHistoryTimeline() {
-  const { toast } = useToast()
-  const { appointments, records, prescriptions } = useDataStore()
   const [activeFilter, setActiveFilter] = useState("All")
-  const [showAll, setShowAll] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<any>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const { toast } = useToast()
 
-  // Merge events into a single timeline
-  const timelineItems = [
-    ...appointments
-      .filter(a => a.status === 'Completed')
-      .map(a => ({
-        id: `app-${a.id}`,
-        type: "visit",
-        title: `${a.type} with ${a.doctorName}`,
-        date: a.date,
-        description: `Consultation at hospital branch. Status: ${a.status}`,
-        status: "Completed",
-        statusColor: "bg-emerald-500/10 text-emerald-600",
-        dotColor: "bg-primary",
-        icon: Stethoscope,
-        original: a
-      })),
-    ...records.map(r => ({
-      id: `rec-${r.id}`,
-      type: "Records",
-      title: r.diagnosis,
-      date: r.date,
-      description: r.notes,
-      status: "Verified",
-      statusColor: "bg-blue-500/10 text-blue-600",
-      dotColor: "bg-blue-500",
-      icon: FileText,
-      original: r
-    })),
-    ...prescriptions.map(p => {
-      const pm = p.medicines[0] || { name: "Medicine", dosage: "-", frequency: "-" }
-      return {
-        id: `pre-${p.id}`,
-        type: "Prescription",
-        title: `Medication: ${pm.name}`,
-        date: p.date,
-        description: `${pm.dosage} - ${pm.frequency}`,
-        status: p.status,
-        statusColor: p.status === 'Active' ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground",
-        dotColor: "bg-amber-500",
-        icon: Pill,
-        original: p
-      }
+  const handleViewDetails = (title: string) => {
+    toast({
+      title: "Loading Record",
+      description: `Fetching detailed information for: ${title}`,
     })
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }
+
+  const handleExtensiveHistory = () => {
+    toast({
+      title: "Loading Archive",
+      description: "Preparing extensive medical history interface...",
+    })
+  }
 
   const filtered = timelineItems.filter((item) => {
     if (activeFilter === "All") return true
-    return item.type.toLowerCase().includes(activeFilter.toLowerCase().slice(0, -1))
+    if (activeFilter === "Visits") return item.type === "visit"
+    if (activeFilter === "Labs") return item.type === "lab"
+    if (activeFilter === "Medications") return item.type === "medication"
+    return true
   })
 
-  const visible = showAll ? filtered : filtered.slice(0, 4)
-
   return (
-    <Card className="border-sidebar-border bg-card/50 shadow-sm">
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6">
-        <CardTitle className="flex items-center gap-2 text-xl font-bold">
-          <Stethoscope className="h-5 w-5 text-primary" />
-          Clinical Timeline
-        </CardTitle>
-        <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl">
+    <Card className="premium-card rounded-[2rem] border-none shadow-premium overflow-hidden">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-8 pb-4 gap-4">
+        <div>
+          <CardTitle className="flex items-center gap-3 text-2xl font-black text-foreground tracking-tight">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-inner-glow">
+              <Stethoscope className="h-5 w-5" />
+            </div>
+            Medical Timeline
+          </CardTitle>
+          <p className="text-sm text-muted-foreground font-medium mt-1">Refining history from the last 12 months</p>
+        </div>
+        <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl border border-border/50">
           {filterTabs.map((tab) => (
             <Button
               key={tab}
-              variant={activeFilter === tab ? "secondary" : "ghost"}
+              variant="ghost"
               size="sm"
               onClick={() => setActiveFilter(tab)}
-              className={`text-[10px] font-bold uppercase tracking-wider h-8 rounded-lg ${
-                activeFilter === tab ? "bg-background shadow-sm" : "text-muted-foreground"
-              }`}
+              className={cn(
+                "h-8 px-4 rounded-lg text-xs font-black transition-all",
+                activeFilter === tab
+                  ? "bg-primary text-white shadow-md"
+                  : "text-muted-foreground hover:bg-muted/80"
+              )}
             >
               {tab}
             </Button>
           ))}
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="relative ml-4 border-l border-sidebar-border">
-          {visible.length === 0 ? (
-            <div className="py-12 pl-8 text-muted-foreground text-sm italic">
-               No medical events recorded in your timeline.
-            </div>
-          ) : (
-            visible.map((item) => (
-              <div 
-                key={item.id} 
-                className="relative mb-10 pl-8 last:mb-0 cursor-pointer group"
-                onClick={() => {
-                  setSelectedItem(item)
-                  setDialogOpen(true)
-                }}
-              >
-                <div
-                  className={`absolute -left-[5.5px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background ${item.dotColor} ring-4 ring-card transition-transform group-hover:scale-125`}
-                />
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                    <div>
-                        <h4 className="font-bold text-foreground leading-tight group-hover:text-primary transition-colors">
-                        {item.title}
-                        </h4>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase mt-1 block">
-                        {item.date}
-                        </span>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] h-6 font-bold border-none rounded-lg ${item.statusColor}`}
-                    >
-                      {item.status}
-                    </Badge>
-                  </div>
-                  {item.description && (
-                    <p className="text-xs text-muted-foreground italic leading-relaxed line-clamp-2">
-                      {item.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        
-        {/* Detail Dialogs */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          {selectedItem?.type === 'visit' ? (
-            <AppointmentDetailsDialog appointment={selectedItem.original}>
-              <div className="hidden" /> 
-            </AppointmentDetailsDialog>
-          ) : selectedItem ? (
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <selectedItem.icon className="h-5 w-5 text-primary" />
-                  {selectedItem.title}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  <CalendarDays className="h-3 w-3" /> {selectedItem.date}
-                  <span className="opacity-20 mx-2">|</span>
-                  <Badge variant="outline" className={`${selectedItem.statusColor} border-none`}>
-                    {selectedItem.status}
-                  </Badge>
-                </div>
-                <div className="rounded-xl bg-muted/50 p-4 border border-sidebar-border">
-                  <h4 className="text-sm font-bold mb-2">Details</h4>
-                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {selectedItem.description || "No additional details available for this record."}
-                  </p>
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" size="sm">Download PDF</Button>
-                  <Button size="sm">Share with Doctor</Button>
-                </div>
-              </div>
-            </DialogContent>
-          ) : null}
-        </Dialog>
-        
-        {filtered.length > 4 && (
-            <div className="mt-8 pt-4 border-t border-sidebar-border text-center">
-                <Button 
-                variant="ghost" 
-                className="text-primary font-bold text-xs gap-2"
-                onClick={() => setShowAll(!showAll)}
+      <CardContent className="p-8 pt-6">
+        <div className="relative ml-4">
+          {/* Vertical Line */}
+          <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-gradient-to-b from-primary/50 via-border/50 to-transparent" />
+          
+          <div className="space-y-10">
+            <AnimatePresence mode="popLayout">
+              {filtered.map((item, idx) => (
+                <m.div 
+                  key={item.id} 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="relative pl-10 group"
                 >
-                {showAll ? (
-                    <>Show Less <ChevronUp className="h-4 w-4" /></>
-                ) : (
-                    <>Load More Timeline ({filtered.length - 4}) <ChevronDown className="h-4 w-4" /></>
-                )}
-                </Button>
-            </div>
-        )}
+                  {/* Timeline Dot */}
+                  <div
+                    className={cn(
+                      "absolute -left-[7px] top-1.5 h-3.5 w-3.5 rounded-full border-4 border-background shadow-glow transition-transform duration-500 group-hover:scale-125 z-10",
+                      item.dotColor
+                    )}
+                  />
+                  
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground bg-muted/30 px-2 py-0.5 rounded-md w-fit">
+                        {item.date}
+                      </span>
+                      <div className="flex items-center gap-2">
+                         <Badge className={cn("border-none text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg shadow-sm", item.statusColor)}>
+                          {item.status}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="premium-card p-5 rounded-2xl group-hover:border-primary/20 transition-colors bg-card/30 shadow-subtle border border-border/30">
+                      <div className="flex items-start gap-4">
+                        <div className={cn(
+                          "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-inner-glow transition-transform duration-500 group-hover:rotate-3",
+                          item.statusColor
+                        )}>
+                          <item.icon className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-lg font-bold text-foreground tracking-tight leading-tight">
+                            {item.title}
+                          </h4>
+                          {item.description && (
+                            <p className="text-sm text-muted-foreground mt-2 font-medium leading-relaxed">
+                              {item.description}
+                            </p>
+                          )}
+                          
+                          {item.labValues && (
+                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4 rounded-xl bg-orange-500/5 p-4 border border-orange-500/10">
+                              {item.labValues.map((lv) => (
+                                <div key={lv.label} className="space-y-1">
+                                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
+                                    {lv.label}
+                                  </span>
+                                  <p className="text-sm font-black text-foreground">
+                                    {lv.value}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border/30">
+                             <div className="flex gap-2">
+                               {item.extra.filter(e => e.type !== 'link').map((e, i) => (
+                                  <span key={i} className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">
+                                    # {e.label}
+                                  </span>
+                               ))}
+                             </div>
+                             <Button variant="ghost" size="sm" onClick={() => handleViewDetails(item.title)} className="h-8 text-primary font-black text-[10px] uppercase tracking-widest hover:bg-primary/5 rounded-lg group/btn">
+                               Details <ChevronRight className="ml-1 h-3 w-3 transition-transform group-hover/btn:translate-x-1" />
+                             </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </m.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+        <div className="mt-10 text-center">
+          <Button variant="outline" onClick={handleExtensiveHistory} className="h-11 px-10 rounded-xl border-border/50 font-black text-xs uppercase tracking-[0.2em] hover:bg-muted/50 transition-all text-muted-foreground hover:text-foreground">
+            View Extensive History
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )

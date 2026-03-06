@@ -41,9 +41,9 @@ export default function ClinicalHistoryPage() {
 
   // Use a mock patient ID for now or derive from Clerk if implementation allows
   // For demonstration, we'll fetch all records and filter or use a specific ID
-  const patientRecords = getRecordsByPatient("PAT-001") // Mock ID matching seed data
+  const patientRecords = getRecordsByPatient("PAT-001") || [] // Mock ID matching seed data
 
-  const filteredRecords = patientRecords.filter(r => {
+  const filteredRecords = patientRecords.filter((r: any) => {
     const matchesSearch = (
       r.diagnosis.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -132,7 +132,7 @@ export default function ClinicalHistoryPage() {
               </div>
               <div>
                 <p className="text-xs font-bold uppercase text-muted-foreground">Active Diagnoses</p>
-                <h3 className="text-2xl font-bold">{patientRecords.filter(r => r.status === 'Active').length}</h3>
+                <h3 className="text-2xl font-bold">{patientRecords.filter((r: any) => r.status === 'Active').length}</h3>
               </div>
             </div>
           </CardContent>
@@ -188,7 +188,7 @@ export default function ClinicalHistoryPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredRecords.map((record) => {
+            {filteredRecords.map((record: any) => {
               const statusInfo = getStatusInfo(record.status)
               return (
                 <div 

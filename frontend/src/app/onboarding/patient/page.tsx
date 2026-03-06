@@ -25,6 +25,7 @@ import {
   Calendar,
   Activity
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -35,7 +36,7 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion"
+import { m, AnimatePresence } from "framer-motion"
 
 // Steps: 
 // 1. Account (Completed via Clerk)
@@ -48,6 +49,7 @@ import { motion, AnimatePresence } from "framer-motion"
 export default function PatientOnboarding() {
   const router = useRouter()
   const { user, isLoaded } = useUser()
+  const { toast } = useToast()
   const [step, setStep] = React.useState(3)
   const [progress, setProgress] = React.useState(60)
 
@@ -97,7 +99,7 @@ export default function PatientOnboarding() {
 
         <AnimatePresence mode="wait">
           {step === 3 && (
-            <motion.div
+            <m.div
               key="step-3"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -188,11 +190,11 @@ export default function PatientOnboarding() {
                   Continue <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {step === 4 && (
-            <motion.div 
+            <m.div 
               key="step-4"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -274,11 +276,11 @@ export default function PatientOnboarding() {
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {step === 5 && (
-            <motion.div 
+            <m.div 
               key="step-5"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -354,15 +356,18 @@ export default function PatientOnboarding() {
                 <Button variant="ghost" onClick={prevStep} className="font-bold h-12 px-8">
                   <ArrowLeft className="mr-2 h-5 w-5" /> Back
                 </Button>
-                <Button onClick={nextStep} className="bg-primary font-bold h-12 px-12 rounded-xl shadow-xl shadow-primary/20">
+                <Button onClick={() => {
+                  toast({ title: "Profile Created", description: "Your patient profile has been saved successfully." })
+                  nextStep()
+                }} className="bg-primary font-bold h-12 px-12 rounded-xl shadow-xl shadow-primary/20">
                   Complete Profile <CheckCircle2 className="ml-2 h-5 w-5" />
                 </Button>
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {step === 6 && (
-            <motion.div 
+            <m.div 
               key="step-6"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -403,7 +408,7 @@ export default function PatientOnboarding() {
                 Go to Dashboard
                 <ChevronRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Button>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>

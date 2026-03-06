@@ -33,7 +33,7 @@ interface Props {
 
 export function ScheduleAppointmentDialog({ trigger }: Props) {
   const { toast } = useToast()
-  const { patients, addAppointment } = useDataStore()
+  const { users, addAppointment } = useDataStore()
   const [open, setOpen] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
@@ -47,7 +47,7 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
     price: "150",
   })
 
-  const patientList = patients.filter(u => u.role === "Patient" && u.status === "Active")
+  const patientList = users.filter((u: any) => u.role === "Patient" && u.status === "Active")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,7 +62,7 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
 
     setIsSubmitting(true)
     try {
-      const patient = patientList.find(p => p.id === form.patientId)
+      const patient = patientList.find((p: any) => p.id === form.patientId)
       if (!patient) return
 
       addAppointment({
@@ -118,7 +118,7 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
                 <SelectValue placeholder="Select a patient…" />
               </SelectTrigger>
               <SelectContent>
-                {patientList.map(p => (
+                {patientList.map((p: any) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
