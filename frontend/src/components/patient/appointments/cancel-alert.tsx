@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@clerk/nextjs"
-import apiClient from "@/lib/api-client"
+import { useHospital } from "@/hooks/use-hospital"
 
 interface CancelAppointmentAlertProps {
   appointmentId: string
@@ -30,13 +30,8 @@ export function CancelAppointmentAlert({ appointmentId, doctorName, onCancelled 
   const handleCancel = async () => {
     try {
       const token = await getToken()
-      await apiClient.patch(
-        `/appointments/${appointmentId}/cancel`,
-        {},
-        token
-          ? { headers: { Authorization: `Bearer ${token}` } }
-          : undefined
-      )
+      const { booking } = useHospital()
+      await booking.cancelAppointment(appointmentId, token)
 
       toast({
         title: "Appointment Cancelled",

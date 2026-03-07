@@ -65,6 +65,7 @@ const MOCK_DISPUTES = [
 ]
 
 import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 import { toast } from "@/hooks/use-toast"
 
 export default function UserManagementPage() {
@@ -83,17 +84,19 @@ export default function UserManagementPage() {
 
   const loadUsers = React.useCallback(async () => {
     setLoading(true)
-    const data = await admin.getAllUsers()
+    const token = await getToken()
+    const data = await admin.getAllUsers(token)
     setUsers(data || [])
     setLoading(false)
-  }, [admin])
+  }, [admin, getToken])
 
   React.useEffect(() => {
     loadUsers()
   }, [loadUsers])
 
   const handleUpdateStatus = async (userId: string, status: string) => {
-    const result = await admin.updateStatus('users', userId, status)
+    const token = await getToken()
+    const result = await admin.updateStatus('users', userId, status, token)
     if (result) {
       toast({ title: "Success", description: `User status updated to ${status}` })
       loadUsers()
@@ -101,7 +104,8 @@ export default function UserManagementPage() {
   }
 
   const handleDeleteUser = async (userId: string) => {
-    const result = await admin.deleteUser(userId)
+    const token = await getToken()
+    const result = await admin.deleteUser(userId, token)
     if (result) {
       toast({ title: "Deleted", description: "User account has been removed" })
       loadUsers()
@@ -110,7 +114,8 @@ export default function UserManagementPage() {
 
   const handleAddDoctor = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = await admin.addDoctor(newDoctor)
+    const token = await getToken()
+    const result = await admin.addDoctor(newDoctor, token)
     if (result) {
       toast({ title: "Success", description: "Doctor added successfully" })
       setIsAddDoctorOpen(false)

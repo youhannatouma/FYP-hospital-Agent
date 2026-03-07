@@ -372,3 +372,11 @@ SELECT
     updated_at
 FROM usr
 WHERE deleted_at IS NULL;
+
+
+
+ALTER TABLE usr
+ADD COLUMN password_hash TEXT;
+
+ALTER TABLE usr
+ADD COLUMN status TEXT;

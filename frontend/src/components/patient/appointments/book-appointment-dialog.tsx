@@ -22,9 +22,10 @@ import { Calendar } from "@/components/ui/calendar"
 import { CalendarPlus, CheckCircle2, Clock, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useDataStore } from "@/hooks/use-data-store"
+import { useHospital } from "@/hooks/use-hospital"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@clerk/nextjs"
-import apiClient from "@/lib/api-client"
+
 
 interface BookAppointmentDialogProps {
   patientId?: string
@@ -46,8 +47,9 @@ export function BookAppointmentDialog({
   onOpenChange: setControlledOpen
 }: BookAppointmentDialogProps) {
   const { toast } = useToast()
-  const { getDoctors, addAppointment } = useDataStore()
   const { getToken } = useAuth()
+  const { booking } = useHospital()
+  const { getDoctors, addAppointment } = useDataStore()  // keep for fallback
   const [step, setStep] = useState(1)
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
@@ -71,18 +73,36 @@ export function BookAppointmentDialog({
     }
   }, [open, initialDoctorId, getDoctors])
 
-  const allDoctors = getDoctors()
+  const [allDoctors, setAllDoctors] = useState<any[]>([])
+  React.useEffect(() => {
+    const loadDoctors = async () => {
+      const token = await getToken()
+      const docs = await booking.getAvailableDoctors(selectedSpecialty || undefined, token)
+      setAllDoctors(docs || [])
+    }
+    loadDoctors()
+  }, [selectedSpecialty, booking, getToken])
+
   const specialties = [...new Set(allDoctors.map((d: any) => d.specialty).filter(Boolean))] as string[]
   const filteredDoctors = selectedSpecialty
     ? allDoctors.filter((d: any) => d.specialty === selectedSpecialty)
     : allDoctors
   const selectedDoctor = allDoctors.find((d: any) => d.id === selectedDoctorId)
 
-  const timeSlots = [
-    "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM",
-    "11:00 AM", "11:30 AM", "01:00 PM", "01:30 PM",
-    "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM"
-  ]
+  const [timeSlots, setTimeSlots] = useState<string[]>([])
+
+  React.useEffect(() => {
+    const loadSlots = async () => {
+      if (selectedDoctor && date) {
+        const token = await getToken()
+        const slots = await booking.getSlots(selectedDoctor.id, date.toISOString().split('T')[0], token)
+        if (Array.isArray(slots)) {
+          setTimeSlots(slots.map((s: any) => s.time))
+        }
+      }
+    }
+    loadSlots()
+  }, [selectedDoctor, date, booking, getToken])
 
   const handleBook = async () => {
     if (!selectedDoctor || !date || !selectedTime) return
@@ -90,20 +110,16 @@ export function BookAppointmentDialog({
     const formattedDate = date.toISOString().split('T')[0]
     try {
       const token = await getToken()
-      await apiClient.post(
-        "/appointments/bookings",
-        {
-          doctor_id: selectedDoctor.id,
-          day: formattedDate,
-          time: selectedTime,
-          appointment_type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
-          fee: 150,
-          is_virtual: appointmentType === "Video",
-        },
-        token
-          ? { headers: { Authorization: `Bearer ${token}` } }
-          : undefined
-      )
+      const result = await booking.submitBooking({
+        patientId,
+        patientName,
+        doctor_id: selectedDoctor.id,
+        day: formattedDate,
+        time: selectedTime,
+        appointment_type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
+        fee: 150,
+        is_virtual: appointmentType === "Video",
+      }, token)
 
       // Also update local mock store so the UI reflects the new appointment immediately
       addAppointment({
