@@ -111,6 +111,9 @@ const ChartTooltipContent = React.forwardRef<
       indicator?: 'line' | 'dot' | 'dashed'
       nameKey?: string
       labelKey?: string
+      payload?: any[]
+      active?: boolean
+      label?: any
     }
 >(
   (
@@ -139,7 +142,7 @@ const ChartTooltipContent = React.forwardRef<
       }
 
       const [item] = payload
-      const key = `${labelKey || item.dataKey || item.name || 'value'}`
+      const key = `${labelKey || (item as any).dataKey || (item as any).name || 'value'}`
       const itemConfig = getPayloadConfigFromPayload(config, item, key)
       const value =
         !labelKey && typeof label === 'string'
@@ -186,9 +189,9 @@ const ChartTooltipContent = React.forwardRef<
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">
           {payload.map((item, index) => {
-            const key = `${nameKey || item.name || item.dataKey || 'value'}`
+            const key = `${nameKey || (item as any).name || (item as any).dataKey || 'value'}`
             const itemConfig = getPayloadConfigFromPayload(config, item, key)
-            const indicatorColor = color || item.payload.fill || item.color
+            const indicatorColor = color || (item as any).payload?.fill || (item as any).color
 
             return (
               <div
@@ -261,9 +264,11 @@ const ChartLegend = RechartsPrimitive.Legend
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<'div'> &
-    Pick<RechartsPrimitive.LegendProps, 'payload' | 'verticalAlign'> & {
+    {
       hideIcon?: boolean
       nameKey?: string
+      payload?: any[]
+      verticalAlign?: 'top' | 'bottom'
     }
 >(
   (
@@ -285,8 +290,8 @@ const ChartLegendContent = React.forwardRef<
           className,
         )}
       >
-        {payload.map((item) => {
-          const key = `${nameKey || item.dataKey || 'value'}`
+        {payload.map((item: any) => {
+          const key = `${nameKey || (item as any).dataKey || 'value'}`
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
 
           return (

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import Image from "next/image"
 import { X } from "lucide-react"
+import ThreeAvatar from "./ThreeAvatar"
 
 export function FloatingAvatar() {
   const [expanded, setExpanded] = useState(false)
@@ -156,26 +157,20 @@ export function FloatingAvatar() {
         }
       }}
     >
-      {/* Glow ring */}
       <div
         className={`absolute inset-0 rounded-full bg-primary/20 ${isDragging ? "" : "animate-pulse-slow"}`}
         style={{
           transform: "scale(1.15)",
           borderRadius: "50%",
+          willChange: "opacity, transform"
         }}
       />
 
       {/* Avatar container */}
-      <div className="relative h-full w-full overflow-hidden rounded-full border-2 border-primary/60 bg-card shadow-xl">
-        <Image
-          src="/images/ai-doctor-avatar.jpg"
-          alt="AI Healthcare Assistant"
-          width={size}
-          height={size}
-          className="h-full w-full object-cover"
-          draggable={false}
-          priority
-        />
+      <div className="relative h-full w-full overflow-hidden rounded-full border-2 border-primary/60 bg-card shadow-xl flex items-center justify-center">
+        <div className="translate-y-4">
+          <ThreeAvatar size={size * 1.5} />
+        </div>
 
         {/* Online indicator */}
         <div className="absolute right-0 bottom-0 h-4 w-4 rounded-full border-2 border-card bg-emerald-500 shadow-sm shadow-emerald-500/50" />
