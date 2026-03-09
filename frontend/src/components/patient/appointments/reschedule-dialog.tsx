@@ -15,7 +15,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@clerk/nextjs"
-import apiClient from "@/lib/api-client"
+import { useHospital } from "@/hooks/use-hospital"
 
 interface RescheduleDialogProps {
   appointmentId: string
@@ -41,17 +41,8 @@ export function RescheduleDialog({ appointmentId, doctorName, onRescheduled }: R
 
     try {
       const token = await getToken()
-      await apiClient.patch(
-        `/appointments/${appointmentId}/reschedule`,
-        {
-          // In a future iteration we can send these and have the backend update slot/date/time.
-          date: date.toISOString().split("T")[0],
-          time: selectedTime,
-        },
-        token
-          ? { headers: { Authorization: `Bearer ${token}` } }
-          : undefined
-      )
+      const { booking } = useHospital()
+      await booking.rescheduleAppointment(appointmentId, date.toISOString().split("T")[0], selectedTime, token)
 
       toast({
         title: "Appointment Rescheduled",

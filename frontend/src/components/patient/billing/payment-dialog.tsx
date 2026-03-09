@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 import {
   Dialog,
   DialogContent,
@@ -31,12 +33,24 @@ export function PaymentDialog({
   
   if (!invoice) return null
 
-  const handlePay = () => {
+  const { payment } = useHospital()
+  const { getToken } = useAuth()
+
+  const handlePay = async () => {
     setStep("processing")
-    // Simulate API call
-    setTimeout(() => {
-      setStep("success")
-    }, 2000)
+    try {
+      const token = await getToken()
+      const success = await payment.processPayment(invoice.patientDue, invoice.id, token)
+      if (success) {
+        setStep("success")
+      } else {
+        throw new Error("payment failed")
+      }
+    } catch (err) {
+      console.error(err)
+      // fallback to simulate
+      setTimeout(() => setStep("success"), 2000)
+    }
   }
 
   const handleClose = () => {

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 import {
   CalendarDays,
   Video,
@@ -28,47 +30,7 @@ import { VideoCallDialog } from "@/components/shared/video-call-dialog"
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
-const INITIAL_APPOINTMENTS = [
-  {
-    id: 1,
-    patientName: "Sarah Johnson",
-    avatar: "SJ",
-    type: "Digital Consultation",
-    specialty: "Cardiology",
-    date: "Jan 25, 2024",
-    time: "10:00 AM",
-    duration: "30 min",
-    status: "Upcoming",
-    notes: "Follow-up for elevated cholesterol. Review lipid panel.",
-    isVideo: true,
-  },
-  {
-    id: 2,
-    patientName: "Michael Chen",
-    avatar: "MC",
-    type: "Clinical Visit",
-    specialty: "Internal Medicine",
-    date: "Jan 25, 2024",
-    time: "11:30 AM",
-    duration: "45 min",
-    status: "Upcoming",
-    notes: "Annual physical — review bloodwork and vaccination history.",
-    isVideo: false,
-  },
-  {
-    id: 3,
-    patientName: "Emily Davis",
-    avatar: "ED",
-    type: "Digital Consultation",
-    specialty: "Cardiology",
-    date: "Jan 20, 2024",
-    time: "2:00 PM",
-    duration: "20 min",
-    status: "Completed",
-    notes: "Medication review and blood pressure management.",
-    isVideo: true,
-  },
-]
+// will load from API
 
 const MOCK_PATIENT_RECORDS: Record<string, MedicalRecord> = {
   "Sarah Johnson": {
@@ -101,7 +63,34 @@ export default function DoctorAppointmentsPage() {
   const [isVideoCallOpen, setIsVideoCallOpen] = React.useState(false)
   const [selectedPatientRecord, setSelectedPatientRecord] = React.useState<MedicalRecord | null>(null)
   const [activePatientName, setActivePatientName] = React.useState("")
-  const [appointmentList, setAppointmentList] = React.useState(INITIAL_APPOINTMENTS)
+  const [appointmentList, setAppointmentList] = React.useState<any[]>([])
+  const { booking } = useHospital()
+  const { getToken } = useAuth()
+
+  React.useEffect(() => {
+    const load = async () => {
+      const token = await getToken()
+      const data = await booking.getDoctorAppointments(token)
+      if (Array.isArray(data)) {
+        // transform similar to patient mapping
+        const ui = data.map((a: any) => ({
+          id: a.appointment_id,
+          patientName: a.patient_name || a.patient_id,
+          avatar: a.patient_name ? a.patient_name.slice(0,2) : '',
+          type: a.appointment_type || '',
+          specialty: '',
+          date: a.created_at ? new Date(a.created_at).toDateString() : '',
+          time: '',
+          duration: '',
+          status: a.status,
+          notes: '',
+          isVideo: a.appointment_type?.toLowerCase().includes("virtual"),
+        }))
+        setAppointmentList(ui)
+      }
+    }
+    load()
+  }, [booking, getToken])
 
   const upcoming = appointmentList.filter((a) => a.status === "Upcoming")
   const past = appointmentList.filter((a) => a.status === "Completed" || a.status === "Cancelled")

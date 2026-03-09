@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -105,14 +106,15 @@ export default function AdminDashboard() {
 
   React.useEffect(() => {
     const fetchStats = async () => {
-      const data = await admin.getStats()
+      const token = await getToken()
+      const data = await admin.getStats(token)
       setDynamicStats(data)
       // If we had a real API for pending approvals:
       // const approvals = await admin.getPendingApprovals()
       // setPendingApprovals(approvals)
     }
     fetchStats()
-  }, [admin])
+  }, [admin, getToken])
 
   const displayStats = [
     {

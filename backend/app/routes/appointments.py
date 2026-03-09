@@ -21,7 +21,20 @@ def my_appointments(
     db: Session = Depends(get_db),
     user: User = Depends(require_role("patient")),
 ):
-    return db.query(Appointment).filter(Appointment.patient_id == user.user_id).all()
+    appointments = db.query(Appointment).filter(Appointment.patient_id == user.user_id).all()
+    result = []
+    for a in appointments:
+        doctor = db.query(User).filter(User.user_id == a.doctor_id).first()
+        result.append({
+            "appointment_id": str(a.appointment_id),
+            "doctor_id": str(a.doctor_id),
+            "doctor_name": f"{doctor.first_name or ''} {doctor.last_name or ''}".strip(),
+            "status": a.status.value,
+            "appointment_type": a.appointment_type,
+            "fee": float(a.fee) if a.fee is not None else None,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+    return result
 
 
 # Doctor: view my appointments
@@ -30,7 +43,20 @@ def doctor_appointments(
     db: Session = Depends(get_db),
     user: User = Depends(require_role("doctor")),
 ):
-    return db.query(Appointment).filter(Appointment.doctor_id == user.user_id).all()
+    appointments = db.query(Appointment).filter(Appointment.doctor_id == user.user_id).all()
+    result = []
+    for a in appointments:
+        patient = db.query(User).filter(User.user_id == a.patient_id).first()
+        result.append({
+            "appointment_id": str(a.appointment_id),
+            "patient_id": str(a.patient_id),
+            "patient_name": f"{patient.first_name or ''} {patient.last_name or ''}".strip(),
+            "status": a.status.value,
+            "appointment_type": a.appointment_type,
+            "fee": float(a.fee) if a.fee is not None else None,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+    return result
 
 
 # Patient: book appointment (simple booking used by frontend)

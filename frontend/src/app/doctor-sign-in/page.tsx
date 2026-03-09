@@ -26,13 +26,16 @@ export default function DoctorSignInPage() {
     setLoading(true)
 
     try {
-      const response = await apiClient.post('/auth/doctor/login', formData);
-      const { doctor, token } = response.data;
-      toast({ title: "Welcome, " + doctor.name, description: "Successfully signed in to your portal." })
+      const response = await apiClient.post('/auth/login', formData);
+      const { user, access_token } = response.data;
+      if (user.role !== 'doctor') {
+        throw new Error('Not a doctor account');
+      }
+      toast({ title: "Welcome, " + (user.first_name || user.email), description: "Successfully signed in to your portal." })
       // In a real app, save token to cookies/localStorage
       router.push("/doctor")
     } catch (error) {
-      console.warn('[DoctorSignIn] API failed, falling back to mock DB');
+      console.warn('[DoctorSignIn] API failed, falling back to mock DB (or non-doctor user)');
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 800))
 

@@ -9,32 +9,37 @@ import Link from "next/link"
 import { VideoCallDialog } from "@/components/shared/video-call-dialog"
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 
 export function UpcomingVisits() {
-  const [visits] = React.useState([
-    {
-      id: 1,
-      title: "Cardiology Follow-up",
-      doctor: "Dr. Michael Chen",
-      specialty: "Senior Cardiologist",
-      date: "Jan 25, 2024",
-      time: "10:00 AM",
-      type: "Priority",
-      typeColor: "bg-primary/10 text-primary",
-      isVirtual: true,
-    },
-    {
-      id: 2,
-      title: "Annual Physical",
-      doctor: "Dr. Emily Watson",
-      specialty: "General Medicine",
-      date: "Feb 15, 2024",
-      time: "2:30 PM",
-      type: "Confirmed",
-      typeColor: "bg-muted/50 text-muted-foreground",
-      isVirtual: false,
-    },
-  ])
+  const [visits, setVisits] = React.useState<any[]>([])
+  const { booking } = useHospital()
+  const { getToken } = useAuth()
+
+  React.useEffect(() => {
+    const loadVisits = async () => {
+      const token = await getToken()
+      const data = await booking.getMyAppointments(token)
+      if (Array.isArray(data)) {
+        const ui = data.map((a: any) => ({
+          id: a.appointment_id,
+          title: a.appointment_type || "Appointment",
+          doctor: a.doctor_name || a.doctor_id,
+          specialty: "", // could fetch doctor info separately
+          date: a.created_at ? new Date(a.created_at).toDateString() : "",
+          time: "",
+          type: a.status || "",
+          typeColor: a.status === "scheduled" ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground",
+          isVirtual: a.appointment_type?.toLowerCase().includes("virtual"),
+        }))
+        setVisits(ui)
+      } else {
+        setVisits([])
+      }
+    }
+    loadVisits()
+  }, [booking, getToken])
 
   const [isOpen, setIsOpen] = React.useState(false)
   const [activeDoctor, setActiveDoctor] = React.useState("")

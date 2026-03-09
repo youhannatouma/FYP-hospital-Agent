@@ -41,6 +41,9 @@ class User(Base):
     chronic_conditions = Column(ARRAY(Text))     # for patients
     emergency_contact = Column(Text)             # for patients
 
+    # Account state used by admins (Active, Suspended, Pending, etc.)
+    status = Column(Text, default="Active")
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime)

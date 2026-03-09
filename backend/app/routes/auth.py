@@ -14,7 +14,10 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
+    import uuid
+
     new_user = User(
+        clerk_id=str(uuid.uuid4()),  # temporary field for clerk integration
         email=user.email,
         password_hash=hash_password(user.password),
         role=user.role
@@ -34,4 +37,11 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         "role": db_user.role if isinstance(db_user.role, str) else db_user.role.value
     }
     token = create_token(token_data)
-    return {"access_token": token}
+    return {
+        "access_token": token,
+        "user": {
+            "id": str(db_user.user_id),
+            "email": db_user.email,
+            "role": db_user.role
+        }
+    }
