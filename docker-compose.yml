@@ -1,0 +1,53 @@
+
+services:
+  # === DATABASE SERVICE ===
+  db:
+    image: postgres:18
+    container_name: myapp_db
+    environment:
+      POSTGRES_PASSWORD: "1234567890"
+      POSTGRES_DB: "FYP"
+      POSTGRES_USER: "postgres"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # === BACKEND + MAS ===
+  backend:
+    build: ./backend
+    container_name: myapp_backend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: "postgresql://postgres:1234567890@db:5432/FYP"
+      DB_USER: "postgres"
+      DB_PASSWORD: "1234567890"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_NAME: "FYP"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+
+  # === FRONTEND ===
+  frontend:
+    build: ./frontend
+    container_name: myapp_frontend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: "http://backend:8000"
+
+# === VOLUME DEFINITION ===
+volumes:
+  postgres_data: {}
