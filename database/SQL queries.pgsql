@@ -16,26 +16,26 @@ CREATE TYPE payment_status AS ENUM ('pending','completed','failed','refunded');
 --------------------------------------------------
 CREATE TABLE usr (
     user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    clerk_id TEXT UNIQUE NOT NULL,        -- 🔥 Clerk user id
     email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
     first_name TEXT,
     last_name TEXT,
     phone_number TEXT,
     preferred_language TEXT,
     role user_role NOT NULL,
-    permissions TEXT[],           -- for admins
-    specialty TEXT,               -- for doctors
-    license_number TEXT,          -- for doctors
-    years_of_experience INTEGER,  -- for doctors
-    qualifications TEXT[],        -- for doctors
-    clinic_address TEXT,          -- for doctors
-    date_of_birth DATE,           -- for patients
-    gender TEXT,                  -- for patients
-    address TEXT,                 -- for patients
-    blood_type TEXT,              -- for patients
-    allergies TEXT[],             -- for patients
-    chronic_conditions TEXT[],    -- for patients
-    emergency_contact TEXT,       -- for patients
+    permissions TEXT[],
+    specialty TEXT,
+    license_number TEXT,
+    years_of_experience INTEGER,
+    qualifications TEXT[],
+    clinic_address TEXT,
+    date_of_birth DATE,
+    gender TEXT,
+    address TEXT,
+    blood_type TEXT,
+    allergies TEXT[],
+    chronic_conditions TEXT[],
+    emergency_contact TEXT,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     deleted_at TIMESTAMP
@@ -161,12 +161,14 @@ CREATE TABLE time_slot (
 --------------------------------------------------
 CREATE TABLE appointment (
     appointment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id UUID REFERENCES usr(user_id) ON DELETE CASCADE,
-    doctor_id UUID REFERENCES usr(user_id) ON DELETE CASCADE,
-    slot_id UUID REFERENCES time_slot(slot_id) ON DELETE CASCADE,
-    status appointment_status DEFAULT 'scheduled',
+    patient_id UUID NOT NULL REFERENCES usr(user_id) ON DELETE CASCADE,
+    doctor_id UUID NOT NULL REFERENCES usr(user_id) ON DELETE CASCADE,
+    slot_id UUID NOT NULL REFERENCES time_slot(slot_id) ON DELETE CASCADE,
+    status appointment_status NOT NULL DEFAULT 'scheduled',
     appointment_type TEXT,
-    fee NUMERIC,
+    fee NUMERIC CHECK (fee >= 0),   -- ensures fee can't be negative
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
     deleted_at TIMESTAMP
 );
 
@@ -341,3 +343,40 @@ CREATE VIEW active_payments AS SELECT * FROM payment WHERE deleted_at IS NULL;
 CREATE VIEW active_medical_records AS SELECT * FROM medical_record WHERE deleted_at IS NULL;
 CREATE VIEW active_prescriptions AS SELECT * FROM prescription WHERE deleted_at IS NULL;
 CREATE VIEW active_notifications AS SELECT * FROM notification WHERE deleted_at IS NULL;
+
+
+
+
+
+DROP VIEW IF EXISTS active_users;
+ALTER TABLE usr DROP COLUMN password_hash;
+
+ALTER TABLE usr
+ADD COLUMN clerk_id TEXT;
+
+ALTER TABLE usr
+ALTER COLUMN clerk_id SET NOT NULL;
+
+ALTER TABLE usr
+ADD CONSTRAINT uq_usr_clerk_id UNIQUE (clerk_id);
+
+CREATE VIEW active_users AS
+SELECT
+    user_id,
+    clerk_id,
+    email,
+    first_name,
+    last_name,
+    role,
+    created_at,
+    updated_at
+FROM usr
+WHERE deleted_at IS NULL;
+
+
+
+ALTER TABLE usr
+ADD COLUMN password_hash TEXT;
+
+ALTER TABLE usr
+ADD COLUMN status TEXT;

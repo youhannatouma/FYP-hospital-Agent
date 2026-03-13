@@ -1,0 +1,95 @@
+﻿
+> frontend@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 24.7s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/38) ...
+  Generating static pages using 7 workers (9/38) 
+  Generating static pages using 7 workers (18/38) 
+node.exe : The 
+width(-1) and 
+height(-1) of chart 
+should be greater 
+than 0,
+At line:1 char:1
++ & "C:\Program Files\
+nodejs/node.exe" 
+"C:\Users\HP 
+UAE\AppData\Roaming 
+...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (The width(   
+ -1) a...greater t    
+han 0,:String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+       please check 
+the style of 
+container, or the 
+props width(100%) and 
+height(100%),
+       or add a 
+minWidth(0) or 
+minHeight(undefined) 
+or use 
+aspect(undefined) to 
+control the
+       height and 
+width.
+The width(-1) and 
+height(-1) of chart 
+should be greater 
+than 0,
+       please check 
+the style of 
+container, or the 
+props width(100%) and 
+height(100%),
+       or add a 
+minWidth(0) or 
+minHeight(undefined) 
+or use 
+aspect(undefined) to 
+control the
+       height and 
+width.
+Error occurred 
+prerendering page "/pa
+tient/clinical-history
+". Read more: https://
+nextjs.org/docs/messag
+es/prerender-error
+TypeError: Cannot 
+read properties of 
+null (reading 
+'filter')
+    at w (C:\fyp\FYP-h
+ospital-Agent\frontend
+\.next\server\chunks\s
+sr\_22d72724._.js:1:96
+33) {
+  digest: '2709211153'
+}
+Export encountered an 
+error on /patient/clin
+ical-history/page: /pa
+tient/clinical-history
+, exiting the build.
+Γ¿» Next.js build 
+worker exited with 
+code: 1 and signal: 
+null

@@ -1,187 +1,135 @@
-import { CalendarDays, FileText, Pill, Activity, ArrowRight, Video } from "lucide-react"
+"use client"
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { useState } from "react"
+import { m, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { CalendarPlus, Phone, Sparkles, ArrowRight } from "lucide-react"
+import { StatCards } from "@/components/patient/dashboard/stat-cards"
+import { MedicalHistoryTimeline } from "@/components/patient/dashboard/medical-history-timeline"
+import { AIHealthAvatar } from "@/components/patient/dashboard/ai-health-avatar"
+import { UpcomingVisits } from "@/components/patient/dashboard/upcoming-visits"
+import { VitalsTracking } from "@/components/patient/dashboard/vitals-tracking"
+import { HealthGoals } from "@/components/patient/dashboard/health-goals"
+import { AIHealthInsights } from "@/components/patient/dashboard/ai-health-insights"
+import { HealthTip } from "@/components/patient/dashboard/health-tip"
+import { MessagesSection } from "@/components/patient/dashboard/messages-section"
+import { HealthEducation } from "@/components/patient/dashboard/health-education"
+import { CurrentMedications } from "@/components/patient/dashboard/current-medications"
+import { RecentLabResults } from "@/components/patient/dashboard/recent-lab-results"
+import { MedicalDocuments } from "@/components/patient/dashboard/medical-documents"
+import { BookAppointmentDialog } from "@/components/patient/dialogs/book-appointment-dialog"
+import { ContactDoctorDialog } from "@/components/patient/dialogs/contact-doctor-dialog"
+import { cn } from "@/lib/utils"
 
-export default function PatientDashboard() {
+export default function PatientDashboardPage() {
+  const [showBookAppointment, setShowBookAppointment] = useState(false)
+  const [showContactDoctor, setShowContactDoctor] = useState(false)
+
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        <Card x-chunk="dashboard-01-chunk-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Upcoming Appointment
-            </CardTitle>
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">Today, 2:00 PM</div>
-            <p className="text-xs text-muted-foreground">
-              Dr. Sarah Smith - Cardiologist
-            </p>
-          </CardContent>
-        </Card>
-        <Card x-chunk="dashboard-01-chunk-1">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Active Prescriptions
-            </CardTitle>
-            <Pill className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">3 Active</div>
-            <p className="text-xs text-muted-foreground">
-              2 refills available
-            </p>
-          </CardContent>
-        </Card>
-        <Card x-chunk="dashboard-01-chunk-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Medical Records</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+12</div>
-            <p className="text-xs text-muted-foreground">
-              New results attached
-            </p>
-          </CardContent>
-        </Card>
-        <Card x-chunk="dashboard-01-chunk-3">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Health Score</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">98%</div>
-            <p className="text-xs text-muted-foreground">
-              +2% from last month
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-        <Card className="xl:col-span-2" x-chunk="dashboard-01-chunk-4">
-          <CardHeader className="flex flex-row items-center overflow-hidden">
-            <div className="grid gap-2">
-              <CardTitle>Upcoming Schedule</CardTitle>
-              <CardDescription>
-                You have 3 appointments this month.
-              </CardDescription>
+    <AnimatePresence mode="wait">
+      <m.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="flex flex-col gap-12 max-w-[1400px] mx-auto pb-24 px-4 sm:px-6"
+      >
+        {/* Premium Header */}
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between pt-4">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest leading-none shadow-inner-glow">
+              <Sparkles className="h-3 w-3" />
+              Patient Ecosystem
             </div>
-            <Button asChild size="sm" className="ml-auto gap-1">
-              <a href="/patient/appointments">
-                View All
-                <ArrowRight className="h-4 w-4" />
-              </a>
+            <div>
+              <h1 className="text-4xl font-black text-foreground tracking-tight leading-none lg:text-5xl">
+                Welcome back, Sarah
+              </h1>
+              <p className="text-muted-foreground mt-4 font-medium text-lg max-w-lg leading-relaxed">
+                Your health telemetry is synchronized. Summary for <span className="text-foreground font-black underline decoration-primary/30 underline-offset-4">January 15, 2024</span>.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <Button 
+              variant="outline" 
+              className="gap-3 border-border/50 text-foreground h-12 px-6 rounded-2xl hover:bg-muted/50 transition-all font-black text-xs uppercase tracking-widest shadow-subtle group"
+              onClick={() => setShowBookAppointment(true)}
+            >
+              <CalendarPlus className="h-4 w-4 transition-transform group-hover:scale-110" />
+              Book Session
             </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-8">
-                {/* Appointment Item 1 */}
-                <div className="flex items-center">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
-                        <Video className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-                    </div>
-                    <div className="ml-4 space-y-1">
-                        <p className="text-sm font-medium leading-none">Remote Consultation</p>
-                        <p className="text-sm text-muted-foreground">
-                            Dr. Emily Chen • General Medicine
-                        </p>
-                    </div>
-                    <div className="ml-auto font-medium">Today, 2:00 PM</div>
-                </div>
+            <Button 
+              className="gap-3 bg-slate-900 text-white hover:bg-slate-800 h-12 px-8 rounded-2xl transition-all font-black text-xs uppercase tracking-widest shadow-glow group"
+              onClick={() => setShowContactDoctor(true)}
+            >
+              <Phone className="h-4 w-4 transition-transform group-hover:rotate-12" />
+              Consult Specialist
+              <ArrowRight className="h-4 w-4 ml-2 opacity-30 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+            </Button>
+          </div>
+        </div>
 
-                 {/* Appointment Item 2 */}
-                <div className="flex items-center">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-                        <CalendarDays className="h-5 w-5 text-green-600 dark:text-green-300" />
-                    </div>
-                    <div className="ml-4 space-y-1">
-                        <p className="text-sm font-medium leading-none">Annual Checkup</p>
-                        <p className="text-sm text-muted-foreground">
-                            Dr. Michael Ross • Cardiology
-                        </p>
-                    </div>
-                    <div className="ml-auto font-medium">Feb 12, 10:30 AM</div>
-                </div>
+        {/* Core Metrics Staggered */}
+        <div className="space-y-12">
+          {/* Stat Cards - Horizontal Layer */}
+          <section>
+            <StatCards />
+          </section>
 
-                 {/* Appointment Item 3 */}
-                <div className="flex items-center">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900">
-                        <Activity className="h-5 w-5 text-orange-600 dark:text-orange-300" />
-                    </div>
-                    <div className="ml-4 space-y-1">
-                        <p className="text-sm font-medium leading-none">Lab Results Review</p>
-                        <p className="text-sm text-muted-foreground">
-                            Lab Corp • Haematology
-                        </p>
-                    </div>
-                    <div className="ml-auto font-medium">Feb 15, 09:00 AM</div>
-                </div>
+          {/* Asymmetric Core Grid: Timeline + AI Focus */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 items-start">
+            <div className="lg:col-span-2 order-2 lg:order-1">
+              <MedicalHistoryTimeline />
             </div>
-          </CardContent>
-        </Card>
-        <Card x-chunk="dashboard-01-chunk-5">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-8">
-            <div className="flex items-center gap-4">
-              <div className="grid gap-1">
-                <p className="text-sm font-medium leading-none">
-                  Prescription Refilled
-                </p>
-                <p className="text-sm text-muted-foreground">
-                    Amoxicillin 500mg
-                </p>
+            <div className="flex flex-col gap-8 order-1 lg:order-2">
+              <AIHealthAvatar />
+              <div className="hidden lg:block">
+                 <HealthTip />
               </div>
-              <div className="ml-auto font-medium text-xs text-muted-foreground">2h ago</div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="grid gap-1">
-                <p className="text-sm font-medium leading-none">
-                  New Test Result
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Blood Panel - Complete
-                </p>
-              </div>
-              <div className="ml-auto font-medium text-xs text-muted-foreground">5h ago</div>
+          </div>
+
+          {/* Rhythm Shift: Upcoming + Vitals */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <div className="order-2 lg:order-1">
+              <UpcomingVisits />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="grid gap-1">
-                <p className="text-sm font-medium leading-none">
-                  Appointment Booked
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  With Dr. Sarah Smith
-                </p>
-              </div>
-              <div className="ml-auto font-medium text-xs text-muted-foreground">1d ago</div>
+            <div className="lg:col-span-2 order-1 lg:order-2">
+              <VitalsTracking />
             </div>
-            <div className="flex items-center gap-4">
-                <div className="grid gap-1">
-                    <p className="text-sm font-medium leading-none">
-                        Profile Updated
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                        Insurance details verified
-                    </p>
-                </div>
-                <div className="ml-auto font-medium text-xs text-muted-foreground">2d ago</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </div>
+
+          {/* Secondary Intelligence: Medications + Labs + Goals */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+             <CurrentMedications />
+             <RecentLabResults />
+             <HealthGoals />
+          </div>
+
+          {/* Deep Insights Full Width */}
+          <section className="pt-8 border-t border-border/30">
+            <AIHealthInsights />
+          </section>
+
+          {/* Utility Sections Staggered */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+             <MessagesSection />
+             <div className="flex flex-col gap-8">
+                <MedicalDocuments />
+                <HealthEducation />
+             </div>
+          </div>
+        </div>
+
+        <div className="mt-12 lg:hidden">
+           <HealthTip />
+        </div>
+
+        <BookAppointmentDialog open={showBookAppointment} onOpenChange={setShowBookAppointment} />
+        <ContactDoctorDialog open={showContactDoctor} onOpenChange={setShowContactDoctor} />
+      </m.div>
+    </AnimatePresence>
   )
 }
