@@ -7,7 +7,7 @@ from app.auth.dependencies import get_current_user, require_role
 router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.get("/")
-def get_users(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def get_users(db: Session = Depends(get_db), admin=Depends(require_role("admin"))):
     return db.query(User).all()
 
 
