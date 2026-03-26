@@ -1,45 +1,8 @@
-"""Middleware & Infrastructure Package.
+"""Middleware package exports.
 
-This package contains cross-cutting infrastructure concerns:
-
-- stream_manager.py: SSE stream lifecycle management + rate limiting
-- approval_manager.py: Human-in-the-loop approval orchestration (Phase 3 final)
-- lock_manager.py: Deadlock-prevention with ordered lock acquisition
-
-These components provide essential infrastructure for secure, reliable operations.
+Keep package imports resilient by exporting submodules directly.
 """
 
-from .stream_manager import (
-    StreamManager,
-    RateLimiter,
-    get_stream_manager,
-    get_rate_limiter,
-)
+from . import approval_manager, lock_manager, stream_manager
 
-from .approval_manager import (
-    ApprovalManager,
-    ApprovalRequest,
-    ApprovalPolicy,
-    get_approval_manager,
-)
-
-from .lock_manager import (
-    get_ordered_lock,
-    acquire_ordered,
-)
-
-__all__ = [
-    # Streaming
-    "StreamManager",
-    "RateLimiter",
-    "get_stream_manager",
-    "get_rate_limiter",
-    # Approvals
-    "ApprovalManager",
-    "ApprovalRequest",
-    "ApprovalPolicy",
-    "get_approval_manager",
-    # Locking
-    "get_ordered_lock",
-    "acquire_ordered",
-]
+__all__ = ["stream_manager", "approval_manager", "lock_manager"]

@@ -300,6 +300,11 @@ def recall(user_id: str, query: str, k: int = 5) -> list[dict]:
     ]
 
 
+def recall_memory(user_id: str, query: str, k: int = 5) -> list[dict]:
+    """Backward-compatible alias for legacy callers."""
+    return recall(user_id, query, k)
+
+
 def memory_context(user_id: str, query: str, k: int = 5) -> str:
     """Recalled facts formatted for prompt injection. Empty if none."""
     if k < 1:

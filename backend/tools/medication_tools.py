@@ -12,20 +12,13 @@ from sqlalchemy.pool import QueuePool
 load_dotenv()
 log = logging.getLogger(__name__)
 
-# ── DB configs ──────────────────────────────────────────────────────────
-_MED_DB = dict(
-    dbname=os.getenv("MED_DB_NAME", "health_assistant"),
-    user=os.getenv("MED_DB_USER", "guenayfer"),
-    password=os.getenv("MED_DB_PASSWORD", ""),
-    host=os.getenv("MED_DB_HOST", "localhost"),
-    port=int(os.getenv("MED_DB_PORT", "5432")),
-)
-_FYP_DB = dict(
-    dbname=os.getenv("FYP_DB_NAME", "FYP"),
-    user=os.getenv("FYP_DB_USER", "postgres"),
-    password=os.getenv("FYP_DB_PASSWORD", "1234567890"),
-    host=os.getenv("FYP_DB_HOST", "localhost"),
-    port=int(os.getenv("FYP_DB_PORT", "5432")),
+# ── DB config (single FYP database) ─────────────────────────────────────
+_DB = dict(
+    dbname=os.getenv("DB_NAME", "FYP"),
+    user=os.getenv("DB_USER", "postgres"),
+    password=os.getenv("DB_PASSWORD", "1234567890"),
+    host=os.getenv("DB_HOST", "localhost"),
+    port=int(os.getenv("DB_PORT", "5432")),
 )
 _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
 _EMPTY_PROFILE: dict[str, Any] = {
@@ -111,27 +104,49 @@ def _t(val: str | None, n: int = 400) -> str:
 
 # ── 1. query + rank ────────────────────────────────────────────────────
 def query_and_rank_drugs(symptom: str, limit: int = 7) -> list[dict[str, Any]]:
-    """Query DB for drugs matching *symptom*, return ranked (OTC first)."""
+    """Query medication-native fields and map rows into pipeline format."""
     if not symptom or not symptom.strip():
         log.warning("Empty symptom")
         return []
 
-    rows = _query(_MED_DB,
-        """SELECT brand_names, generic_names, manufacturer, product_type,
-                  substances, indications, dosage, warnings,
-                  drug_interactions, contraindications
-           FROM drug_labels WHERE indications ILIKE %(p)s LIMIT %(l)s""",
-        {"p": f"%{symptom.strip()[:200]}%", "l": limit})
+    rows = _query(
+        _DB,
+        """SELECT name, dosage, substances, warnings, contradictions, drug_interactions
+           FROM medication
+           WHERE name ILIKE %(p)s
+              OR dosage ILIKE %(p)s
+              OR warnings ILIKE %(p)s
+              OR contradictions ILIKE %(p)s
+              OR drug_interactions ILIKE %(p)s
+           LIMIT %(l)s""",
+        {"p": f"%{symptom.strip()[:200]}%", "l": limit},
+    )
 
     if not rows:
         log.info("No drugs found for: %s", symptom)
         return []
 
+    mapped = [
+        {
+            "brand_names": [r.get("name")] if r.get("name") else [],
+            "generic_names": [],
+            "manufacturer": None,
+            "product_type": "GENERAL",
+            "substances": r.get("substances") or [],
+            "indications": r.get("warnings") or r.get("contradictions") or "",
+            "dosage": r.get("dosage") or "",
+            "warnings": r.get("warnings") or "",
+            "drug_interactions": r.get("drug_interactions") or "",
+            "contradictions": r.get("contradictions") or "",
+        }
+        for r in rows
+    ]
+
     def _k(d: dict) -> tuple:
-        pt = (d.get("product_type") or "").upper()
         b = d.get("brand_names") or []
-        return (0 if "OTC" in pt else 1, str(b[0]).upper() if b else "ZZZ")
-    return sorted(rows, key=_k)
+        return (str(b[0]).upper() if b else "ZZZ",)
+
+    return sorted(mapped, key=_k)
 
 
 # ── 2. user profile ───────────────────────────────────────────────────
@@ -141,7 +156,7 @@ def get_user_profile(user_id: str) -> dict[str, Any]:
         log.warning("Empty user_id")
         return dict(_EMPTY_PROFILE)
 
-    row = _query_one(_FYP_DB,
+    row = _query_one(_DB,
         """SELECT first_name, last_name, date_of_birth,
                   allergies, chronic_conditions
            FROM usr WHERE user_id = %s AND deleted_at IS NULL""", (user_id,))
@@ -150,11 +165,13 @@ def get_user_profile(user_id: str) -> dict[str, Any]:
         log.warning("User not found: %s", user_id)
         return dict(_EMPTY_PROFILE)
 
-    meds = _query(_FYP_DB,
+    meds = _query(
+        _DB,
         """SELECT medications FROM prescription
            WHERE patient_id = %s AND deleted_at IS NULL
              AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)""",
-        (user_id,))
+        (user_id,),
+    )
     current_meds = [m for r in meds for m in (r.get("medications") or [])]
 
     age = None
@@ -207,7 +224,7 @@ def filter_allergic_drugs(
 # ── 4. LLM safety check ───────────────────────────────────────────────
 _SAFETY_PROMPT = (
     "Check these drugs for interactions with the patient's current medications "
-    "and contraindications given their conditions/age/pregnancy. "
+    "and contradictions given their conditions/age/pregnancy. "
     "Allergies are already handled. Return ONLY valid JSON:\n"
     '{{"safe":[{{"brand_names":[...],"substances":[...],"reason":"..."}}],'
     '"flagged":[{{"brand_names":[...],"substances":[...],'
@@ -272,7 +289,7 @@ def llm_safety_check(
         {"brand_names": d.get("brand_names", []),
          "substances": d.get("substances", []),
          "drug_interactions": _t(d.get("drug_interactions")),
-         "contraindications": _t(d.get("contraindications"))}
+         "contradictions": _t(d.get("contradictions"))}
         for d in allowed
     ]
     sep = (",", ":")
@@ -314,7 +331,7 @@ def _get_stocks(brand_names: list[str]) -> set[str]:
     """Batch check stock availability for multiple brands."""
     if not brand_names:
         return set()
-    rows = _query(_FYP_DB,
+    rows = _query(_DB,
         """SELECT m.name FROM pharmacy_inventory pi
            JOIN medication m ON m.medication_id = pi.medication_id
            WHERE pi.quantity_available > 0 AND m.name ILIKE ANY(%s)""",
