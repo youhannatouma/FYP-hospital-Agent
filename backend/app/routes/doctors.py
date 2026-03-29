@@ -9,12 +9,17 @@ from app.models.user import User
 from app.models.time_slot import TimeSlot
 from app.auth.dependencies import get_current_user, require_role
 from app.schemas.doctor import DoctorCreate
+from app.auth.hashing import hash_password
 
 router = APIRouter(prefix="/doctors", tags=["Doctors"])
 
 
 @router.get("/", response_model=List[dict])
-def list_doctors(specialty: Optional[str] = None, db: Session = Depends(get_db)):
+def list_doctors(
+    specialty: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("patient")),
+):
     """Return all users with role 'doctor'. Optional specialty filter."""
     query = db.query(User).filter(User.role == "doctor")
     if specialty:
@@ -60,7 +65,11 @@ def get_slots(
 
 
 @router.post("/")
-def create_doctor(payload: DoctorCreate, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
+def create_doctor(
+    payload: DoctorCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
     """Admin can register a new doctor account."""
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
@@ -68,7 +77,8 @@ def create_doctor(payload: DoctorCreate, db: Session = Depends(get_db), user=Dep
 
     new_user = User(
         email=payload.email,
-        password_hash=payload.password,  # assume caller will hash or we store raw for now
+        # Never store raw passwords; hash server-side.
+        password_hash=hash_password(payload.password),
         role="doctor",
         first_name=payload.name,
         specialty=payload.specialty,

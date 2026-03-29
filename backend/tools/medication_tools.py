@@ -12,6 +12,7 @@ from sqlalchemy.pool import QueuePool
 load_dotenv()
 log = logging.getLogger(__name__)
 
+<<<<<<< HEAD
 # ── DB config (single FYP database) ─────────────────────────────────────
 _DB = dict(
     dbname=os.getenv("DB_NAME", "FYP"),
@@ -19,6 +20,22 @@ _DB = dict(
     password=os.getenv("DB_PASSWORD", "1234567890"),
     host=os.getenv("DB_HOST", "localhost"),
     port=int(os.getenv("DB_PORT", "5432")),
+=======
+# ── DB configs ──────────────────────────────────────────────────────────
+_MED_DB = dict(
+    dbname=os.getenv("MED_DB_NAME", "health_assistant"),
+    user=os.getenv("MED_DB_USER", "guenayfer"),
+    password=os.getenv("MED_DB_PASSWORD"),
+    host=os.getenv("MED_DB_HOST", "localhost"),
+    port=int(os.getenv("MED_DB_PORT", "5432")),
+)
+_FYP_DB = dict(
+    dbname=os.getenv("FYP_DB_NAME", "FYP"),
+    user=os.getenv("FYP_DB_USER", "postgres"),
+    password=os.getenv("FYP_DB_PASSWORD"),
+    host=os.getenv("FYP_DB_HOST", "localhost"),
+    port=int(os.getenv("FYP_DB_PORT", "5432")),
+>>>>>>> 21193b7391a3600f8ee6577ed93090a0327c2dbe
 )
 _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
 _EMPTY_PROFILE: dict[str, Any] = {
@@ -31,6 +48,8 @@ _ENGINE_CACHE_LOCK = RLock()
 
 # ── DB helpers (all catch psycopg2 errors) ──────────────────────────────
 def _engine_for(cfg: dict):
+    if not cfg.get("password"):
+        raise RuntimeError("Missing database password configuration for medication tools.")
     key = (
         cfg.get("host", "localhost"),
         cfg.get("dbname", ""),
@@ -47,38 +66,17 @@ def _engine_for(cfg: dict):
             engine = create_engine(
                 url,
                 poolclass=QueuePool,
-                pool_size=5,
-                max_overflow=10,
-                pool_timeout=30,
-                pool_pre_ping=True,
-                pool_recycle=1800,
-            )
-            _ENGINE_CACHE[key] = engine
-        return engine
+                load_dotenv()
+                log = logging.getLogger(__name__)
 
-
-def _query(cfg: dict, sql: str, params: tuple | dict) -> list[dict[str, Any]]:
-    try:
-        engine = _engine_for(cfg)
-        with engine.connect() as conn:
-            result = conn.exec_driver_sql(sql, params)
-            return [dict(r._mapping) for r in result.fetchall()]
-    except SQLAlchemyError as e:
-        log.error("DB query failed: %s", e)
-        return []
-
-
-def _query_one(cfg: dict, sql: str, params: tuple | dict) -> dict[str, Any] | None:
-    rows = _query(cfg, sql, params)
-    return rows[0] if rows else None
-
-
-def _exists(cfg: dict, sql: str, params: tuple | dict) -> bool:
-    try:
-        engine = _engine_for(cfg)
-        with engine.connect() as conn:
-            result = conn.exec_driver_sql(sql, params)
-            return result.fetchone() is not None
+                # ── DB config (single FYP database) ─────────────────────────────────────
+                _DB = dict(
+                    dbname=os.getenv("DB_NAME", "FYP"),
+                    user=os.getenv("DB_USER", "postgres"),
+                    password=os.getenv("DB_PASSWORD", "1234567890"),
+                    host=os.getenv("DB_HOST", "localhost"),
+                    port=int(os.getenv("DB_PORT", "5432")),
+                )
     except SQLAlchemyError as e:
         log.error("DB exists-check failed: %s", e)
         return False
