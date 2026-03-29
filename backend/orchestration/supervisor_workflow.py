@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, AsyncIterator, TypedDict
+from typing import Any, AsyncIterator, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 
 
 class SupervisorState(TypedDict, total=False):
+    # Existing generic supervisor fields.
     user_id: str
     task_specs: list[dict[str, Any]]
     planned_tasks: list[ToolTask]
@@ -33,6 +34,19 @@ class SupervisorState(TypedDict, total=False):
     raw_results: dict[str, Any]
     results: dict[str, Any]
     errors: list[str]
+
+    # Phase 1: Specialized doctor-matching/booking state contract.
+    thread_id: str
+    patient_profile_snapshot: dict[str, Any]
+    inferred_need: str
+    ranked_doctor_candidates: list[dict[str, Any]]
+    selected_doctor: dict[str, Any]
+    selected_appointment_date: str
+    selected_appointment_time: str
+    booking_ready: bool
+    booking_result: dict[str, Any]
+    booking_mode: Literal["suggest_only", "booked", "booking_failed"]
+    structured_errors: list[dict[str, Any]]
 
 
 def _validate_and_build_tool_task(user_id: str, task_spec: dict[str, Any], index: int) -> ToolTask:

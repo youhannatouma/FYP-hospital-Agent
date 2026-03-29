@@ -37,7 +37,7 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "FYP")
 
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = os.getenv("DATABASE_URL") or f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 engine = create_engine(DATABASE_URL)
 
@@ -52,11 +52,53 @@ else:
 os.makedirs(os.path.dirname(SNAPSHOT_PATH), exist_ok=True)
 
 
+def _verify_database_connectivity() -> None:
+    """Fail fast on startup if DB config is wrong or database is unreachable."""
+    health = _database_health_snapshot()
+    if health["ok"]:
+        log.info("Database connectivity check passed (database=%s)", health.get("database"))
+        return
+
+    log.error("Database connectivity check failed: %s", health.get("error"))
+    log.error(
+        "Verify DB_HOST/DB_PORT/DB_NAME (for host Docker Postgres often DB_PORT=5433)."
+    )
+    raise RuntimeError(
+        "Database is not reachable or database does not exist. "
+        "Check DATABASE_URL or DB_* environment variables."
+    )
+
+
+def _database_health_snapshot() -> dict:
+    """Return current DB health for startup checks and health endpoints."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            current_db = conn.execute(text("SELECT current_database()")).scalar()
+        return {
+            "ok": True,
+            "database": current_db,
+            "host": DB_HOST,
+            "port": DB_PORT,
+            "db_name": DB_NAME,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "host": DB_HOST,
+            "port": DB_PORT,
+            "db_name": DB_NAME,
+        }
+
+
 # ── Lifespan: load/save memory on startup/shutdown ──────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load memory on startup, save on shutdown."""
     # Startup
+    _verify_database_connectivity()
+
     log.info("Loading memory snapshot...")
     loaded = memory_tools.load_snapshot(SNAPSHOT_PATH)
     log.info(f"Loaded {loaded} users from memory snapshot")
@@ -81,6 +123,15 @@ app.add_middleware(
 @app.get("/")
 def root():
     return {"message": "Backend is running!"}
+
+
+@app.get("/health/db")
+def database_health():
+    """Lightweight DB health endpoint for readiness checks."""
+    status = _database_health_snapshot()
+    if not status.get("ok"):
+        raise HTTPException(status_code=503, detail=status)
+    return status
 
 @app.get("/users")
 def get_users():
