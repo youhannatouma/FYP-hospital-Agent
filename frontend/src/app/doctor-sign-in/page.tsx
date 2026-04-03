@@ -1,67 +1,10 @@
 "use client"
 
-import * as React from "react"
-import { useRouter } from "next/navigation"
-import { Activity, Stethoscope, Mail, Lock, Fingerprint, ArrowRight, Loader2 } from "lucide-react"
+import { SignIn } from "@clerk/nextjs"
+import { Activity, Stethoscope } from "lucide-react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { toast } from "@/hooks/use-toast"
-import { db } from "@/lib/hospital-core/MockDatabase"
-import apiClient from "@/lib/api-client"
 
 export default function DoctorSignInPage() {
-  const router = useRouter()
-  const [loading, setLoading] = React.useState(false)
-  const [formData, setFormData] = React.useState({
-    email: "",
-    customId: "",
-    password: ""
-  })
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      const response = await apiClient.post('/auth/login', formData);
-      const { user, access_token } = response.data;
-      if (user.role !== 'doctor') {
-        throw new Error('Not a doctor account');
-      }
-      toast({ title: "Welcome, " + (user.first_name || user.email), description: "Successfully signed in to your portal." })
-      // In a real app, save token to cookies/localStorage
-      router.push("/doctor")
-    } catch (error) {
-      console.warn('[DoctorSignIn] API failed, falling back to mock DB (or non-doctor user)');
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800))
-
-      const users = db.getUsers()
-      const doctor = users.find(u => 
-        u.role === 'Doctor' && 
-        u.email === formData.email && 
-        u.customId === formData.customId && 
-        u.password === formData.password
-      )
-
-      if (doctor) {
-        toast({ title: "Welcome, " + doctor.name, description: "Successfully signed in to your portal." })
-        router.push("/doctor")
-      } else {
-        toast({ 
-          title: "Sign in failed", 
-          description: "Invalid email, doctor ID, or password. Please contact your admin if you've forgotten your credentials.",
-          variant: "destructive"
-        })
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans">
       {/* Left Decoration */}
@@ -86,13 +29,13 @@ export default function DoctorSignInPage() {
               Physician <span className="text-primary italic">Portal</span>.
             </h2>
             <p className="text-muted-foreground text-lg max-w-md font-medium">
-              Access your personalized dashboard, manage schedules, and coordinate patient care with AI advanced tools.
+              Access your personalized dashboard, manage schedules, and coordinate patient care.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-4 text-sm text-muted-foreground font-medium">
-          <span>Enterprise-grade security for medical professionals</span>
+          <span>Secure sign-in for medical professionals</span>
         </div>
       </div>
 
@@ -110,77 +53,31 @@ export default function DoctorSignInPage() {
 
           <div className="space-y-2 text-center md:text-left">
             <h1 className="text-3xl font-black tracking-tight text-foreground">Doctor Sign In</h1>
-            <p className="text-muted-foreground font-medium">Enter your credentials provided by the administrator.</p>
+            <p className="text-muted-foreground font-medium">
+              Sign in to access your physician portal.
+            </p>
           </div>
 
-          <form onSubmit={handleSignIn} className="space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-bold">Work Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="name@hospital.com" 
-                    className="pl-10 h-12 rounded-xl border-border bg-muted/30 focus:border-primary transition-all"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="doctorId" className="text-sm font-bold">Doctor ID</Label>
-                <div className="relative">
-                  <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="doctorId" 
-                    placeholder="DOC-XXXXX" 
-                    className="pl-10 h-12 rounded-xl border-border bg-muted/30 focus:border-primary transition-all"
-                    value={formData.customId}
-                    onChange={(e) => setFormData({...formData, customId: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm font-bold">Password</Label>
-                  <Link href="#" className="text-xs text-primary font-bold hover:underline">Forgot password?</Link>
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    placeholder="••••••••" 
-                    className="pl-10 h-12 rounded-xl border-border bg-muted/30 focus:border-primary transition-all"
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Button 
-              type="submit" 
-              className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all flex items-center justify-center gap-2"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  Sign In to Physician Portal
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </form>
+          <SignIn
+            afterSignInUrl="/doctor"
+            appearance={{
+              elements: {
+                formButtonPrimary:
+                  "bg-primary hover:bg-primary/90 text-sm font-bold h-11 rounded-xl shadow-lg shadow-primary/20",
+                card: "bg-transparent border-0 shadow-none p-0",
+                headerTitle: "text-3xl font-extrabold tracking-tight text-foreground",
+                headerSubtitle: "text-muted-foreground font-medium",
+                socialButtonsBlockButton:
+                  "rounded-xl border-border bg-card/50 hover:bg-muted text-foreground transition-all h-11",
+                formFieldLabel: "text-sm font-bold text-foreground",
+                formFieldInput:
+                  "rounded-xl border-border bg-muted/30 focus:border-primary focus:ring-primary backdrop-blur-sm h-11",
+                footerActionLink: "text-primary hover:text-primary/80 font-bold",
+                identityPreviewText: "text-foreground font-medium",
+                identityPreviewEditButton: "text-primary font-bold",
+              },
+            }}
+          />
 
           <div className="text-center">
             <p className="text-sm text-muted-foreground font-medium">

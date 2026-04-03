@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:18
+    container_name: myapp_db
+    env_file:
+      - backend/.env
+    environment:
+      POSTGRES_DB: "FYP"
+      POSTGRES_USER: "postgres"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    ports:
+      - "5433:5432"
+    networks:
+      - appnet
+
+  backend:
+    build: ./backend
+    container_name: myapp_backend
+    env_file:
+      - backend/.env
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: "postgresql://postgres:1234567890@db:5432/FYP"
+      DB_USER: "postgres"
+      DB_PASSWORD: "1234567890"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_NAME: "FYP"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
+      LANGSMITH_API_KEY: "${LANGSMITH_API_KEY}"
+      LANGSMITH_TRACING_V2: "${LANGSMITH_TRACING_V2}"
+      LANGSMITH_PROJECT: "${LANGSMITH_PROJECT}"
+      MEMORY_MAX_FACTS: "${MEMORY_MAX_FACTS}"
+      MEMORY_SNAPSHOT_PATH: "data/memory_snapshot.json"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    networks:
+      - appnet
+
+  frontend:
+    build: ./frontend
+    container_name: myapp_frontend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: "http://backend:8000"
+    networks:
+      - appnet
+
+volumes:
+  postgres_data: {}
+
+networks:
+  appnet:
+    driver: bridge

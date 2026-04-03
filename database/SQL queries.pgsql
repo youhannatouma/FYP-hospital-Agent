@@ -224,9 +224,10 @@ CREATE TABLE medication (
     medication_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT,
     dosage TEXT,
-    frequency TEXT,
-    duration INTEGER,
-    instructions TEXT
+    substances TEXT[],
+    warnings TEXT,
+    contradictions TEXT,
+    drug_interactions TEXT
 );
 
 --------------------------------------------------
