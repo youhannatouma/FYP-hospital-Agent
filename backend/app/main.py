@@ -19,6 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.routes.signaling import sio_app
+
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(appointments.router)
@@ -27,6 +29,7 @@ api_router.include_router(payments.router)
 api_router.include_router(admin.router)
 
 app.include_router(api_router)
+app.mount("/ws", sio_app)
 
 @app.get("/")
 def root():
