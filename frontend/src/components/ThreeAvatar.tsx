@@ -2,19 +2,27 @@
 
 import { Canvas, useFrame, useGraph } from "@react-three/fiber"
 import { useGLTF } from "@react-three/drei"
-import { useRef, useEffect, useMemo } from "react"
+import { useRef, useEffect, useMemo, useState } from "react"
 import * as THREE from "three"
 import { SkeletonUtils } from "three-stdlib"
 
 interface Props {
   size: number
   textToSpeak?: string
+  manualJawPosition?: number // 0-1, manual control of jaw position
 }
 
-export function Head({ textToSpeak = "" }: { textToSpeak?: string }) {
-  const { scene } = useGLTF("/models/avatar.glb")
+export function Head({ textToSpeak = "", manualJawPosition }: { textToSpeak?: string, manualJawPosition?: number }) {
+  const { scene, error } = useGLTF("/models/avatar.glb")
   const clone = useMemo(() => SkeletonUtils.clone(scene), [scene])
   const { nodes } = useGraph(clone)
+
+  // Debug logging
+  useEffect(() => {
+    console.log("Avatar model loaded:", !!scene)
+    console.log("Avatar error:", error)
+    console.log("Nodes:", Object.keys(nodes))
+  }, [scene, error, nodes])
   
   const groupRef = useRef<THREE.Group>(null!)
   const headMeshRef = useRef<THREE.SkinnedMesh | null>(null)
@@ -35,6 +43,16 @@ export function Head({ textToSpeak = "" }: { textToSpeak?: string }) {
   }, [])
 
   useEffect(() => {
+    if (error) {
+      console.error("Failed to load avatar model:", error)
+      return
+    }
+
+    if (!scene) {
+      console.log("Avatar model not loaded yet")
+      return
+    }
+
     // Hide body parts
     const partsToKeep = ["Wolf3D_Head", "Wolf3D_Teeth", "EyeLeft", "EyeRight"]
     Object.keys(nodes).forEach((key) => {
@@ -93,8 +111,11 @@ export function Head({ textToSpeak = "" }: { textToSpeak?: string }) {
     if (headMeshRef.current && jawIndex.current !== null) {
       const influence = headMeshRef.current.morphTargetInfluences!
       const target = jawIndex.current
-      
-      influence[target] = THREE.MathUtils.lerp(influence[target], speakingIntensity.current, 0.2)
+
+      // Use manual jaw position if provided, otherwise use speech synthesis
+      const jawPosition = manualJawPosition !== undefined ? manualJawPosition : speakingIntensity.current
+
+      influence[target] = THREE.MathUtils.lerp(influence[target], jawPosition, 0.2)
 
       // Sync teeth
       if (teethMeshRef.current?.morphTargetInfluences) {
@@ -113,13 +134,45 @@ export function Head({ textToSpeak = "" }: { textToSpeak?: string }) {
   )
 }
 
-export default function ThreeAvatar({ size, textToSpeak = "" }: Props) {
+export default function ThreeAvatar({ size, textToSpeak = "", manualJawPosition }: Props) {
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    // Check if WebGL is supported
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    if (!gl) {
+      console.error('WebGL not supported')
+      setHasError(true)
+    }
+  }, [])
+
+  if (hasError) {
+    return (
+      <div
+        style={{
+          width: size,
+          height: size,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f0f0f0'
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div>Avatar</div>
+          <div style={{ fontSize: '12px', color: 'red' }}>WebGL Error</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ width: size, height: size }}>
       <Canvas camera={{ position: [0, 0.2, 0.8], fov: 35 }}>
         <ambientLight intensity={2} />
         <pointLight position={[2, 2, 2]} intensity={5} />
-        <Head textToSpeak={textToSpeak} />
+        <Head textToSpeak={textToSpeak} manualJawPosition={manualJawPosition} />
       </Canvas>
     </div>
   )
