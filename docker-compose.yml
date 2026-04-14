@@ -8,9 +8,14 @@ services:
       POSTGRES_DB: "FYP"
       POSTGRES_USER: "postgres"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d FYP"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - appnet
 
@@ -23,7 +28,8 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DATABASE_URL: "postgresql://postgres:1234567890@db:5432/FYP"
       DB_USER: "postgres"

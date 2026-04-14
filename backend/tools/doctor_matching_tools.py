@@ -5,14 +5,17 @@ import hashlib
 import logging
 import os
 import uuid
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import QueuePool
+
+from ..middleware import approval_manager
 
 load_dotenv()
 log = logging.getLogger(__name__)
@@ -27,6 +30,34 @@ _DB = dict(
 )
 
 _ENGINE = None
+
+
+class BookingDomainError(Exception):
+    """Domain-level booking error with stable code and safe message."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+    def to_dict(self) -> dict[str, str]:
+        return {"code": self.code, "message": self.message}
+
+
+def _is_patient_assigned_to_doctor(conn, doctor_id: uuid.UUID, patient_id: uuid.UUID) -> bool:
+        sql = text(
+                """
+                SELECT 1
+                FROM doctor_patient_assignment
+                WHERE doctor_id = :did
+                    AND patient_id = :pid
+                    AND is_active = TRUE
+                    AND deleted_at IS NULL
+                LIMIT 1
+                """
+        )
+        row = conn.execute(sql, {"did": doctor_id, "pid": patient_id}).first()
+        return row is not None
 
 
 _SPECIALTY_HINTS: dict[str, set[str]] = {
@@ -418,8 +449,31 @@ def search_doctors_for_need(
         raise RuntimeError(f"Failed to search doctors for need: {exc}") from exc
 
 
-def _idempotency_key(thread_id: str, patient_id: str, doctor_id: str, dt: datetime) -> str:
-    payload = f"{thread_id.strip()}|{patient_id.strip()}|{doctor_id.strip()}|{dt.isoformat()}"
+def _normalize_booking_datetime_utc(
+    appointment_date: date,
+    appointment_time: time,
+    booking_timezone: str = "UTC",
+) -> datetime:
+    try:
+        tz = ZoneInfo(booking_timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError(f"Invalid booking timezone: {booking_timezone}") from exc
+
+    local_dt = datetime.combine(appointment_date, appointment_time)
+    aware_local = local_dt.replace(tzinfo=tz)
+    return aware_local.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _idempotency_key(
+    thread_id: str,
+    patient_id: str,
+    doctor_id: str,
+    *,
+    slot_id: str | None = None,
+    dt_utc: datetime | None = None,
+) -> str:
+    target = f"slot:{slot_id.strip()}" if slot_id else f"dt_utc:{dt_utc.isoformat() if dt_utc else ''}"
+    payload = f"{thread_id.strip()}|{patient_id.strip()}|{doctor_id.strip()}|{target}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -433,13 +487,17 @@ def book_appointment(
     actor_user_id: str,
     patient_user_id: str,
     doctor_id: str,
-    appointment_date: date,
-    appointment_time: time,
+    slot_id: str | None = None,
+    appointment_date: date | None = None,
+    appointment_time: time | None = None,
+    booking_timezone: str = "UTC",
+    booking_reason: str | None = None,
+    policy_context: dict[str, Any] | None = None,
     doctor_name: str | None = None,
     appointment_type: str | None = None,
     fee: float | None = None,
 ) -> dict[str, Any]:
-    """Book an appointment atomically with idempotency and slot locking safeguards."""
+    """Book an appointment atomically with slot-first resolution and UTC fallback."""
     if not thread_id.strip():
         raise ValueError("thread_id is required")
 
@@ -447,11 +505,33 @@ def book_appointment(
     patient_uuid = _as_uuid(patient_user_id)
     doctor_uuid = _as_uuid(doctor_id)
 
-    if not isinstance(appointment_date, date) or not isinstance(appointment_time, time):
-        raise ValueError("appointment_date and appointment_time are required")
+    resolved_slot_uuid: uuid.UUID | None = None
+    target_dt_utc: datetime | None = None
+    window_start: datetime | None = None
+    window_end: datetime | None = None
+    resolution_mode = "slot_id" if slot_id else "datetime_fallback"
 
-    target_dt = datetime.combine(appointment_date, appointment_time)
-    key_hex = _idempotency_key(thread_id, patient_user_id, doctor_id, target_dt)
+    if slot_id:
+        resolved_slot_uuid = _as_uuid(slot_id)
+    else:
+        if not isinstance(appointment_date, date) or not isinstance(appointment_time, time):
+            raise ValueError("slot_id or (appointment_date and appointment_time) is required")
+        target_dt_utc = _normalize_booking_datetime_utc(
+            appointment_date,
+            appointment_time,
+            booking_timezone=booking_timezone,
+        )
+        # Bounded range protects against second/microsecond precision drift.
+        window_start = target_dt_utc - timedelta(seconds=59)
+        window_end = target_dt_utc + timedelta(seconds=59)
+
+    key_hex = _idempotency_key(
+        thread_id,
+        patient_user_id,
+        doctor_id,
+        slot_id=slot_id,
+        dt_utc=target_dt_utc,
+    )
     lock_key = _advisory_lock_int(key_hex)
 
     doctor_sql = text(
@@ -472,22 +552,57 @@ def book_appointment(
         """
     )
 
-    slot_lock_sql = text(
+    patient_sql = text(
+        """
+        SELECT user_id, role, deleted_at
+        FROM usr
+        WHERE user_id = :pid AND deleted_at IS NULL
+        LIMIT 1
+        """
+    )
+
+    slot_lock_by_id_sql = text(
+        """
+        SELECT slot_id, doctor_id, start_time, end_time, is_available
+        FROM time_slot
+        WHERE slot_id = :sid
+          AND doctor_id = :did
+          AND deleted_at IS NULL
+        LIMIT 1
+        FOR UPDATE
+        """
+    )
+
+    slot_lock_by_dt_sql = text(
         """
         SELECT slot_id, doctor_id, start_time, end_time, is_available
         FROM time_slot
         WHERE doctor_id = :did
           AND deleted_at IS NULL
-                    AND DATE(start_time) = :appt_date
-                    AND :target_dt >= start_time
-                    AND :target_dt < end_time
+          AND start_time >= :window_start
+          AND start_time <= :window_end
         ORDER BY start_time ASC
         LIMIT 1
         FOR UPDATE
         """
     )
 
-    existing_for_key_sql = text(
+    existing_for_key_by_slot_sql = text(
+        """
+        SELECT a.appointment_id, a.status, a.slot_id, ts.start_time, ts.end_time
+        FROM appointment a
+        JOIN time_slot ts ON ts.slot_id = a.slot_id
+        WHERE a.deleted_at IS NULL
+          AND ts.deleted_at IS NULL
+          AND a.patient_id = :pid
+          AND a.doctor_id = :did
+          AND a.slot_id = :sid
+          AND a.status IN ('scheduled', 'completed')
+        LIMIT 1
+        """
+    )
+
+    existing_for_key_by_dt_sql = text(
         """
         SELECT a.appointment_id, a.status, a.slot_id, ts.start_time, ts.end_time
         FROM appointment a
@@ -497,9 +612,8 @@ def book_appointment(
           AND a.patient_id = :pid
           AND a.doctor_id = :did
           AND a.status IN ('scheduled', 'completed')
-          AND DATE(ts.start_time) = :appt_date
-                    AND :target_dt >= ts.start_time
-                    AND :target_dt < ts.end_time
+          AND ts.start_time >= :window_start
+          AND ts.start_time <= :window_end
         LIMIT 1
         """
     )
@@ -540,31 +654,107 @@ def book_appointment(
         with _engine().begin() as conn:
             actor = conn.execute(actor_sql, {"aid": actor_uuid}).mappings().first()
             if not actor:
-                raise ValueError("Actor user not found")
+                raise BookingDomainError("ActorNotFound", "Actor user not found")
             if actor["role"] not in {"admin", "doctor"}:
-                raise PermissionError("Only admin or doctor can book on behalf of a patient")
+                raise BookingDomainError(
+                    "InvalidBookingActorRole",
+                    "Only admin or doctor can book on behalf of a patient",
+                )
+
+            actor_role = str(actor.get("role"))
+            is_cross_patient = actor_uuid != patient_uuid
+
+            # Enforce explicit policy matrix:
+            # - admin can book any patient
+            # - doctor can book only assigned patients
+            if actor_role == "doctor":
+                try:
+                    assigned = _is_patient_assigned_to_doctor(conn, actor_uuid, patient_uuid)
+                except SQLAlchemyError as exc:
+                    raise BookingDomainError(
+                        "AuthorizationPolicyNotConfigured",
+                        "Doctor-patient assignment policy is not configured",
+                    ) from exc
+                if not assigned:
+                    raise BookingDomainError(
+                        "ActorPatientScopeViolation",
+                        "Doctor is not authorized to book for this patient",
+                    )
+                if is_cross_patient and not (booking_reason or "").strip():
+                    raise BookingDomainError(
+                        "MissingAuditReason",
+                        "booking_reason is required for doctor on-behalf booking",
+                    )
+
+                context = dict(policy_context or {})
+                is_high_risk = bool(context.get("high_risk", False))
+                if is_cross_patient and is_high_risk:
+                    approval = approval_manager.create_approval_request(
+                        user_id=str(actor_uuid),
+                        task_id=f"book_appointment:{thread_id}",
+                        tool_name="book_appointment_cross_patient",
+                        operation_type="write",
+                        context={
+                            "actor_user_id": str(actor_uuid),
+                            "patient_user_id": str(patient_uuid),
+                            "doctor_id": str(doctor_uuid),
+                            "booking_reason": booking_reason,
+                            "policy_context": context,
+                        },
+                    )
+                    raise BookingDomainError(
+                        "ApprovalRequired",
+                        f"Human approval required before booking. approval_id={approval.approval_id}",
+                    )
+
+            patient = conn.execute(patient_sql, {"pid": patient_uuid}).mappings().first()
+            if not patient:
+                raise BookingDomainError(
+                    "PatientNotFound",
+                    "Patient not found or inactive",
+                )
+            if patient.get("role") != "patient":
+                raise BookingDomainError(
+                    "InvalidPatientRole",
+                    "Target user must have patient role",
+                )
 
             doctor = conn.execute(doctor_sql, {"did": doctor_uuid}).mappings().first()
             if not doctor:
-                raise ValueError("Doctor not found")
+                raise BookingDomainError("DoctorNotFound", "Doctor not found")
 
             if doctor_name:
                 db_name = f"{doctor.get('first_name') or ''} {doctor.get('last_name') or ''}".strip().lower()
                 if doctor_name.strip().lower() not in {db_name, str(doctor_uuid)}:
-                    raise ValueError("Provided doctor_name does not match doctor_id")
+                    raise BookingDomainError(
+                        "DoctorIdentityMismatch",
+                        "Provided doctor_name does not match doctor_id",
+                    )
 
             conn.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": lock_key})
 
-            existing_key = conn.execute(
-                existing_for_key_sql,
-                {
-                    "pid": patient_uuid,
-                    "did": doctor_uuid,
-                    "appt_date": appointment_date,
-                    "target_dt": target_dt,
-                },
-            ).mappings().first()
+            if resolved_slot_uuid is not None:
+                existing_key = conn.execute(
+                    existing_for_key_by_slot_sql,
+                    {
+                        "pid": patient_uuid,
+                        "did": doctor_uuid,
+                        "sid": resolved_slot_uuid,
+                    },
+                ).mappings().first()
+            else:
+                existing_key = conn.execute(
+                    existing_for_key_by_dt_sql,
+                    {
+                        "pid": patient_uuid,
+                        "did": doctor_uuid,
+                        "window_start": window_start,
+                        "window_end": window_end,
+                    },
+                ).mappings().first()
+
             if existing_key:
+                existing_start = existing_key.get("start_time")
                 return {
                     "status": "booked",
                     "idempotent_replay": True,
@@ -573,28 +763,51 @@ def book_appointment(
                     "slot_id": str(existing_key["slot_id"]),
                     "doctor_id": str(doctor_uuid),
                     "patient_id": str(patient_uuid),
-                    "appointment_date": appointment_date.isoformat(),
-                    "appointment_time": appointment_time.isoformat(),
+                    "appointment_date": existing_start.date().isoformat() if existing_start else None,
+                    "appointment_time": existing_start.time().isoformat() if existing_start else None,
+                    "resolution_mode": resolution_mode,
+                    "normalized_booking_time_utc": (
+                        target_dt_utc.isoformat() + "Z" if target_dt_utc else None
+                    ),
                     "message": "Existing appointment returned for idempotent retry.",
                 }
 
-            slot = conn.execute(
-                slot_lock_sql,
-                {
-                    "did": doctor_uuid,
-                    "appt_date": appointment_date,
-                    "target_dt": target_dt,
-                },
-            ).mappings().first()
+            if resolved_slot_uuid is not None:
+                slot = conn.execute(
+                    slot_lock_by_id_sql,
+                    {
+                        "sid": resolved_slot_uuid,
+                        "did": doctor_uuid,
+                    },
+                ).mappings().first()
+            else:
+                slot = conn.execute(
+                    slot_lock_by_dt_sql,
+                    {
+                        "did": doctor_uuid,
+                        "window_start": window_start,
+                        "window_end": window_end,
+                    },
+                ).mappings().first()
+
             if not slot:
-                raise ValueError("No matching time slot found for doctor/date/time")
+                raise BookingDomainError(
+                    "BookingSlotNotFound",
+                    "No matching time slot found for provided booking input",
+                )
 
             if not slot["is_available"]:
-                raise ValueError("Requested slot is not available")
+                raise BookingDomainError(
+                    "BookingSlotUnavailable",
+                    "Requested slot is not available",
+                )
 
             existing_slot = conn.execute(existing_for_slot_sql, {"sid": slot["slot_id"]}).mappings().first()
             if existing_slot:
-                raise ValueError("Requested slot is already booked")
+                raise BookingDomainError(
+                    "BookingSlotAlreadyBooked",
+                    "Requested slot is already booked",
+                )
 
             created = conn.execute(
                 insert_sql,
@@ -609,6 +822,8 @@ def book_appointment(
 
             conn.execute(mark_slot_unavailable_sql, {"sid": slot["slot_id"]})
 
+            slot_start = slot.get("start_time")
+
             return {
                 "status": "booked",
                 "idempotent_replay": False,
@@ -617,13 +832,32 @@ def book_appointment(
                 "slot_id": str(slot["slot_id"]),
                 "doctor_id": str(doctor_uuid),
                 "patient_id": str(patient_uuid),
-                "appointment_date": appointment_date.isoformat(),
-                "appointment_time": appointment_time.isoformat(),
+                "appointment_date": slot_start.date().isoformat() if slot_start else None,
+                "appointment_time": slot_start.time().isoformat() if slot_start else None,
+                "resolution_mode": resolution_mode,
+                "normalized_booking_time_utc": (
+                    target_dt_utc.isoformat() + "Z"
+                    if target_dt_utc
+                    else ((slot_start.isoformat() + "Z") if slot_start else None)
+                ),
                 "message": "Appointment booked successfully.",
             }
-    except (SQLAlchemyError, ValueError, PermissionError) as exc:
-        log.error("Appointment booking failed: %s", exc)
+    except BookingDomainError as exc:
+        log.warning(
+            "Appointment booking rejected [%s]: %s (actor=%s patient=%s doctor=%s)",
+            exc.code,
+            exc.message,
+            actor_user_id,
+            patient_user_id,
+            doctor_id,
+        )
         raise
+    except SQLAlchemyError as exc:
+        log.error("Appointment booking DB failure: %s", exc)
+        raise BookingDomainError(
+            "BookingPersistenceError",
+            "Unable to complete booking due to a persistence error",
+        ) from exc
 
 
 __all__ = [

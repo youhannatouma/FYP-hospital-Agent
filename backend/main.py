@@ -2,11 +2,12 @@ import os
 import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -25,6 +26,8 @@ from .orchestration.supervisor_workflow import (
     stream_supervisor_workflow,
 )
 from .middleware import stream_manager, approval_manager
+from .scripts.db_apply_migrations import apply_phase_migrations, verify_required_indexes
+from .tools.doctor_matching_tools import BookingDomainError
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -92,12 +95,44 @@ def _database_health_snapshot() -> dict:
         }
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    """Parse common boolean env flag formats."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _enforce_database_safeguards() -> None:
+    """Apply phase migrations and verify required booking indexes."""
+    database_dir = Path(REPO_ROOT) / "database"
+
+    if _env_flag("DB_SKIP_MIGRATIONS", False):
+        log.warning("Skipping DB migration application because DB_SKIP_MIGRATIONS is enabled")
+    else:
+        summary = apply_phase_migrations(engine=engine, database_dir=database_dir, dry_run=False)
+        log.info(
+            "DB migrations completed (applied=%s skipped=%s)",
+            summary.get("applied", 0),
+            summary.get("skipped", 0),
+        )
+
+    if _env_flag("DB_ENFORCE_REQUIRED_INDEXES", True):
+        missing = verify_required_indexes(engine)
+        if missing:
+            raise RuntimeError(f"Missing required DB safeguard indexes: {', '.join(missing)}")
+        log.info("Required DB safeguard indexes verified")
+    else:
+        log.warning("Required index verification disabled by DB_ENFORCE_REQUIRED_INDEXES")
+
+
 # ── Lifespan: load/save memory on startup/shutdown ──────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load memory on startup, save on shutdown."""
     # Startup
     _verify_database_connectivity()
+    _enforce_database_safeguards()
 
     log.info("Loading memory snapshot...")
     loaded = memory_tools.load_snapshot(SNAPSHOT_PATH)
@@ -112,6 +147,33 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MyApp Backend", lifespan=lifespan)
+
+_BOOKING_ERROR_STATUS: dict[str, int] = {
+    "PatientNotFound": 404,
+    "DoctorNotFound": 404,
+    "ActorNotFound": 404,
+    "AuthorizationPolicyNotConfigured": 503,
+    "ActorPatientScopeViolation": 403,
+    "InvalidPatientRole": 422,
+    "InvalidBookingActorRole": 403,
+    "MissingAuditReason": 422,
+    "ApprovalRequired": 409,
+    "DoctorIdentityMismatch": 422,
+    "BookingSlotNotFound": 404,
+    "BookingSlotUnavailable": 409,
+    "BookingSlotAlreadyBooked": 409,
+    "BookingPersistenceError": 503,
+}
+
+
+@app.exception_handler(BookingDomainError)
+async def booking_domain_error_handler(_: Request, exc: BookingDomainError):
+    """Map booking domain failures to consistent HTTP responses."""
+    status_code = _BOOKING_ERROR_STATUS.get(exc.code, 400)
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
 
 app.add_middleware(
     CORSMiddleware,

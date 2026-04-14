@@ -60,8 +60,16 @@ def get_slots(
         except ValueError:
             pass
     slots = query.all()
-    # simple format for front-end
-    return [{"time": slot.start_time.strftime("%I:%M %p")} for slot in slots]
+    # Return stable slot IDs from the time_slot table so booking can prefer slot_id over datetime matching.
+    return [
+        {
+            "slot_id": str(slot.slot_id),
+            "start_time": slot.start_time.isoformat(),
+            "end_time": slot.end_time.isoformat(),
+            "time": slot.start_time.strftime("%I:%M %p"),
+        }
+        for slot in slots
+    ]
 
 
 @router.post("/")

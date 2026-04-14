@@ -11,13 +11,28 @@ jobs:
   db-preflight:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: FYP
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: 1234567890
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d FYP"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DB_HOST: ${{ secrets.DB_HOST }}
-      DB_PORT: ${{ secrets.DB_PORT }}
-      DB_NAME: ${{ secrets.DB_NAME }}
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DATABASE_URL: postgresql://postgres:1234567890@localhost:5432/FYP
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: FYP
+      DB_USER: postgres
+      DB_PASSWORD: 1234567890
 
     steps:
       - name: Checkout
@@ -33,6 +48,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Wait for postgres service
+        run: |
+          for i in {1..30}; do
+            if pg_isready -h localhost -p 5432 -U postgres -d FYP; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres did not become ready in time"
+          exit 1
+
+      - name: Apply DB phase migrations
+        run: |
+          python backend/scripts/db_apply_migrations.py
+
       - name: Run DB preflight check
         run: |
           python backend/scripts/db_preflight_check.py
+
+      - name: Assert required DB safeguard indexes
+        run: |
+          python backend/scripts/db_apply_migrations.py --check-indexes-only

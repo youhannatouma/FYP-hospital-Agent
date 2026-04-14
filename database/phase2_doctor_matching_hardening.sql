@@ -5,7 +5,7 @@ BEGIN;
 
 -- 1) Doctor specialty and active-status lookup index.
 CREATE INDEX IF NOT EXISTS idx_usr_doctor_specialty_status_active
-    ON usr (role, specialty, status)
+    ON usr (role, specialty)
     WHERE deleted_at IS NULL;
 
 -- 2) Available slot lookup index for doctor/date queries.
