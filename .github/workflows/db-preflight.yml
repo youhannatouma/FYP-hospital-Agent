@@ -60,6 +60,10 @@ jobs:
           echo "Postgres did not become ready in time"
           exit 1
 
+      - name: Bootstrap base schema tables
+        run: |
+          python backend/scripts/db_bootstrap_schema.py
+
       - name: Apply DB phase migrations
         run: |
           python backend/scripts/db_apply_migrations.py
