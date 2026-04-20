@@ -260,6 +260,47 @@ def test_missing_fields_still_suggestion_only(monkeypatch):
     assert calls["book"] == 0
 
 
+def test_single_fuzzy_db_hit_stays_ambiguous(monkeypatch):
+    calls = {"book": 0}
+
+    def fake_profile_user(_patient_user_id: str):
+        return {"user_id": _patient_user_id, "first_name": "P"}
+
+    def fake_search_doctors_for_need(_need_text: str, _patient_user_id: str, _max: int):
+        return {"candidates": []}
+
+    def fake_search_user(_query: str, role: str | None = None, limit: int = 10):
+        assert role == "doctor"
+        return [
+            {
+                "user_id": "doc-fuzzy",
+                "first_name": "Dr",
+                "last_name": "Nearby",
+                "email": "dr.nearby@example.com",
+            }
+        ]
+
+    def fake_book_appointment(**_kwargs):
+        calls["book"] += 1
+        return {"status": "booked", "appointment_id": "appt-fuzzy"}
+
+    monkeypatch.setattr(swf, "profile_user", fake_profile_user)
+    monkeypatch.setattr(swf, "search_doctors_for_need", fake_search_doctors_for_need)
+    monkeypatch.setattr(swf, "search_user", fake_search_user)
+    monkeypatch.setattr(swf, "book_appointment", fake_book_appointment)
+
+    state = _base_state()
+    state["selected_doctor"] = {"doctor_name": "Dr Near"}
+
+    out = asyncio.run(swf.execute_doctor_match_workflow(state))
+
+    assert out["doctor_resolution_status"] == "ambiguous"
+    assert out["booking_mode"] == "suggest_only"
+    assert out["booking_blocked_reason"] == "doctor_name_ambiguous"
+    assert len(out["doctor_resolution_candidates"]) == 1
+    assert calls["book"] == 0
+
+
 def test_missing_thread_id_sets_booking_failed_validation_true():
     state: swf.SupervisorState = {
         "thread_id": "",

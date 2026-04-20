@@ -263,21 +263,7 @@ async def _resolve_selected_doctor_from_candidates(
     if len(exact_rows) > 1:
         return selected_doctor, "ambiguous", _doctor_resolution_candidates_from_rows(exact_rows)
 
-    if len(db_rows) == 1:
-        row = db_rows[0]
-        resolved = dict(selected_doctor)
-        resolved["doctor_id"] = row.get("user_id")
-        if not resolved.get("doctor_name"):
-            resolved["doctor_name"] = " ".join(
-                part
-                for part in [
-                    str(row.get("first_name") or "").strip(),
-                    str(row.get("last_name") or "").strip(),
-                ]
-                if part
-            )
-        return resolved, "resolved", []
-    if len(db_rows) > 1:
+    if len(db_rows) >= 1:
         return selected_doctor, "ambiguous", _doctor_resolution_candidates_from_rows(db_rows)
 
     return selected_doctor, "not_found", []
@@ -680,19 +666,24 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
     selected_doctor = state.get("selected_doctor") or {}
     doctor_id = str(selected_doctor.get("doctor_id") or "").strip()
     doctor_name = str(selected_doctor.get("doctor_name") or "").strip()
+    slot_id = str(state.get("selected_slot_id") or "").strip() or None
     appointment_date = _coerce_date_value(state.get("selected_appointment_date"))
     appointment_time = _coerce_time_value(state.get("selected_appointment_time"))
+    booking_timezone = str(state.get("booking_timezone") or "UTC")
+    booking_reason = state.get("booking_reason")
+    policy_context = state.get("policy_context") if isinstance(state.get("policy_context"), dict) else {}
     patient_user_id = str(state.get("patient_user_id") or state.get("user_id") or "").strip()
     actor_user_id = str(state.get("actor_user_id") or state.get("user_id") or "").strip()
     thread_id = str(state.get("thread_id") or "").strip()
+    requires_datetime = not bool(slot_id)
 
-    if not (doctor_id and appointment_date and appointment_time):
+    if not doctor_id or (requires_datetime and (not appointment_date or not appointment_time)):
         missing: list[str] = []
         if not doctor_id:
             missing.append("selected_doctor")
-        if not appointment_date:
+        if requires_datetime and not appointment_date:
             missing.append("selected_appointment_date")
-        if not appointment_time:
+        if requires_datetime and not appointment_time:
             missing.append("selected_appointment_time")
 
         blocked_reason = "missing_required_booking_fields"
@@ -745,8 +736,8 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 "actor_user_id": actor_user_id,
                 "patient_user_id": patient_user_id,
                 "doctor_id": doctor_id,
-                "resolution_mode": "datetime_fallback",
-                "booking_timezone": str(state.get("booking_timezone", "UTC")),
+                "resolution_mode": "slot_id" if slot_id else "datetime_fallback",
+                "booking_timezone": booking_timezone,
             },
         )
         result = await asyncio.to_thread(
@@ -755,8 +746,12 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             actor_user_id=actor_user_id,
             patient_user_id=patient_user_id,
             doctor_id=doctor_id,
+            slot_id=slot_id,
             appointment_date=appointment_date,
             appointment_time=appointment_time,
+            booking_timezone=booking_timezone,
+            booking_reason=booking_reason,
+            policy_context=policy_context,
             doctor_name=selected_doctor.get("doctor_name"),
         )
         return {
@@ -1110,6 +1105,76 @@ async def execute_doctor_matching_workflow(state: SupervisorState) -> dict[str, 
     return await execute_doctor_match_workflow(state)
 
 
+async def execute_doctor_match_workflow_legacy(state: SupervisorState) -> dict[str, Any]:
+    """Alternate non-checkpoint doctor workflow execution for controlled fallback.
+
+    This path intentionally avoids checkpoint resume and thread lock orchestration.
+    """
+    thread_id = str(state.get("thread_id") or "").strip()
+    if not thread_id:
+        return _doctor_workflow_response(
+            {
+                "thread_id": "",
+                "booking_mode": "booking_failed",
+                "booking_attempted": False,
+                "booking_committed": False,
+                "booking_result": {
+                    "status": "failed",
+                    "code": "MissingThreadId",
+                    "message": "thread_id is required",
+                },
+                "structured_errors": _append_structured_error(
+                    state,
+                    code="MissingThreadId",
+                    message="thread_id is required",
+                    node="execute_doctor_match_workflow_legacy",
+                ),
+            }
+        )
+
+    try:
+        current: SupervisorState = dict(state)
+        current.update(await profile_user_node(current))
+        current.update(await match_doctors_node(current))
+        current.update(suggest_cards_node(current))
+        current.update(await profile_view_node(current))
+
+        if bool(current.get("booking_ready")):
+            current.update(await conditional_book_node(current))
+        else:
+            current.setdefault("booking_mode", "suggest_only")
+            current.setdefault("booking_attempted", False)
+            current.setdefault("booking_committed", False)
+            current.setdefault("booking_result", {})
+
+        current["resume_from_checkpoint"] = False
+        current["checkpoint_version"] = CHECKPOINT_VERSION
+        return _doctor_workflow_response(current)
+    except Exception as exc:
+        log.exception("Legacy doctor workflow fallback failed for thread %s", thread_id)
+        return _doctor_workflow_response(
+            {
+                "thread_id": thread_id,
+                "booking_mode": "booking_failed",
+                "booking_attempted": False,
+                "booking_committed": False,
+                "booking_result": {
+                    "status": "failed",
+                    "code": "WorkflowExecutionFailed",
+                    "message": str(exc),
+                },
+                "structured_errors": _append_structured_error(
+                    state,
+                    code="WorkflowExecutionFailed",
+                    message=str(exc),
+                    node="execute_doctor_match_workflow_legacy",
+                ),
+                "resume_from_checkpoint": False,
+                "checkpoint_version": CHECKPOINT_VERSION,
+            }
+        )
+
+
 async def stream_doctor_match_workflow(state: SupervisorState) -> AsyncIterator[dict[str, Any]]:
     """Streaming specialized workflow while preserving existing SSE event envelope."""
     thread_id = str(state.get("thread_id") or "").strip()
@@ -1326,6 +1391,7 @@ __all__ = [
     "SupervisorState",
     "build_graph_config",
     "execute_doctor_match_workflow",
+    "execute_doctor_match_workflow_legacy",
     "execute_doctor_matching_workflow",
     "execute_supervisor_workflow",
     "invoke_with_checkpoint",

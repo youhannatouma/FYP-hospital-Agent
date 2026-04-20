@@ -177,15 +177,18 @@ def test_select_doctor_endpoint_family_canary_bounds(monkeypatch):
 
 
 def test_supervisor_doctor_route_auto_fallback_on_runtime_error(monkeypatch):
-    calls = {"count": 0}
+    calls = {"primary": 0, "legacy": 0}
 
     async def flaky_execute_doctor_match_workflow(_state: dict):
-        calls["count"] += 1
-        if calls["count"] == 1:
-            raise RuntimeError("transient failure")
-        return {"path": "doctor", "fallback": True}
+        calls["primary"] += 1
+        raise RuntimeError("transient failure")
+
+    async def legacy_execute_doctor_match_workflow(_state: dict):
+        calls["legacy"] += 1
+        return {"path": "doctor", "fallback": "legacy"}
 
     monkeypatch.setattr(backend_main, "execute_doctor_match_workflow", flaky_execute_doctor_match_workflow)
+    monkeypatch.setattr(backend_main, "execute_doctor_match_workflow_legacy", legacy_execute_doctor_match_workflow)
     monkeypatch.setattr(
         backend_main.stream_manager,
         "get_rate_limiter",
@@ -204,5 +207,6 @@ def test_supervisor_doctor_route_auto_fallback_on_runtime_error(monkeypatch):
     out = asyncio.run(backend_main.supervisor_doctor_route(request))
 
     assert out["path"] == "doctor"
-    assert out["fallback"] is True
-    assert calls["count"] == 2
+    assert out["fallback"] == "legacy"
+    assert calls["primary"] == 1
+    assert calls["legacy"] == 1

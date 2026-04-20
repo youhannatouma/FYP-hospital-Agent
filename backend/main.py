@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from pydantic import ValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from dotenv import load_dotenv
@@ -24,11 +25,12 @@ load_dotenv(os.path.join(REPO_ROOT, ".env"))
 from .memory import memory_tools
 from .orchestration.supervisor_workflow import (
     execute_doctor_match_workflow,
+    execute_doctor_match_workflow_legacy,
     execute_supervisor_workflow,
     stream_doctor_match_workflow,
     stream_supervisor_workflow,
 )
-from .app.schemas.doctor_matching_agent import DoctorMatchAgentRequest
+from .app.schemas.doctor_matching_agent import DoctorMatchAgentRequest, DoctorMatchAgentResponse
 from .middleware import stream_manager, approval_manager
 from .scripts.db_apply_migrations import apply_phase_migrations, verify_required_indexes
 from .telemetry import emit_telemetry_event
@@ -399,7 +401,106 @@ async def _execute_doctor_workflow_with_fallback(
                 "failure_code": getattr(exc, "code", type(exc).__name__),
             },
         )
-        return await execute_doctor_match_workflow(doctor_state)
+        return await execute_doctor_match_workflow_legacy(doctor_state)
+
+
+def _coerce_doctor_response_contract(
+    workflow_response: dict,
+    request: DoctorMatchAgentRequest,
+    *,
+    strict: bool,
+) -> dict:
+    """Convert internal workflow payload into strict DoctorMatchAgentResponse schema."""
+    if not isinstance(workflow_response, dict) or "booking_mode" not in workflow_response:
+        return workflow_response
+
+    mode = str(workflow_response.get("booking_mode") or "suggest_only")
+    missing_fields = workflow_response.get("booking_blocked_missing_fields")
+    if not isinstance(missing_fields, list):
+        missing_fields = workflow_response.get("booking_missing_fields", [])
+    if not isinstance(missing_fields, list):
+        missing_fields = []
+
+    profile = workflow_response.get("patient_profile_snapshot")
+    profile = profile if isinstance(profile, dict) else {}
+    structured_errors = workflow_response.get("structured_errors")
+    if not isinstance(structured_errors, list):
+        structured_errors = []
+
+    suggestions_in = workflow_response.get("suggestion_cards")
+    suggestions_in = suggestions_in if isinstance(suggestions_in, list) else []
+    suggestions: list[dict] = []
+    for item in suggestions_in:
+        if not isinstance(item, dict):
+            continue
+        suggestions.append(
+            {
+                "doctor_id": item.get("doctor_id"),
+                "doctor_name": item.get("doctor_name"),
+                "specialty": item.get("specialty"),
+                "clinic_address": item.get("clinic_address"),
+                "session_price": item.get("session_price"),
+                "earliest_available_at": item.get("earliest_available_at"),
+                "ranking_score": float(item.get("ranking_score") or 0.0),
+                "rationale": item.get("rationale") or "specialty+availability+proximity+price",
+            }
+        )
+
+    booking_result = workflow_response.get("booking_result")
+    booking_result = booking_result if isinstance(booking_result, dict) else {}
+    booking_outcome = None
+    if mode in {"booked", "booking_failed"}:
+        booking_outcome = {
+            "status": "booked" if mode == "booked" else "failed",
+            "appointment_id": booking_result.get("appointment_id"),
+            "slot_id": booking_result.get("slot_id"),
+            "doctor_id": booking_result.get("doctor_id"),
+            "doctor_name": request.booking.doctor_name if request.booking else None,
+            "appointment_date": booking_result.get("appointment_date"),
+            "appointment_time": booking_result.get("appointment_time"),
+            "resolution_mode": booking_result.get("resolution_mode"),
+            "normalized_booking_time_utc": booking_result.get("normalized_booking_time_utc"),
+            "message": str(booking_result.get("message") or ("Appointment booked" if mode == "booked" else "Booking failed")),
+        }
+
+    payload = {
+        "thread_id": workflow_response.get("thread_id") or request.thread_id,
+        "actor_user_id": request.actor_user_id,
+        "patient_user_id": request.patient_user_id,
+        "inferred_need": workflow_response.get("inferred_need") or request.need_text,
+        "patient_profile_snapshot": {
+            "user_id": profile.get("user_id") or request.patient_user_id,
+            "first_name": profile.get("first_name"),
+            "last_name": profile.get("last_name"),
+            "age": profile.get("age"),
+            "gender": profile.get("gender"),
+            "allergies": profile.get("allergies") if isinstance(profile.get("allergies"), list) else [],
+            "chronic_conditions": (
+                profile.get("chronic_conditions") if isinstance(profile.get("chronic_conditions"), list) else []
+            ),
+        },
+        "suggestions": suggestions,
+        "booking_readiness": {
+            "ready": mode != "suggest_only",
+            "missing_fields": missing_fields,
+            "reason": str(
+                workflow_response.get("booking_blocked_reason")
+                or ("ready_for_booking" if mode != "suggest_only" else "missing_required_booking_fields")
+            ),
+        },
+        "booking_mode": mode,
+        "booking_outcome": booking_outcome,
+        "errors": structured_errors,
+    }
+
+    try:
+        model = DoctorMatchAgentResponse.model_validate(payload)
+        return model.model_dump(mode="json")
+    except ValidationError:
+        if strict:
+            raise
+        log.warning("Doctor response schema coercion skipped for non-conforming stream payload")
+        return workflow_response
 
 
 def _build_sse_response(event_generator):
@@ -475,7 +576,7 @@ def save_memory_snapshot():
 
 
 # ── Supervisor routing endpoint ────────────────────────────────────────
-@app.post("/supervisor/doctor/route")
+@app.post("/supervisor/doctor/route", response_model=DoctorMatchAgentResponse)
 async def supervisor_doctor_route(request: DoctorMatchAgentRequest):
     """Execute specialized doctor-matching workflow via dedicated endpoint."""
     rate_limiter = stream_manager.get_rate_limiter()
@@ -491,13 +592,16 @@ async def supervisor_doctor_route(request: DoctorMatchAgentRequest):
             routing_reason="dedicated_endpoint_request",
             request=request,
         )
-        return await _execute_doctor_workflow_with_fallback(
+        out = await _execute_doctor_workflow_with_fallback(
             request,
             request_path="/supervisor/doctor/route",
             endpoint_family=selected,
         )
+        return _coerce_doctor_response_contract(out, request, strict=True)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=500, detail=f"Doctor response contract validation failed: {e}")
 
 
 @app.post("/supervisor/route")
@@ -528,11 +632,12 @@ async def supervisor_route(request: SupervisorRequestPayload):
                 request.actor_user_id,
                 request.thread_id,
             )
-            return await _execute_doctor_workflow_with_fallback(
+            out = await _execute_doctor_workflow_with_fallback(
                 request,
                 request_path="/supervisor/route",
                 endpoint_family=selected,
             )
+            return _coerce_doctor_response_contract(out, request, strict=False)
 
         task_specs = [task.model_dump() for task in request.tasks]
         return await execute_supervisor_workflow(request.user_id, task_specs)
@@ -594,8 +699,8 @@ async def supervisor_doctor_stream(request: DoctorMatchAgentRequest):
                     },
                 )
                 doctor_state = _doctor_state_from_request(request)
-                async for event in stream_doctor_match_workflow(doctor_state):
-                    yield f"data: {json.dumps(event)}\n\n"
+                fallback_result = await execute_doctor_match_workflow_legacy(doctor_state)
+                yield f"data: {json.dumps({'type': 'complete', 'results': _coerce_doctor_response_contract(fallback_result, request, strict=False), 'errors': fallback_result.get('structured_errors', []), 'stages': []})}\n\n"
             else:
                 log.error("Stream error for doctor actor %s: %s", request.actor_user_id, e)
                 error_event = {"type": "error", "message": "Internal server error"}
