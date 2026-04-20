@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import threading
 import uuid
@@ -167,7 +167,7 @@ def test_real_db_same_slot_race_one_wins():
     patient_id = uuid.uuid4()
     doctor_id = uuid.uuid4()
     slot_id = uuid.uuid4()
-    start_time = datetime.utcnow().replace(microsecond=0) + timedelta(days=7)
+    start_time = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0) + timedelta(days=7)
     end_time = start_time + timedelta(minutes=30)
 
     cleanup_sql = [
@@ -177,6 +177,9 @@ def test_real_db_same_slot_race_one_wins():
     ]
 
     with engine.begin() as conn:
+        # CI ephemeral schema can miss UUID defaults on appointment_id; enforce one for this test path.
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
+        conn.execute(text("ALTER TABLE appointment ALTER COLUMN appointment_id SET DEFAULT gen_random_uuid()"))
         conn.execute(
             text(
                 """
