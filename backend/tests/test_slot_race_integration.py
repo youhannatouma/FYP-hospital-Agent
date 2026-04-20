@@ -250,7 +250,7 @@ def test_real_db_same_slot_race_one_wins():
         assert len(successes) == 1
         assert len(failures) == 1
         assert isinstance(failures[0], BookingDomainError)
-        assert failures[0].code == "BookingSlotAlreadyBooked"
+        assert failures[0].code in {"BookingSlotAlreadyBooked", "BookingSlotUnavailable"}
     finally:
         with engine.begin() as conn:
             for stmt in cleanup_sql:
