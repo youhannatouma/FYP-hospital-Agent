@@ -3,7 +3,25 @@ from __future__ import annotations
 from datetime import date, time
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+def _parse_date_boundary_value(value: Any) -> date | None:
+    """Convert ISO date strings at graph/tool boundaries into typed dates."""
+    if value is None or isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        return date.fromisoformat(value)
+    raise TypeError(f"Unsupported date value type: {type(value).__name__}")
+
+
+def _parse_time_boundary_value(value: Any) -> time | None:
+    """Convert ISO time strings at graph/tool boundaries into typed times."""
+    if value is None or isinstance(value, time):
+        return value
+    if isinstance(value, str):
+        return time.fromisoformat(value)
+    raise TypeError(f"Unsupported time value type: {type(value).__name__}")
 
 
 class PhaseScopeBoundaries(BaseModel):
@@ -65,6 +83,16 @@ class BookingSelectionInput(BaseModel):
     booking_reason: str | None = None
     policy_context: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("appointment_date", mode="before")
+    @classmethod
+    def _normalize_appointment_date(cls, value: Any) -> date | None:
+        return _parse_date_boundary_value(value)
+
+    @field_validator("appointment_time", mode="before")
+    @classmethod
+    def _normalize_appointment_time(cls, value: Any) -> time | None:
+        return _parse_time_boundary_value(value)
+
     def uses_slot_id(self) -> bool:
         return bool(self.slot_id)
 
@@ -82,6 +110,49 @@ class BookingSelectionInput(BaseModel):
 
     def is_complete(self) -> bool:
         return len(self.missing_fields()) == 0
+
+    @classmethod
+    def from_workflow_selection(
+        cls,
+        *,
+        selected_doctor: dict[str, Any] | None,
+        selected_appointment_date: Any,
+        selected_appointment_time: Any,
+        slot_id: str | None = None,
+        booking_timezone: str = "UTC",
+        booking_reason: str | None = None,
+        policy_context: dict[str, Any] | None = None,
+    ) -> "BookingSelectionInput":
+        doctor_name: str | None = None
+        if isinstance(selected_doctor, dict):
+            doctor_name = selected_doctor.get("doctor_name") or selected_doctor.get("doctor_id")
+
+        return cls(
+            slot_id=slot_id,
+            doctor_name=doctor_name,
+            appointment_date=selected_appointment_date,
+            appointment_time=selected_appointment_time,
+            booking_timezone=booking_timezone,
+            booking_reason=booking_reason,
+            policy_context=policy_context or {},
+        )
+
+    def workflow_missing_fields(self, *, selected_doctor: dict[str, Any] | None) -> list[str]:
+        """Map schema-required booking fields to workflow state field names."""
+        mapped: list[str] = []
+        for field_name in self.missing_fields():
+            if field_name == "doctor_name":
+                mapped.append("selected_doctor")
+            elif field_name == "appointment_date":
+                mapped.append("selected_appointment_date")
+            elif field_name == "appointment_time":
+                mapped.append("selected_appointment_time")
+
+        if not isinstance(selected_doctor, dict) or not selected_doctor.get("doctor_id"):
+            if "selected_doctor" not in mapped:
+                mapped.append("selected_doctor")
+
+        return mapped
 
 
 class DoctorMatchAgentRequest(BaseModel):
@@ -144,6 +215,16 @@ class BookingOutcome(BaseModel):
     resolution_mode: Literal["slot_id", "datetime_fallback"] | None = None
     normalized_booking_time_utc: str | None = None
     message: str
+
+    @field_validator("appointment_date", mode="before")
+    @classmethod
+    def _normalize_appointment_date(cls, value: Any) -> date | None:
+        return _parse_date_boundary_value(value)
+
+    @field_validator("appointment_time", mode="before")
+    @classmethod
+    def _normalize_appointment_time(cls, value: Any) -> time | None:
+        return _parse_time_boundary_value(value)
 
 
 class StructuredError(BaseModel):

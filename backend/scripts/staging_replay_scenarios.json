@@ -1,0 +1,91 @@
+{
+  "description": "Template multi-turn replay scenarios for specialized doctor workflow. Replace IDs/names with seeded staging data before running.",
+  "scenarios": [
+    {
+      "name": "suggest_only_missing_booking_fields",
+      "endpoint": "/supervisor/doctor/route",
+      "payload": {
+        "thread_id": "thread-replay-001",
+        "actor_user_id": "actor-11111111-1111-1111-1111-111111111111",
+        "patient_user_id": "patient-22222222-2222-2222-2222-222222222222",
+        "need_text": "persistent cough",
+        "max_suggestions": 3
+      },
+      "expect": {
+        "booking_mode": "suggest_only"
+      }
+    },
+    {
+      "name": "complete_booking_turn",
+      "endpoint": "/supervisor/doctor/route",
+      "payload": {
+        "thread_id": "thread-replay-001",
+        "actor_user_id": "actor-11111111-1111-1111-1111-111111111111",
+        "patient_user_id": "patient-22222222-2222-2222-2222-222222222222",
+        "need_text": "persistent cough",
+        "booking": {
+          "doctor_name": "Dr One",
+          "appointment_date": "2026-05-12",
+          "appointment_time": "10:00:00",
+          "booking_timezone": "UTC",
+          "booking_reason": "staging replay"
+        },
+        "max_suggestions": 3
+      }
+    },
+    {
+      "name": "retry_same_thread_idempotent",
+      "endpoint": "/supervisor/doctor/route",
+      "payload": {
+        "thread_id": "thread-replay-001",
+        "actor_user_id": "actor-11111111-1111-1111-1111-111111111111",
+        "patient_user_id": "patient-22222222-2222-2222-2222-222222222222",
+        "need_text": "persistent cough",
+        "booking": {
+          "doctor_name": "Dr One",
+          "appointment_date": "2026-05-12",
+          "appointment_time": "10:00:00",
+          "booking_timezone": "UTC",
+          "booking_reason": "staging replay retry"
+        },
+        "max_suggestions": 3
+      }
+    },
+    {
+      "name": "interruption_resume_path",
+      "endpoint": "/supervisor/doctor/route",
+      "payload": {
+        "thread_id": "thread-replay-002",
+        "actor_user_id": "actor-11111111-1111-1111-1111-111111111111",
+        "patient_user_id": "patient-22222222-2222-2222-2222-222222222222",
+        "need_text": "severe headache",
+        "booking": {
+          "doctor_name": "Dr Two",
+          "appointment_date": "2026-05-13",
+          "appointment_time": "11:30:00",
+          "booking_timezone": "UTC",
+          "booking_reason": "resume check"
+        },
+        "max_suggestions": 3
+      }
+    },
+    {
+      "name": "conflict_path_second_thread",
+      "endpoint": "/supervisor/doctor/route",
+      "payload": {
+        "thread_id": "thread-replay-003",
+        "actor_user_id": "actor-11111111-1111-1111-1111-111111111111",
+        "patient_user_id": "patient-22222222-2222-2222-2222-222222222222",
+        "need_text": "persistent cough",
+        "booking": {
+          "doctor_name": "Dr One",
+          "appointment_date": "2026-05-12",
+          "appointment_time": "10:00:00",
+          "booking_timezone": "UTC",
+          "booking_reason": "conflict check"
+        },
+        "max_suggestions": 3
+      }
+    }
+  ]
+}

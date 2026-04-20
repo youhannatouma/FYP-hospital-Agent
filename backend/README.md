@@ -60,6 +60,37 @@ backend/
 - **approval_manager.py**: Human-in-the-loop (HITL) system for escalating risky operations. Configurable policies: ALWAYS, NEVER, RISKY, THRESHOLD.
 - **lock_manager.py**: Deadlock prevention via ordered lock acquisition. Fixed order: session → memory → supervisor.
 
+## 🔀 Specialized Endpoint Split
+
+The backend now provides dedicated doctor-workflow endpoints in addition to the legacy multiplexed endpoints.
+
+### Dedicated doctor endpoints
+
+- `POST /supervisor/doctor/route`
+- `POST /supervisor/doctor/stream`
+- `POST /supervisor/doctor/cancel/{actor_user_id}`
+
+### Legacy multiplexed endpoints (compatibility)
+
+- `POST /supervisor/route`
+- `POST /supervisor/stream`
+
+Doctor payloads are still accepted on legacy endpoints during a 3-month compatibility window.
+
+### Why specialized endpoints were added
+
+1. **Clearer contracts**: dedicated URLs remove union-payload ambiguity and make request validation simpler.
+2. **Correct stream cancellation scope**: doctor workflows are actor-scoped; dedicated cancel route maps directly to `actor_user_id`.
+3. **Safer authorization and audit boundaries**: specialized paths isolate doctor booking-on-behalf behavior and policy checks.
+4. **Cleaner observability**: route-level metrics and logs can distinguish generic orchestration from specialized medical-booking flow.
+5. **Frontend simplicity**: clients can route explicitly by intent rather than relying on backend payload branching.
+
+### Migration policy
+
+1. Frontend should migrate doctor flow calls to dedicated URLs behind a feature flag.
+2. Legacy endpoint doctor usage is deprecated and emits warnings in backend logs.
+3. After the 3-month window, doctor payload support on legacy multiplexed endpoints will be removed.
+
 ## 🚀 Import Examples
 
 ```python
@@ -99,6 +130,68 @@ uvicorn main:app --reload --port 8000
 ```bash
 python comprehensive_integration_test.py
 ```
+
+## 📡 Specialized SSE Contract Notes
+
+For specialized doctor-match streaming responses, field names are being aligned for clearer semantics.
+
+- New field: `booking_blocked_missing_fields` (preferred)
+- Legacy field: `booking_missing_fields` (temporary compatibility)
+- New field: `booking_failed_validation` (true only for validation/policy/domain booking failures)
+
+### Migration Guidance
+
+1. Clients should read `booking_blocked_missing_fields` as the canonical missing-fields list.
+2. Clients may continue to read `booking_missing_fields` during the migration window.
+3. `booking_failed_validation` should be used to distinguish actionable validation failures from runtime/system failures.
+
+### Deprecation Note
+
+`booking_missing_fields` is deprecated and retained only for backward compatibility.
+Plan to remove it in a follow-up cleanup release after frontend consumers complete migration.
+
+## 📈 Structured Telemetry and Rollout Flags
+
+The specialized workflow now includes structured telemetry hooks and rollout controls so production behavior can be observed and safely migrated.
+
+### Why this was added
+
+1. **Thread-level observability**: track one workflow from request through ranking to booking outcome.
+2. **Actionable denial analytics**: aggregate booking denial reasons instead of only reading error logs.
+3. **Safer rollout**: canary and fallback controls reduce blast radius while moving traffic.
+4. **Faster rollback**: feature flags allow behavior changes without redeploy.
+
+### Telemetry events (high level)
+
+- `endpoint_selection`
+- `workflow_started`
+- `doctor_search_initiated`
+- `ranking_emitted`
+- `stage_completed`
+- `booking_attempted`
+- `booking_denied`
+- `booking_committed`
+- `fallback_triggered`
+- `workflow_completed`
+- `workflow_failed`
+
+### Telemetry and rollout environment flags
+
+- `TELEMETRY_ENABLED=false`
+- `TELEMETRY_SAMPLE_RATE=0.10`
+- `TELEMETRY_PII_MASKING=true`
+- `TELEMETRY_SINK=stdout`
+- `SPECIALIZED_DOCTOR_ROLLOUT_MODE=shadow` (`off|shadow|canary|on`)
+- `SPECIALIZED_DOCTOR_CANARY_PERCENT=5`
+- `SPECIALIZED_DOCTOR_AUTO_FALLBACK=true`
+- `SPECIALIZED_DOCTOR_FALLBACK_REASON_LOGGING=true`
+
+### Operational guidance
+
+1. Start with `TELEMETRY_ENABLED=true` and low sample rate (for example `0.01`) in staging.
+2. Keep PII masking enabled in all shared environments.
+3. Move rollout mode from `shadow` to `canary` before `on`.
+4. Keep auto fallback enabled during migration windows.
 
 ## 📝 Key Design Principles
 

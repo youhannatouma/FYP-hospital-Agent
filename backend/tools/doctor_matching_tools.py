@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import math
 import os
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
@@ -138,6 +140,77 @@ def _token_overlap_ratio(a: str | None, b: str | None) -> float:
     return len(common) / max(len(ta), 1)
 
 
+def _normalize_address_for_geocoding(address: str | None) -> str:
+    """Normalize free-text addresses for geocoding/fallback scoring consistency."""
+    if not address:
+        return ""
+    normalized = str(address).strip().lower()
+    for ch in [",", ".", ";", "#", "\\n", "\\t"]:
+        normalized = normalized.replace(ch, " ")
+    return " ".join(normalized.split())
+
+
+def _coerce_coordinate(value: Any, minimum: float, maximum: float) -> float | None:
+    """Return bounded float coordinate value or None when invalid."""
+    if value is None:
+        return None
+    try:
+        as_float = float(value)
+    except (TypeError, ValueError):
+        return None
+    if minimum <= as_float <= maximum:
+        return as_float
+    return None
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Compute great-circle distance in kilometers."""
+    r_earth_km = 6371.0088
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lambda = math.radians(lon2 - lon1)
+
+    a = (
+        math.sin(d_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(max(1 - a, 0.0)))
+    return r_earth_km * c
+
+
+def _distance_to_proximity_score(distance_km: float | None) -> float:
+    """Convert distance to a score where smaller distance is larger score."""
+    if distance_km is None:
+        return 0.0
+    # Smooth monotonic transform to [0, 1], compatible with existing descending sort.
+    return 1.0 / (1.0 + max(distance_km, 0.0))
+
+
+def _proximity_score_with_fallback(
+    patient: dict[str, Any],
+    doctor_row: dict[str, Any],
+) -> tuple[float, str, float | None]:
+    """Prefer coordinate distance; fall back to token overlap when geodata is missing."""
+    patient_lat = _coerce_coordinate(patient.get("patient_latitude"), -90.0, 90.0)
+    patient_lon = _coerce_coordinate(patient.get("patient_longitude"), -180.0, 180.0)
+    doctor_lat = _coerce_coordinate(doctor_row.get("clinic_latitude"), -90.0, 90.0)
+    doctor_lon = _coerce_coordinate(doctor_row.get("clinic_longitude"), -180.0, 180.0)
+
+    if None not in {patient_lat, patient_lon, doctor_lat, doctor_lon}:
+        distance_km = _haversine_km(
+            patient_lat,
+            patient_lon,
+            doctor_lat,
+            doctor_lon,
+        )
+        return _distance_to_proximity_score(distance_km), "distance", round(distance_km, 3)
+
+    patient_address = _normalize_address_for_geocoding(patient.get("address"))
+    clinic_address = _normalize_address_for_geocoding(doctor_row.get("clinic_address"))
+    return _token_overlap_ratio(patient_address, clinic_address), "token_overlap", None
+
+
 def _infer_specialties(need_text: str) -> list[str]:
     q = _normalize_text(need_text)
     scores: list[tuple[str, int]] = []
@@ -155,40 +228,106 @@ def _optional_llm_refine(
     need_text: str,
     candidates: list[dict[str, Any]],
     use_llm_refinement: bool,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    meta: dict[str, Any] = {
+        "requested": bool(use_llm_refinement),
+        "applied": False,
+        "reason": "refinement_disabled",
+        "invalid_id_count": 0,
+        "unknown_id_count": 0,
+        "duplicate_id_count": 0,
+    }
+
     if not use_llm_refinement or not candidates:
-        return candidates
+        return candidates, meta
 
     try:
+        meta["reason"] = "parse_failed"
+
         llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+        # Keep prompt payload compact and stable to reduce malformed responses.
+        safe_need = " ".join(str(need_text).split())[:500]
+        prompt_candidates = [
+            {
+                "doctor_id": c.get("doctor_id"),
+                "specialty": c.get("specialty"),
+                "earliest_available_at": c.get("earliest_available_at"),
+                "avg_session_price": c.get("avg_session_price"),
+            }
+            for c in candidates
+        ]
         prompt = (
             "Given the patient need and candidate doctors, reorder candidates from best to worst. "
             "Return JSON only: {\"ordered_doctor_ids\":[\"...\"]}.\n"
-            f"Need: {need_text}\n"
-            f"Candidates: {candidates}"
+            f"Need: {safe_need}\n"
+            f"Candidates: {json.dumps(prompt_candidates, ensure_ascii=True)}"
         )
         resp = llm.invoke(prompt)
-        content = str(resp.content)
-        start = content.find("[")
-        end = content.find("]", start + 1)
-        if start == -1 or end == -1:
-            return candidates
+        content = str(resp.content).strip()
+        payload = json.loads(content)
+        ordered_ids = payload.get("ordered_doctor_ids") if isinstance(payload, dict) else None
+        if not isinstance(ordered_ids, list):
+            meta["reason"] = "invalid_schema"
+            return candidates, meta
 
-        ordered = [x.strip().strip('"').strip("'") for x in content[start + 1:end].split(",") if x.strip()]
-        index = {c["doctor_id"]: c for c in candidates}
+        index: dict[str, dict[str, Any]] = {}
+        for candidate in candidates:
+            doctor_id = candidate.get("doctor_id")
+            if not doctor_id:
+                continue
+            try:
+                index[str(uuid.UUID(str(doctor_id)))] = candidate
+            except (ValueError, TypeError, AttributeError):
+                # Candidate IDs are expected to be valid UUIDs; skip malformed records safely.
+                continue
+
         out: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for did in ordered:
-            if did in index:
-                out.append(index[did])
-                seen.add(did)
+        for raw_id in ordered_ids:
+            if not isinstance(raw_id, str):
+                meta["invalid_id_count"] += 1
+                continue
+
+            try:
+                did = str(uuid.UUID(raw_id))
+            except ValueError:
+                meta["invalid_id_count"] += 1
+                continue
+
+            if did not in index:
+                meta["unknown_id_count"] += 1
+                continue
+            if did in seen:
+                meta["duplicate_id_count"] += 1
+                continue
+
+            out.append(index[did])
+            seen.add(did)
+
+        if not out:
+            meta["reason"] = "no_valid_ids"
+            return candidates, meta
+
         for c in candidates:
-            if c["doctor_id"] not in seen:
+            try:
+                candidate_id = str(uuid.UUID(str(c["doctor_id"])))
+            except (ValueError, TypeError, KeyError):
                 out.append(c)
-        return out
+                continue
+            if candidate_id not in seen:
+                out.append(c)
+
+        meta["applied"] = out != candidates
+        meta["reason"] = "ok" if meta["applied"] else "valid_but_no_reordering"
+        return out, meta
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:  # pragma: no cover
+        log.warning("LLM refinement parse failed, using deterministic order: %s", exc)
+        meta["reason"] = "json_parse_error"
+        return candidates, meta
     except Exception as exc:  # pragma: no cover
         log.warning("LLM refinement failed, using deterministic order: %s", exc)
-        return candidates
+        meta["reason"] = "llm_error"
+        return candidates, meta
 
 
 def profile_user(user_id: str) -> dict[str, Any]:
@@ -199,7 +338,9 @@ def profile_user(user_id: str) -> dict[str, Any]:
         SELECT
             user_id, email, first_name, last_name, role, status,
             specialty, clinic_address,
-            address, date_of_birth, gender, allergies, chronic_conditions
+            clinic_latitude, clinic_longitude,
+            address, patient_latitude, patient_longitude,
+            date_of_birth, gender, allergies, chronic_conditions
         FROM usr
         WHERE user_id = :uid AND deleted_at IS NULL
         LIMIT 1
@@ -261,7 +402,8 @@ def get_doctor_profile(doctor_id: str) -> dict[str, Any]:
         """
         SELECT
             user_id, email, first_name, last_name, role, status,
-            specialty, clinic_address, years_of_experience, qualifications
+            specialty, clinic_address, clinic_latitude, clinic_longitude,
+            years_of_experience, qualifications
         FROM usr
         WHERE user_id = :did
           AND role = 'doctor'
@@ -286,10 +428,11 @@ def list_available_slots(
     on_date: date | None = None,
     days_ahead: int = 14,
     limit: int = 30,
+    booking_timezone: str = "UTC",
 ) -> list[dict[str, Any]]:
     """List available future slots for a doctor with soft-delete filtering."""
     did = _as_uuid(doctor_id)
-    start_dt = datetime.utcnow()
+    start_dt = datetime.now(timezone.utc).replace(tzinfo=None)
     end_dt = start_dt + timedelta(days=max(1, days_ahead))
 
     filters = [
@@ -306,8 +449,17 @@ def list_available_slots(
         "lim": int(limit),
     }
     if on_date is not None:
-        filters.append("DATE(start_time) = :on_date")
-        params["on_date"] = on_date
+        try:
+            tz = ZoneInfo(booking_timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError(f"Invalid booking timezone: {booking_timezone}") from exc
+        # Convert caller-local day boundaries to UTC for stable DB matching.
+        local_day_start = datetime.combine(on_date, time.min).replace(tzinfo=tz)
+        local_day_end = local_day_start + timedelta(days=1)
+        params["on_start_utc"] = local_day_start.astimezone(timezone.utc).replace(tzinfo=None)
+        params["on_end_utc"] = local_day_end.astimezone(timezone.utc).replace(tzinfo=None)
+        filters.append("start_time >= :on_start_utc")
+        filters.append("start_time < :on_end_utc")
 
     sql = text(
         f"""
@@ -340,8 +492,6 @@ def search_doctors_for_need(
     """Deterministic ranking: specialty match -> availability -> proximity -> price tie-break."""
     patient = profile_user(patient_user_id)
     inferred = _infer_specialties(need_text)
-    patient_address = patient.get("address")
-
     specialty_sql = text(
         """
         SELECT
@@ -350,6 +500,8 @@ def search_doctors_for_need(
             d.last_name,
             d.specialty,
             d.clinic_address,
+            d.clinic_latitude,
+            d.clinic_longitude,
             d.status,
             MIN(ts.start_time) AS earliest_available_at,
             AVG(a.fee) FILTER (WHERE a.fee IS NOT NULL) AS avg_fee
@@ -358,7 +510,7 @@ def search_doctors_for_need(
             ON ts.doctor_id = d.user_id
            AND ts.deleted_at IS NULL
            AND ts.is_available = TRUE
-           AND ts.start_time >= NOW()
+           AND ts.start_time >= timezone('UTC', now())
         LEFT JOIN appointment a
             ON a.doctor_id = d.user_id
            AND a.deleted_at IS NULL
@@ -369,7 +521,8 @@ def search_doctors_for_need(
             LOWER(COALESCE(d.specialty, '')) = ANY(:specialties)
             OR :allow_fallback = TRUE
           )
-        GROUP BY d.user_id, d.first_name, d.last_name, d.specialty, d.clinic_address, d.status
+        GROUP BY d.user_id, d.first_name, d.last_name, d.specialty, d.clinic_address,
+                 d.clinic_latitude, d.clinic_longitude, d.status
         HAVING MIN(ts.start_time) IS NOT NULL
         """
     )
@@ -401,7 +554,7 @@ def search_doctors_for_need(
                 specialty = _normalize_text(r.get("specialty"))
                 specialty_match = 0 if specialty in specialties else 1
                 earliest = r.get("earliest_available_at")
-                proximity = _token_overlap_ratio(patient_address, r.get("clinic_address"))
+                proximity, proximity_mode, distance_km = _proximity_score_with_fallback(patient, dict(r))
                 avg_fee = float(r.get("avg_fee")) if r.get("avg_fee") is not None else 10**9
 
                 candidates.append(
@@ -416,6 +569,8 @@ def search_doctors_for_need(
                             "specialty_match_rank": specialty_match,
                             "earliest_available_at": earliest.isoformat() if earliest else None,
                             "proximity_score": round(proximity, 6),
+                            "proximity_mode": proximity_mode,
+                            "distance_km": distance_km,
                             "avg_fee": None if avg_fee == 10**9 else avg_fee,
                         },
                         "ranking_reason": "specialty+availability+proximity+price",
@@ -432,7 +587,7 @@ def search_doctors_for_need(
             )
         )
         limited = candidates[: max(1, int(max_results))]
-        refined = _optional_llm_refine(need_text, limited, use_llm_refinement)
+        refined, refinement_details = _optional_llm_refine(need_text, limited, use_llm_refinement)
 
         return {
             "inferred_specialties": inferred,
@@ -443,7 +598,8 @@ def search_doctors_for_need(
                 "proximity",
                 "price",
             ],
-            "llm_refinement_applied": bool(use_llm_refinement),
+            "llm_refinement_applied": bool(refinement_details.get("applied")),
+            "refinement_details": refinement_details,
         }
     except SQLAlchemyError as exc:
         raise RuntimeError(f"Failed to search doctors for need: {exc}") from exc
@@ -477,8 +633,18 @@ def _idempotency_key(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _advisory_lock_int(key_hex: str) -> int:
-    return int(key_hex[:16], 16) & ((1 << 63) - 1)
+def _uint32_to_int32(value: int) -> int:
+    """Convert unsigned 32-bit integer to signed int32."""
+    return value - (1 << 32) if value >= (1 << 31) else value
+
+
+def _advisory_lock_keys(key_hex: str) -> tuple[int, int]:
+    """Use two int32 lock keys for better entropy than single truncated integer."""
+    if len(key_hex) < 16:
+        raise ValueError("idempotency hash is too short for advisory lock key derivation")
+    key1_u32 = int(key_hex[:8], 16)
+    key2_u32 = int(key_hex[8:16], 16)
+    return _uint32_to_int32(key1_u32), _uint32_to_int32(key2_u32)
 
 
 def book_appointment(
@@ -532,7 +698,7 @@ def book_appointment(
         slot_id=slot_id,
         dt_utc=target_dt_utc,
     )
-    lock_key = _advisory_lock_int(key_hex)
+    lock_key_1, lock_key_2 = _advisory_lock_keys(key_hex)
 
     doctor_sql = text(
         """
@@ -731,7 +897,10 @@ def book_appointment(
                         "Provided doctor_name does not match doctor_id",
                     )
 
-            conn.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": lock_key})
+            conn.execute(
+                text("SELECT pg_advisory_xact_lock(:k1, :k2)"),
+                {"k1": lock_key_1, "k2": lock_key_2},
+            )
 
             if resolved_slot_uuid is not None:
                 existing_key = conn.execute(

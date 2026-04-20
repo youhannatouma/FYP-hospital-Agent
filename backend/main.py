@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -22,11 +23,15 @@ load_dotenv(os.path.join(REPO_ROOT, ".env"))
 # Run with: uvicorn backend.main:app --reload
 from .memory import memory_tools
 from .orchestration.supervisor_workflow import (
+    execute_doctor_match_workflow,
     execute_supervisor_workflow,
+    stream_doctor_match_workflow,
     stream_supervisor_workflow,
 )
+from .app.schemas.doctor_matching_agent import DoctorMatchAgentRequest
 from .middleware import stream_manager, approval_manager
 from .scripts.db_apply_migrations import apply_phase_migrations, verify_required_indexes
+from .telemetry import emit_telemetry_event
 from .tools.doctor_matching_tools import BookingDomainError
 
 # Set up logging
@@ -101,6 +106,72 @@ def _env_flag(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _rollout_mode() -> str:
+    raw = os.getenv("SPECIALIZED_DOCTOR_ROLLOUT_MODE", "shadow").strip().lower()
+    if raw not in {"off", "shadow", "canary", "on"}:
+        return "shadow"
+    return raw
+
+
+def _rollout_canary_percent() -> int:
+    return max(0, min(100, _env_int("SPECIALIZED_DOCTOR_CANARY_PERCENT", 5)))
+
+
+def _stable_bucket_percent(actor_user_id: str, thread_id: str) -> int:
+    key = str(actor_user_id or thread_id or "").strip()
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return int(digest[:8], 16) % 100
+
+
+def _select_doctor_endpoint_family(actor_user_id: str, thread_id: str) -> str:
+    mode = _rollout_mode()
+    if mode in {"off", "shadow"}:
+        return "legacy"
+    if mode == "on":
+        return "dedicated"
+    # canary
+    return "dedicated" if _stable_bucket_percent(actor_user_id, thread_id) < _rollout_canary_percent() else "legacy"
+
+
+def _is_fallback_eligible(exc: Exception) -> bool:
+    return not isinstance(exc, (HTTPException, ValueError, BookingDomainError))
+
+
+def _emit_endpoint_selection_event(
+    *,
+    request_path: str,
+    endpoint_selected: str,
+    routing_reason: str,
+    request: DoctorMatchAgentRequest,
+) -> None:
+    emit_telemetry_event(
+        "endpoint_selection",
+        request_path=request_path,
+        endpoint_family=endpoint_selected,
+        sample_key=f"{request.actor_user_id}:{request.thread_id}:endpoint_selection",
+        payload={
+            "thread_id": request.thread_id,
+            "actor_user_id": request.actor_user_id,
+            "patient_user_id": request.patient_user_id,
+            "endpoint_family_selected": endpoint_selected,
+            "routing_reason": routing_reason,
+            "rollout_mode": _rollout_mode(),
+            "canary_percent": _rollout_canary_percent(),
+            "auto_fallback_enabled": _env_flag("SPECIALIZED_DOCTOR_AUTO_FALLBACK", True),
+        },
+    )
 
 
 def _enforce_database_safeguards() -> None:
@@ -236,9 +307,111 @@ class SupervisorRouteRequest(BaseModel):
     tasks: list[SupervisorTaskInput]
 
 
+SupervisorRequestPayload = SupervisorRouteRequest | DoctorMatchAgentRequest
+
+
 class ApprovalActionRequest(BaseModel):
     human_user_id: str
     response_message: Optional[str] = None
+
+
+def _is_doctor_match_request(request: SupervisorRequestPayload) -> bool:
+    return isinstance(request, DoctorMatchAgentRequest)
+
+
+def _doctor_state_from_request(request: DoctorMatchAgentRequest) -> dict:
+    selected_doctor = None
+    selected_date = None
+    selected_time = None
+    selected_slot_id = None
+    booking_timezone = "UTC"
+    booking_reason = None
+    policy_context: dict = {}
+
+    if request.booking is not None:
+        selected_slot_id = request.booking.slot_id
+        selected_date = request.booking.appointment_date
+        selected_time = request.booking.appointment_time
+        booking_timezone = request.booking.booking_timezone
+        booking_reason = request.booking.booking_reason
+        policy_context = request.booking.policy_context
+
+        if request.booking.doctor_name:
+            selected_doctor = {
+                # doctor_id is unresolved from route payload and must be resolved downstream.
+                "doctor_name": request.booking.doctor_name,
+            }
+
+    return {
+        "thread_id": request.thread_id,
+        "actor_user_id": request.actor_user_id,
+        "patient_user_id": request.patient_user_id,
+        "need_text": request.need_text,
+        "max_suggestions": request.max_suggestions,
+        "selected_doctor": selected_doctor,
+        "selected_slot_id": selected_slot_id,
+        "selected_appointment_date": selected_date,
+        "selected_appointment_time": selected_time,
+        "booking_timezone": booking_timezone,
+        "booking_reason": booking_reason,
+        "policy_context": policy_context,
+    }
+
+
+async def _execute_doctor_workflow_with_fallback(
+    request: DoctorMatchAgentRequest,
+    *,
+    request_path: str,
+    endpoint_family: str,
+) -> dict:
+    doctor_state = _doctor_state_from_request(request)
+    try:
+        return await execute_doctor_match_workflow(doctor_state)
+    except Exception as exc:
+        if endpoint_family == "legacy":
+            raise
+        if not _env_flag("SPECIALIZED_DOCTOR_AUTO_FALLBACK", True):
+            raise
+        if not _is_fallback_eligible(exc):
+            raise
+
+        if _env_flag("SPECIALIZED_DOCTOR_FALLBACK_REASON_LOGGING", True):
+            log.warning(
+                "Specialized fallback triggered for thread=%s actor=%s from=%s due to %s",
+                request.thread_id,
+                request.actor_user_id,
+                endpoint_family,
+                type(exc).__name__,
+            )
+
+        emit_telemetry_event(
+            "fallback_triggered",
+            request_path=request_path,
+            endpoint_family="legacy",
+            sample_key=f"{request.actor_user_id}:{request.thread_id}:fallback",
+            payload={
+                "thread_id": request.thread_id,
+                "actor_user_id": request.actor_user_id,
+                "patient_user_id": request.patient_user_id,
+                "from_path": endpoint_family,
+                "to_path": "legacy",
+                "failure_class": type(exc).__name__,
+                "failure_code": getattr(exc, "code", type(exc).__name__),
+            },
+        )
+        return await execute_doctor_match_workflow(doctor_state)
+
+
+def _build_sse_response(event_generator):
+    return StreamingResponse(
+        event_generator,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
+    )
 
 
 # ── Memory API Routes ───────────────────────────────────────────────────
@@ -302,16 +475,65 @@ def save_memory_snapshot():
 
 
 # ── Supervisor routing endpoint ────────────────────────────────────────
+@app.post("/supervisor/doctor/route")
+async def supervisor_doctor_route(request: DoctorMatchAgentRequest):
+    """Execute specialized doctor-matching workflow via dedicated endpoint."""
+    rate_limiter = stream_manager.get_rate_limiter()
+    allowed, error_msg = rate_limiter.check_rate_limit(request.actor_user_id)
+    if not allowed:
+        raise HTTPException(status_code=429, detail=error_msg)
+
+    try:
+        selected = _select_doctor_endpoint_family(request.actor_user_id, request.thread_id)
+        _emit_endpoint_selection_event(
+            request_path="/supervisor/doctor/route",
+            endpoint_selected=selected,
+            routing_reason="dedicated_endpoint_request",
+            request=request,
+        )
+        return await _execute_doctor_workflow_with_fallback(
+            request,
+            request_path="/supervisor/doctor/route",
+            endpoint_family=selected,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/supervisor/route")
-async def supervisor_route(request: SupervisorRouteRequest):
-    """Build and execute a safe parallel plan via LangGraph state workflow."""
+async def supervisor_route(request: SupervisorRequestPayload):
+    """Build and execute workflows via legacy multiplexed endpoint.
+
+    Deprecated for specialized doctor requests. Prefer `/supervisor/doctor/route`.
+    """
     # Rate limit check
     rate_limiter = stream_manager.get_rate_limiter()
-    allowed, error_msg = rate_limiter.check_rate_limit(request.user_id)
+    rate_limit_user = request.actor_user_id if _is_doctor_match_request(request) else request.user_id
+    allowed, error_msg = rate_limiter.check_rate_limit(rate_limit_user)
     if not allowed:
         raise HTTPException(status_code=429, detail=error_msg)
     
     try:
+        if _is_doctor_match_request(request):
+            selected = _select_doctor_endpoint_family(request.actor_user_id, request.thread_id)
+            _emit_endpoint_selection_event(
+                request_path="/supervisor/route",
+                endpoint_selected=selected,
+                routing_reason="legacy_multiplexed_request",
+                request=request,
+            )
+            log.warning(
+                "DEPRECATION: DoctorMatchAgentRequest on /supervisor/route is deprecated; "
+                "use /supervisor/doctor/route (actor_user_id=%s thread_id=%s)",
+                request.actor_user_id,
+                request.thread_id,
+            )
+            return await _execute_doctor_workflow_with_fallback(
+                request,
+                request_path="/supervisor/route",
+                endpoint_family=selected,
+            )
+
         task_specs = [task.model_dump() for task in request.tasks]
         return await execute_supervisor_workflow(request.user_id, task_specs)
     except ValueError as e:
@@ -319,9 +541,74 @@ async def supervisor_route(request: SupervisorRouteRequest):
 
 
 # ── Phase 3: Streaming SSE Endpoints ────────────────────────────────────
+@app.post("/supervisor/doctor/stream")
+async def supervisor_doctor_stream(request: DoctorMatchAgentRequest):
+    """Stream specialized doctor workflow via dedicated endpoint."""
+    rate_limiter = stream_manager.get_rate_limiter()
+    allowed, error_msg = rate_limiter.check_rate_limit(request.actor_user_id)
+    if not allowed:
+        raise HTTPException(status_code=429, detail=error_msg)
+
+    selected = _select_doctor_endpoint_family(request.actor_user_id, request.thread_id)
+    _emit_endpoint_selection_event(
+        request_path="/supervisor/doctor/stream",
+        endpoint_selected=selected,
+        routing_reason="dedicated_stream_request",
+        request=request,
+    )
+
+    async def event_generator():
+        try:
+            doctor_state = _doctor_state_from_request(request)
+            async for event in stream_doctor_match_workflow(doctor_state):
+                yield f"data: {json.dumps(event)}\n\n"
+        except ValueError as e:
+            error_event = {"type": "error", "message": str(e)}
+            yield f"data: {json.dumps(error_event)}\n\n"
+        except Exception as e:
+            if (
+                selected != "legacy"
+                and _env_flag("SPECIALIZED_DOCTOR_AUTO_FALLBACK", True)
+                and _is_fallback_eligible(e)
+            ):
+                if _env_flag("SPECIALIZED_DOCTOR_FALLBACK_REASON_LOGGING", True):
+                    log.warning(
+                        "Specialized stream fallback triggered for thread=%s actor=%s due to %s",
+                        request.thread_id,
+                        request.actor_user_id,
+                        type(e).__name__,
+                    )
+                emit_telemetry_event(
+                    "fallback_triggered",
+                    request_path="/supervisor/doctor/stream",
+                    endpoint_family="legacy",
+                    sample_key=f"{request.actor_user_id}:{request.thread_id}:stream_fallback",
+                    payload={
+                        "thread_id": request.thread_id,
+                        "actor_user_id": request.actor_user_id,
+                        "patient_user_id": request.patient_user_id,
+                        "from_path": selected,
+                        "to_path": "legacy",
+                        "failure_class": type(e).__name__,
+                        "failure_code": getattr(e, "code", type(e).__name__),
+                    },
+                )
+                doctor_state = _doctor_state_from_request(request)
+                async for event in stream_doctor_match_workflow(doctor_state):
+                    yield f"data: {json.dumps(event)}\n\n"
+            else:
+                log.error("Stream error for doctor actor %s: %s", request.actor_user_id, e)
+                error_event = {"type": "error", "message": "Internal server error"}
+                yield f"data: {json.dumps(error_event)}\n\n"
+
+    return _build_sse_response(event_generator())
+
+
 @app.post("/supervisor/stream")
-async def supervisor_stream(request: SupervisorRouteRequest):
-    """Execute supervisor workflow with SSE streaming.
+async def supervisor_stream(request: SupervisorRequestPayload):
+    """Execute workflows with SSE via legacy multiplexed endpoint.
+
+    Deprecated for specialized doctor requests. Prefer `/supervisor/doctor/stream`.
     
     Streams partial results as execution progresses, allowing:
     - Real-time progress updates
@@ -338,33 +625,45 @@ async def supervisor_stream(request: SupervisorRouteRequest):
     """
     # Rate limit check
     rate_limiter = stream_manager.get_rate_limiter()
-    allowed, error_msg = rate_limiter.check_rate_limit(request.user_id)
+    rate_limit_user = request.actor_user_id if _is_doctor_match_request(request) else request.user_id
+    allowed, error_msg = rate_limiter.check_rate_limit(rate_limit_user)
     if not allowed:
         raise HTTPException(status_code=429, detail=error_msg)
     
     async def event_generator():
         try:
-            task_specs = [task.model_dump() for task in request.tasks]
-            async for event in stream_supervisor_workflow(request.user_id, task_specs):
-                # SSE format: "data: {json}\n\n"
-                yield f"data: {json.dumps(event)}\n\n"
+            if _is_doctor_match_request(request):
+                selected = _select_doctor_endpoint_family(request.actor_user_id, request.thread_id)
+                _emit_endpoint_selection_event(
+                    request_path="/supervisor/stream",
+                    endpoint_selected=selected,
+                    routing_reason="legacy_multiplexed_stream_request",
+                    request=request,
+                )
+                log.warning(
+                    "DEPRECATION: DoctorMatchAgentRequest on /supervisor/stream is deprecated; "
+                    "use /supervisor/doctor/stream (actor_user_id=%s thread_id=%s)",
+                    request.actor_user_id,
+                    request.thread_id,
+                )
+                doctor_state = _doctor_state_from_request(request)
+                async for event in stream_doctor_match_workflow(doctor_state):
+                    yield f"data: {json.dumps(event)}\n\n"
+            else:
+                task_specs = [task.model_dump() for task in request.tasks]
+                async for event in stream_supervisor_workflow(request.user_id, task_specs):
+                    # SSE format: "data: {json}\n\n"
+                    yield f"data: {json.dumps(event)}\n\n"
         except ValueError as e:
             error_event = {"type": "error", "message": str(e)}
             yield f"data: {json.dumps(error_event)}\n\n"
         except Exception as e:
-            log.error(f"Stream error for user {request.user_id}: {e}")
+            stream_user = request.actor_user_id if _is_doctor_match_request(request) else request.user_id
+            log.error(f"Stream error for user {stream_user}: {e}")
             error_event = {"type": "error", "message": "Internal server error"}
             yield f"data: {json.dumps(error_event)}\n\n"
-    
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
-        },
-    )
+
+    return _build_sse_response(event_generator())
 
 
 @app.post("/supervisor/cancel/{user_id}")
@@ -377,6 +676,15 @@ async def cancel_supervisor_stream(user_id: str):
     if cancelled:
         return {"message": f"Stream cancelled for user {user_id}"}
     return {"message": f"No active stream for user {user_id}"}
+
+
+@app.post("/supervisor/doctor/cancel/{actor_user_id}")
+async def cancel_supervisor_doctor_stream(actor_user_id: str):
+    """Cancel active doctor-specialized stream by actor_user_id."""
+    cancelled = stream_manager.cancel_stream(actor_user_id)
+    if cancelled:
+        return {"message": f"Doctor stream cancelled for actor {actor_user_id}"}
+    return {"message": f"No active doctor stream for actor {actor_user_id}"}
 
 
 @app.get("/rate-limit/status/{user_id}")
