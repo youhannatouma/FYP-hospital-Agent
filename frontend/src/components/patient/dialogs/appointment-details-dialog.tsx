@@ -55,7 +55,7 @@ export function AppointmentDetailsDialog({
                 <FileText className="h-5 w-5" />
               </div>
               <div className="inline-flex items-center px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-[10px] font-black uppercase tracking-widest text-primary">
-                Record ID: {appointment.id?.slice(0, 8) || "N/A"}
+                Record ID: {appointment.id ? String(appointment.id).slice(0, 8) : "N/A"}
               </div>
             </div>
             <DialogTitle className="text-3xl font-black tracking-tight text-foreground leading-none">

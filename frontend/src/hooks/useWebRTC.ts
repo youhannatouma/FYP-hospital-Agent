@@ -8,58 +8,85 @@ export const useWebRTC = (roomId: string) => {
   const socket = useRef<Socket | null>(null);
 
   useEffect(() => {
+    if (!roomId) return;
+
     // 1. Initialize Socket.io
     socket.current = io('http://localhost:8000', { path: '/ws/socket.io' });
 
-    socket.current.on('connect', () => {
-        console.log('Connected to signaling server');
-        socket.current?.emit('join_room', { room: roomId });
-    });
-
-    socket.current.on('user_joined', async () => {
-        console.log('User joined room, creating offer...');
-        await createOffer();
-    });
-
-    socket.current.on('signal', async (data) => {
-        if (data.offer) {
-            await handleOffer(data.offer);
-        } else if (data.answer) {
-            await handleAnswer(data.answer);
-        } else if (data.candidate) {
-            await handleCandidate(data.candidate);
-        }
-    });
-
     // 2. Setup WebRTC
     const setupMedia = async () => {
+      try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
-        
+
         pc.current = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         });
 
         stream.getTracks().forEach(track => pc.current?.addTrack(track, stream));
 
         pc.current.ontrack = (event) => {
+          if (event.streams[0]) {
             setRemoteStream(event.streams[0]);
+          }
         };
 
         pc.current.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.current?.emit('signal', { room: roomId, candidate: event.candidate });
-            }
+          if (event.candidate) {
+            socket.current?.emit('signal', { room: roomId, candidate: event.candidate });
+          }
         };
+      } catch (err) {
+        console.error("Failed to setup media:", err);
+      }
     };
 
-    setupMedia();
+    setupMedia().then(() => {
+      if (!socket.current) return;
+      if (socket.current.connected) {
+        socket.current.emit('join_room', { room: roomId });
+      } else {
+        socket.current.on('connect', () => {
+          socket.current?.emit('join_room', { room: roomId });
+        });
+      }
+      
+      socket.current.on('user_joined', async () => {
+        console.log('User joined room, creating offer...');
+        await createOffer();
+      });
+
+      socket.current.on('signal', async (data) => {
+        try {
+          if (data.offer) {
+            await handleOffer(data.offer);
+          } else if (data.answer) {
+            await handleAnswer(data.answer);
+          } else if (data.candidate) {
+            await handleCandidate(data.candidate);
+          }
+        } catch (err) {
+          console.error("Signaling error:", err);
+        }
+      });
+    });
 
     return () => {
-        localStream?.getTracks().forEach(track => track.stop());
-        pc.current?.close();
-        socket.current?.disconnect();
+      // ── SAFE CLEANUP ──────────────────────────────
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      if (pc.current) {
+        pc.current.close();
+        pc.current = null;
+      }
+      if (socket.current) {
+        socket.current.disconnect();
+        socket.current = null;
+      }
+      // ──────────────────────────────────────────────
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
   const createOffer = async () => {

@@ -70,6 +70,7 @@ import { toast } from "@/hooks/use-toast"
 
 export default function UserManagementPage() {
   const { admin } = useHospital()
+  const { getToken } = useAuth()
   const [searchTerm, setSearchTerm] = React.useState("")
   const [filterRole, setFilterRole] = React.useState("All")
   const [users, setUsers] = React.useState<any[]>([])
@@ -85,7 +86,7 @@ export default function UserManagementPage() {
   const loadUsers = React.useCallback(async () => {
     setLoading(true)
     const token = await getToken()
-    const data = await admin.getAllUsers(token)
+    const data = await admin.getAllUsers(token || undefined)
     setUsers(data || [])
     setLoading(false)
   }, [admin, getToken])
@@ -96,7 +97,7 @@ export default function UserManagementPage() {
 
   const handleUpdateStatus = async (userId: string, status: string) => {
     const token = await getToken()
-    const result = await admin.updateStatus('users', userId, status, token)
+    const result = await admin.updateStatus('users', userId, status, token || undefined)
     if (result) {
       toast({ title: "Success", description: `User status updated to ${status}` })
       loadUsers()
@@ -105,7 +106,7 @@ export default function UserManagementPage() {
 
   const handleDeleteUser = async (userId: string) => {
     const token = await getToken()
-    const result = await admin.deleteUser(userId, token)
+    const result = await admin.deleteUser(userId, token || undefined)
     if (result) {
       toast({ title: "Deleted", description: "User account has been removed" })
       loadUsers()
@@ -115,7 +116,7 @@ export default function UserManagementPage() {
   const handleAddDoctor = async (e: React.FormEvent) => {
     e.preventDefault()
     const token = await getToken()
-    const result = await admin.addDoctor(newDoctor, token)
+    const result = await admin.addDoctor(newDoctor, token || undefined)
     if (result) {
       toast({ title: "Success", description: "Doctor added successfully" })
       setIsAddDoctorOpen(false)

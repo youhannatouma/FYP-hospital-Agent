@@ -21,10 +21,15 @@ import { MedicalDocuments } from "@/components/patient/dashboard/medical-documen
 import { BookAppointmentDialog } from "@/components/patient/dialogs/book-appointment-dialog"
 import { ContactDoctorDialog } from "@/components/patient/dialogs/contact-doctor-dialog"
 import { cn } from "@/lib/utils"
+import { useUser } from "@clerk/nextjs"
 
 export default function PatientDashboardPage() {
   const [showBookAppointment, setShowBookAppointment] = useState(false)
   const [showContactDoctor, setShowContactDoctor] = useState(false)
+  const { user } = useUser()
+
+  const firstName = user?.firstName || "there"
+  const todayFormatted = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 
   return (
     <AnimatePresence mode="wait">
@@ -43,10 +48,10 @@ export default function PatientDashboardPage() {
             </div>
             <div>
               <h1 className="text-4xl font-black text-foreground tracking-tight leading-none lg:text-5xl">
-                Welcome back, Sarah
+                Welcome back, {firstName}
               </h1>
               <p className="text-muted-foreground mt-4 font-medium text-lg max-w-lg leading-relaxed">
-                Your health telemetry is synchronized. Summary for <span className="text-foreground font-black underline decoration-primary/30 underline-offset-4">January 15, 2024</span>.
+                Your health telemetry is synchronized. Summary for <span className="text-foreground font-black underline decoration-primary/30 underline-offset-4">{todayFormatted}</span>.
               </p>
             </div>
           </div>

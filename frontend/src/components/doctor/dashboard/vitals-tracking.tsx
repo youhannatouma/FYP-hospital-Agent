@@ -1,9 +1,10 @@
 "use client"
-
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Activity } from "lucide-react"
+import { Activity, Loader2 } from "lucide-react"
 import {
   LineChart,
   Line,
@@ -15,19 +16,40 @@ import {
   Legend,
 } from "recharts"
 
-const vitalsData = [
-  { date: "Jan 8", systolic: 135, diastolic: 82, heartRate: 72 },
-  { date: "Jan 9", systolic: 138, diastolic: 85, heartRate: 75 },
-  { date: "Jan 10", systolic: 132, diastolic: 80, heartRate: 70 },
-  { date: "Jan 11", systolic: 140, diastolic: 88, heartRate: 78 },
-  { date: "Jan 12", systolic: 136, diastolic: 84, heartRate: 73 },
-  { date: "Jan 13", systolic: 137, diastolic: 85, heartRate: 72 },
-  { date: "Jan 14", systolic: 134, diastolic: 82, heartRate: 71 },
-  { date: "Jan 15", systolic: 137, diastolic: 85, heartRate: 72 },
-]
-
 export function VitalsTracking() {
+  const { medicalRecords } = useHospital();
+  const { getToken } = useAuth();
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [period] = useState("7d")
+
+  useEffect(() => {
+    const fetchVitals = async () => {
+      try {
+        const token = await getToken();
+        const records = await medicalRecords.getMyRecords(token || undefined);
+        
+        const extracted = records
+          .filter((r: any) => r.vitals && typeof r.vitals === 'object')
+          .map((r: any) => ({
+            date: new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            systolic: r.vitals.systolic,
+            diastolic: r.vitals.diastolic,
+            heartRate: r.vitals.heart_rate || r.vitals.heartRate,
+          }))
+          .reverse();
+        
+        setChartData(extracted.length > 0 ? extracted : [
+          { date: "No Data", systolic: 0, diastolic: 0, heartRate: 0 }
+        ]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchVitals();
+  }, [medicalRecords, getToken]);
 
   return (
     <Card className="premium-card rounded-[2.5rem] border-none shadow-premium overflow-hidden">
@@ -48,9 +70,14 @@ export function VitalsTracking() {
         </Select>
       </CardHeader>
       <CardContent>
-        <div className="h-80 w-full pr-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={vitalsData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        {isLoading ? (
+          <div className="flex h-80 w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="h-80 w-full pr-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/30" />
               <XAxis
                 dataKey="date"
@@ -112,6 +139,7 @@ export function VitalsTracking() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+        )}
       </CardContent>
     </Card>
   )

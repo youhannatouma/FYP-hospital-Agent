@@ -27,7 +27,7 @@ async def join_room(sid, data):
 async def signal(sid, data):
     room = data.get('room')
     if room:
-        # Forward the signaling data (offer, answer, or candidate) to everyone else in the room
+        # Forward the signaling data om(offer, answer, or candidate) to everyone else in the ro
         await sio.emit('signal', data, room=room, skip_sid=sid)
 
 @sio.event

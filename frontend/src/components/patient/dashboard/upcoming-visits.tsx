@@ -20,15 +20,15 @@ export function UpcomingVisits() {
   React.useEffect(() => {
     const loadVisits = async () => {
       const token = await getToken()
-      const data = await booking.getMyAppointments(token)
+      const data = await booking.getMyAppointments(token || undefined)
       if (Array.isArray(data)) {
         const ui = data.map((a: any) => ({
           id: a.appointment_id,
           title: a.appointment_type || "Appointment",
           doctor: a.doctor_name || a.doctor_id,
-          specialty: "", // could fetch doctor info separately
-          date: a.created_at ? new Date(a.created_at).toDateString() : "",
-          time: "",
+          specialty: a.doctor_specialty || "General Medicine",
+          date: a.date || (a.created_at ? new Date(a.created_at).toDateString() : ""),
+          time: a.time || "",
           type: a.status || "",
           typeColor: a.status === "scheduled" ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground",
           isVirtual: a.appointment_type?.toLowerCase().includes("virtual"),
@@ -146,6 +146,7 @@ export function UpcomingVisits() {
         onOpenChange={setIsOpen}
         remoteName={activeDoctor}
         role="patient"
+        roomId="quick_consult"
       />
     </Card>
   )

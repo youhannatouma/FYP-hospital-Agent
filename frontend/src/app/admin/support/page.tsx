@@ -6,7 +6,8 @@ import {
   Clock, 
   Filter,
   Ticket,
-  ChevronRight
+  ChevronRight,
+  Tag
 } from "lucide-react"
 import { m } from "framer-motion"
 import { useToast } from "@/hooks/use-toast"

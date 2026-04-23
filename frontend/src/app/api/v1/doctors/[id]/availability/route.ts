@@ -1,34 +1,36 @@
-import { NextResponse } from 'next/server';
+import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+
+const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  // Mock availability logic
-  // Returns available slots for the next 7 days
-  
-  const slots = [];
-  const today = new Date();
-  
-  for (let i = 1; i <= 7; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + i);
-    const dateString = date.toISOString().split('T')[0];
-    
-    // Skip weekends for mock logic
-    if (date.getDay() === 0 || date.getDay() === 6) continue;
-    
-    slots.push(
-      { date: dateString, time: '09:00 AM', available: true },
-      { date: dateString, time: '10:00 AM', available: true },
-      { date: dateString, time: '02:00 PM', available: true },
-      { date: dateString, time: '03:30 PM', available: true }
+  try {
+    const { id } = await params;
+    const { getToken } = await auth();
+    const token = await getToken();
+    const { searchParams } = new URL(request.url);
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Proxy to FastAPI backend
+    const res = await fetch(`${BACKEND}/doctors/${id}/slots?${searchParams}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error("[doctor availability GET] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch doctor availability" },
+      { status: 500 },
     );
   }
-  
-  return NextResponse.json({
-    doctorId: id,
-    availableSlots: slots
-  });
 }

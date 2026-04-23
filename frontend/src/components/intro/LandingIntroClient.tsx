@@ -2,12 +2,19 @@
 import dynamic from "next/dynamic";
 import { ReactNode } from "react";
 
-// Dynamically import so sessionStorage check runs client-side only
+// ssr: false is critical — sessionStorage doesn't exist on the server.
+// Without this, the initial render always shows "idle" (no intro),
+// then hydration re-renders with the correct state, causing a flash.
 const LandingIntro = dynamic(
   () => import("./LandingIntro").then((m) => m.LandingIntro),
-  { ssr: false }  // ← critical: prevents server/client mismatch
+  { ssr: false }
 );
 
-export function LandingIntroClient({ children }: { children: ReactNode }) {
+interface LandingIntroClientProps {
+  children: ReactNode;
+}
+
+export function LandingIntroClient({ children }: LandingIntroClientProps) {
+  // No timer. No hidden div. LandingIntro handles everything correctly.
   return <LandingIntro>{children}</LandingIntro>;
 }

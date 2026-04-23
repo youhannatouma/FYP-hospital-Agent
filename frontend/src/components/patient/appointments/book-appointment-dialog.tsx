@@ -77,7 +77,7 @@ export function BookAppointmentDialog({
   React.useEffect(() => {
     const loadDoctors = async () => {
       const token = await getToken()
-      const docs = await booking.getAvailableDoctors(selectedSpecialty || undefined, token)
+      const docs = await booking.getAvailableDoctors(selectedSpecialty || undefined, token || undefined)
       setAllDoctors(docs || [])
     }
     loadDoctors()
@@ -95,7 +95,7 @@ export function BookAppointmentDialog({
     const loadSlots = async () => {
       if (selectedDoctor && date) {
         const token = await getToken()
-        const slots = await booking.getSlots(selectedDoctor.id, date.toISOString().split('T')[0], token)
+        const slots = await booking.getSlots(selectedDoctor.id, date.toISOString().split('T')[0], token || undefined)
         if (Array.isArray(slots)) {
           setTimeSlots(slots.map((s: any) => s.time))
         }
@@ -119,7 +119,7 @@ export function BookAppointmentDialog({
         appointment_type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
         fee: 150,
         is_virtual: appointmentType === "Video",
-      }, token)
+      }, token || undefined)
 
       // Also update local mock store so the UI reflects the new appointment immediately
       addAppointment({

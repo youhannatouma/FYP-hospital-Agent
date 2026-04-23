@@ -14,33 +14,46 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Calendar, Clock, MapPin, Video, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useDataStore, type Appointment } from "@/hooks/use-data-store"
+import { apiClient } from "@/lib/api-client"
 
 interface AppointmentDetailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  appointment: Appointment | null
+  appointment: any | null
 }
 
 export function AppointmentDetailDialog({ open, onOpenChange, appointment }: AppointmentDetailDialogProps) {
   const { toast } = useToast()
-  const { updateAppointmentStatus } = useDataStore()
   const [loading, setLoading] = React.useState(false)
 
   if (!appointment) return null
 
-  const handleStatusChange = (newStatus: 'Scheduled' | 'Completed' | 'Cancelled' | 'In Progress' | 'Pending') => {
+  const handleStatusChange = async (newStatus: 'scheduled' | 'completed' | 'cancelled') => {
     setLoading(true)
-    // Simulate slight delay for feedback
-    setTimeout(() => {
-      updateAppointmentStatus(appointment.id, newStatus)
-      setLoading(false)
+    try {
+      let endpoint = `/appointments/${appointment.appointment_id}`;
+      if (newStatus === 'completed') endpoint += '/complete';
+      else if (newStatus === 'cancelled') endpoint += '/cancel';
+      
+      await apiClient.patch(endpoint)
+      
       toast({
-        title: "Status Updated",
-        description: `Appointment with ${appointment.patientName} is now ${newStatus}.`,
+        title: "Status Synchronized",
+        description: `Appointment with ${appointment.patient_name} is now ${newStatus}.`,
       })
       onOpenChange(false)
-    }, 500)
+      // Refresh page to show updated status
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to update appointment status', error);
+      toast({
+        title: "Update Failed",
+        description: "Could not synchronize the status change with the clinical server.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -128,7 +141,11 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
 
         <div className="flex flex-col gap-2">
           {appointment.status === "Scheduled" && (
-            <Button className="w-full gap-2" onClick={() => handleStatusChange("In Progress")} disabled={loading}>
+            <Button 
+              className="w-full gap-2" 
+              onClick={() => toast({ title: "Connecting...", description: "Initializing secure clinical video session..." })} 
+              disabled={loading}
+            >
               <Video className="h-4 w-4" /> Start Consultation
             </Button>
           )}
@@ -136,7 +153,7 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
             <Button 
               variant="outline" 
               className="gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200" 
-              onClick={() => handleStatusChange("Completed")}
+              onClick={() => handleStatusChange("completed")}
               disabled={loading || appointment.status === 'Completed'}
             >
               <CheckCircle2 className="h-4 w-4" /> Complete
@@ -144,7 +161,7 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
             <Button 
               variant="outline" 
               className="gap-2 text-destructive hover:bg-destructive/5 border-destructive/20" 
-              onClick={() => handleStatusChange("Cancelled")}
+              onClick={() => handleStatusChange("cancelled")}
               disabled={loading || appointment.status === 'Cancelled'}
             >
               <XCircle className="h-4 w-4" /> Cancel
