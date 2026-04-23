@@ -167,6 +167,7 @@ CREATE TABLE appointment (
     status appointment_status NOT NULL DEFAULT 'scheduled',
     appointment_type TEXT,
     fee NUMERIC CHECK (fee >= 0),   -- ensures fee can't be negative
+    room_id UUID DEFAULT gen_random_uuid(), -- persistent Room ID for video calls
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     deleted_at TIMESTAMP

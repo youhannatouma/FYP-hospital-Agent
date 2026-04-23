@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Bot, Send, User, Sparkles, Stethoscope, FlaskConical, FileText, CalendarDays } from "lucide-react"
+import apiClient from "@/lib/api-client"
 
 interface ChatMessage {
   id: number
@@ -49,11 +50,11 @@ export default function DoctorAIAssistantPage() {
     }
   }, [messages, isTyping])
 
-  const sendMessage = (content: string) => {
+  const sendMessage = async (content: string) => {
     if (!content.trim()) return
 
     const userMessage: ChatMessage = {
-      id: messages.length + 1,
+      id: Date.now(),
       role: "user",
       content: content.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -63,16 +64,28 @@ export default function DoctorAIAssistantPage() {
     setInputValue("")
     setIsTyping(true)
 
-    setTimeout(() => {
-      const aiMessage: ChatMessage = {
-        id: messages.length + 2,
+    try {
+      const response = await apiClient.post('/ai/chat', {
+        message: content.trim(),
+        context: 'doctor',
+      })
+      const reply = response.data?.reply || response.data?.message || "I couldn't process that request."
+      setMessages((prev) => [...prev, {
+        id: Date.now() + 1,
         role: "assistant",
-        content: `I've noted your query: **"${content.trim()}"**\n\nI can help you with this. In the full implementation, I would access your patient records, clinical knowledge base, and hospital systems to provide a tailored clinical response. For now, this is a scaffold.\n\nWould you like me to pull up any specific patient data or clinical guidelines?`,
+        content: reply,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      }
-      setMessages((prev) => [...prev, aiMessage])
+      }])
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: Date.now() + 1,
+        role: "assistant",
+        content: "I'm having trouble connecting to the clinical AI right now. Please try again in a moment.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      }])
+    } finally {
       setIsTyping(false)
-    }, 1200)
+    }
   }
 
   return (

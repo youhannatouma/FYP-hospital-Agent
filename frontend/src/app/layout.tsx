@@ -35,7 +35,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
-        <body className="font-sans antialiased selection:bg-primary/20">
+        <body className="font-sans antialiased selection:bg-primary/20" suppressHydrationWarning>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -43,9 +43,11 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <AnimationProvider>
-              <div className="relative flex min-h-screen flex-col">
-                {children}
-              </div>
+              <React.Suspense fallback={null}>
+                <div className="relative flex min-h-screen flex-col">
+                  {children}
+                </div>
+              </React.Suspense>
               <Toaster />
             </AnimationProvider>
           </ThemeProvider>

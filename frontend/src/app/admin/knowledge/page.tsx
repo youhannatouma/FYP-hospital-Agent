@@ -7,7 +7,7 @@ import {
   Pipette, 
   Search, 
   Plus, 
-  FileEdit, 
+  Pencil, 
   Trash2, 
   CheckCircle2, 
   AlertCircle,
@@ -109,7 +109,7 @@ export default function KnowledgeBasePage() {
                         <p className="text-xs font-bold">{item.interactions} Checked</p>
                       </div>
                       <Button size="icon" variant="ghost" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <FileEdit className="h-4 w-4" />
+                        <Pencil className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>

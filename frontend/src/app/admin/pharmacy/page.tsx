@@ -16,7 +16,8 @@ import {
   Building2,
   Table as TableIcon,
   Trash2,
-  ArrowUpRight
+  ArrowUpRight,
+  Pencil
 } from "lucide-react"
 import { m } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -214,7 +215,7 @@ export default function PharmacyHubPage() {
                         {med.status}
                       </Badge>
                       <div className="flex gap-1">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => { const { toast } = require('@/hooks/use-toast'); toast({ title: 'Edit Medicine', description: `Editing ${med.name}` }) }}><FileEdit className="h-3 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => { const { toast } = require('@/hooks/use-toast'); toast({ title: 'Edit Medicine', description: `Editing ${med.name}` }) }}><Pencil className="h-3 w-4" /></Button>
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-rose-500" onClick={() => { const { toast } = require('@/hooks/use-toast'); toast({ title: 'Delete Medicine', description: `${med.name} will be removed.`, variant: 'destructive' }) }}><Trash2 className="h-3 w-4" /></Button>
                       </div>
                     </div>

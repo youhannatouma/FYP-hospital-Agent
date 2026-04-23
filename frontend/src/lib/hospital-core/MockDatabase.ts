@@ -131,6 +131,14 @@ class MockDatabase {
     return newApt;
   }
 
+  public getAppointmentsByPatient(patientId: string) {
+    return this.appointments.filter(a => a.patientId === patientId);
+  }
+
+  public getAppointmentsByDoctor(doctorId: string) {
+    return this.appointments.filter(a => a.doctorId === doctorId);
+  }
+
   // Stats
   public getStats() {
     return {

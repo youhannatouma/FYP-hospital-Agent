@@ -4,12 +4,35 @@ import { Heart, Droplets, Weight, Moon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { m } from "framer-motion"
+import { useState, useEffect } from "react"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 
 export function StatCards() {
-  const stats = [
+  const { stats } = useHospital();
+  const { getToken } = useAuth();
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = await getToken();
+        const res = await stats.getPatientStats(token || undefined);
+        setData(res);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStats();
+  }, [stats, getToken]);
+
+  const statsItems = [
     {
       icon: Heart,
-      value: "72 bpm",
+      value: "72 bpm", // Mocked as we don't have vitals series yet
       label: "Heart Rate",
       status: "Optimal",
       statusColor: "text-emerald-500",
@@ -21,39 +44,39 @@ export function StatCards() {
     },
     {
       icon: Droplets,
-      value: "137/85",
-      label: "Blood Pressure",
-      status: "Stable",
+      value: `${data?.upcoming_appointments || 0}`,
+      label: "Appointments",
+      status: "Upcoming",
       statusColor: "text-emerald-500",
       iconBg: "bg-amber-500/10",
       iconColor: "text-amber-500",
-      updated: "3h ago",
+      updated: "Real-time",
     },
     {
       icon: Weight,
-      value: "158 lbs",
-      label: "Weight",
-      status: "-2 lbs",
+      value: `${data?.medical_records || 0}`,
+      label: "Medical Records",
+      status: "Stored",
       statusColor: "text-blue-500",
       iconBg: "bg-emerald-500/10",
       iconColor: "text-emerald-500",
-      updated: "Today",
+      updated: "Total",
     },
     {
       icon: Moon,
-      value: "7.5 hrs",
-      label: "Sleep Quality",
-      status: "Good",
+      value: `${data?.active_prescriptions || 0}`,
+      label: "Prescriptions",
+      status: "Active",
       statusColor: "text-indigo-500",
       iconBg: "bg-indigo-500/10",
       iconColor: "text-indigo-500",
-      updated: "Last Night",
+      updated: "Current",
     },
   ]
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 px-1">
-      {stats.map((stat, idx) => (
+      {statsItems.map((stat, idx) => (
         <m.div
           key={stat.label}
           initial={{ opacity: 0, y: 20 }}

@@ -1,48 +1,107 @@
-import { NextResponse } from 'next/server';
-import { APPOINTMENTS } from '@/lib/hospital-data-manifest';
+import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+
+const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const appointment = APPOINTMENTS.find(apt => apt.id === id);
-  
-  if (!appointment) {
+  try {
+    const { id } = await params;
+    const { getToken } = await auth();
+    const token = await getToken();
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const res = await fetch(`${BACKEND}/appointments/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error("[appointment GET] Error:", error);
     return NextResponse.json(
-      { error: 'Appointment not found' },
-      { status: 404 }
+      { error: "Failed to fetch appointment" },
+      { status: 500 },
     );
   }
-  
-  return NextResponse.json(appointment);
 }
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const aptIndex = APPOINTMENTS.findIndex(apt => apt.id === id);
-  
-  if (aptIndex === -1) {
+  try {
+    const { id } = await params;
+    const { getToken } = await auth();
+    const token = await getToken();
+    const body = await request.json();
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Determine the correct endpoint based on the action
+    let endpoint = `${BACKEND}/appointments/${id}`;
+    if (body.action === "cancel") {
+      endpoint = `${BACKEND}/appointments/${id}/cancel`;
+    } else if (body.action === "reschedule") {
+      endpoint = `${BACKEND}/appointments/${id}/reschedule`;
+    }
+
+    const res = await fetch(endpoint, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error("[appointment PATCH] Error:", error);
     return NextResponse.json(
-      { error: 'Appointment not found' },
-      { status: 404 }
+      { error: "Failed to update appointment" },
+      { status: 500 },
     );
   }
-  
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
-    const body = await request.json();
-    const updatedAppointment = { ...APPOINTMENTS[aptIndex], ...body };
-    
-    // In a real app, update DB here
-    
-    return NextResponse.json(updatedAppointment);
+    const { id } = await params;
+    const { getToken } = await auth();
+    const token = await getToken();
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const res = await fetch(`${BACKEND}/appointments/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
+    console.error("[appointment DELETE] Error:", error);
     return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
+      { error: "Failed to delete appointment" },
+      { status: 500 },
     );
   }
 }

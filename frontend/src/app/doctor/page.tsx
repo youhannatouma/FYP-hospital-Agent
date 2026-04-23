@@ -8,7 +8,7 @@ import { DoctorAIAvatar } from "@/components/doctor/dashboard/ai-avatar"
 import { UpcomingVisits } from "@/components/doctor/dashboard/upcoming-visits"
 import { MessagesSection } from "@/components/patient/dashboard/messages-section"
 import { RecentPatients } from "@/components/doctor/dashboard/recent-patients"
-import {AppointmentsTable} from "@/components/doctor/dashboard/appointement-table"
+import {AppointmentsTable} from "@/components/doctor/dashboard/appointment-table"
 import {VitalsTracking} from "@/components/doctor/dashboard/vitals-tracking"
 
 
@@ -19,8 +19,15 @@ import { AppointmentDetailDialog } from "@/components/doctor/dialogs/appointment
 import { RecordDetailDialog } from "@/components/doctor/dialogs/record-detail-dialog"
 import { useState } from "react"
 import { m } from "framer-motion"
+import { apiClient } from "@/lib/api-client"
+import { useToast } from "@/hooks/use-toast"
+import { RefreshCw } from "lucide-react"
+import { useUser } from "@clerk/nextjs"
 
 export default function DoctorDashboardPage() {
+  const { toast } = useToast()
+  const { user } = useUser()
+  const [isSyncing, setIsSyncing] = useState(false)
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
   const [isPatientProfileOpen, setIsPatientProfileOpen] = useState(false)
   const [isAppointmentDetailOpen, setIsAppointmentDetailOpen] = useState(false)
@@ -30,6 +37,31 @@ export default function DoctorDashboardPage() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null)
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
   const [selectedRecord, setSelectedRecord] = useState<any>(null)
+
+  const firstName = user?.firstName || "Doctor"
+  const todayFormatted = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+
+  const handleSyncRegistry = async () => {
+    setIsSyncing(true)
+    try {
+      const response = await apiClient.post('/admin/sync-clerk')
+      toast({
+        title: "Registry Synchronized",
+        description: response.data.message || "All clinicians and patients have been mapped to the local registry.",
+      })
+      // Reload to show new data
+      window.location.reload()
+    } catch (error) {
+      console.error('Sync failed', error)
+      toast({
+        title: "Sync Error",
+        description: "Could not communicate with the authentication server. Ensure you have Admin privileges.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   const handleViewPatient = (patient: any) => {
     setSelectedPatient(patient)
@@ -57,13 +89,22 @@ export default function DoctorDashboardPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground lg:text-3xl">
-            Welcome dr, Sarah
+            Welcome Dr. {firstName}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {"Here's your health overview for January 15, 2024"}
+            {`Here's your health overview for ${todayFormatted}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            className="gap-2 border-border/50 font-bold"
+            onClick={handleSyncRegistry}
+            disabled={isSyncing}
+          >
+            <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? "Syncing..." : "Sync Registry"}
+          </Button>
           <Button 
             className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={() => setIsAdminDialogOpen(true)}
@@ -99,7 +140,7 @@ export default function DoctorDashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <DoctorMedicalTimeline 
-            onViewPatient={() => handleViewPatient({ name: "John Doe", id: "00284719" })}
+            onViewPatient={(patient: any) => handleViewPatient(patient || { name: "Unknown Patient", id: "" })}
             onViewRecord={handleViewRecord}
           />
         </div>

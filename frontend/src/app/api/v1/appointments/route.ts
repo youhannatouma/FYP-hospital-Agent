@@ -1,55 +1,69 @@
-import { NextResponse } from 'next/server';
-import { APPOINTMENTS, Appointment } from '@/lib/hospital-data-manifest';
+import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+
+const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const patientId = searchParams.get('patientId');
-  const doctorId = searchParams.get('doctorId');
-  const status = searchParams.get('status');
-  
-  let filteredAppointments = APPOINTMENTS;
-  
-  if (patientId) {
-    filteredAppointments = filteredAppointments.filter(apt => apt.patientId === patientId);
+  try {
+    const { getToken } = await auth();
+    const token = await getToken();
+    const { searchParams } = new URL(request.url);
+
+    if (!token) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Proxy to FastAPI backend
+    const res = await fetch(`${BACKEND}/appointments/my?${searchParams}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error("[appointments GET] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch appointments" },
+      { status: 500 }
+    );
   }
-  
-  if (doctorId) {
-    filteredAppointments = filteredAppointments.filter(apt => apt.doctorId === doctorId);
-  }
-  
-  if (status) {
-    filteredAppointments = filteredAppointments.filter(apt => apt.status.toLowerCase() === status.toLowerCase());
-  }
-  
-  return NextResponse.json(filteredAppointments);
 }
 
 export async function POST(request: Request) {
   try {
+    const { getToken } = await auth();
+    const token = await getToken();
     const body = await request.json();
-    
-    // Validate required fields
-    if (!body.patientId || !body.doctorId || !body.date || !body.time) {
+
+    if (!token) {
       return NextResponse.json(
-        { error: 'Missing required fields: patientId, doctorId, date, time' },
-        { status: 400 }
+        { error: "Unauthorized" },
+        { status: 401 }
       );
     }
-    
-    // Create new appointment
-    const newAppointment: Appointment = {
-      id: `APT-${Date.now()}`,
-      status: 'Scheduled',
-      createdAt: new Date().toISOString().split('T')[0],
-      price: 150, // Default price, mock logic
-      ...body
-    };
-    
-    return NextResponse.json(newAppointment, { status: 201 });
+
+    // Proxy to FastAPI backend
+    const res = await fetch(`${BACKEND}/appointments/bookings`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
+    console.error("[appointments POST] Error:", error);
     return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
+      { error: "Failed to book appointment" },
+      { status: 500 }
     );
   }
 }
