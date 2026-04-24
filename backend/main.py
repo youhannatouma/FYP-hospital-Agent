@@ -31,6 +31,9 @@ from .orchestration.supervisor_workflow import (
     stream_supervisor_workflow,
 )
 from .app.schemas.doctor_matching_agent import DoctorMatchAgentRequest, DoctorMatchAgentResponse
+from .app.schemas.unified_agent_response import UnifiedAgentRequest, UnifiedAgentResponse
+from .orchestration.synthesis import synthesize_response, stream_synthesize_response
+from .tools.medication_tools import medication_pipeline
 from .middleware import stream_manager, approval_manager
 from .scripts.db_apply_migrations import apply_phase_migrations, verify_required_indexes
 from .telemetry import emit_telemetry_event
@@ -900,3 +903,169 @@ async def cleanup_approvals():
     """Manually trigger cleanup of expired approval requests."""
     approval_manager.cleanup_expired_approvals()
     return {"message": "Cleanup complete"}
+
+
+# ── Phase 5: Unified Assistant Endpoints ────────────────────────────────
+
+def _unified_doctor_state_from_request(request: UnifiedAgentRequest) -> dict:
+    """Convert UnifiedAgentRequest to doctor workflow state dict."""
+    selected_doctor = None
+    selected_date = None
+    selected_time = None
+    selected_slot_id = None
+    booking_timezone = "UTC"
+    booking_reason = None
+    policy_context: dict = {}
+
+    booking = request.booking or {}
+    if booking:
+        selected_slot_id = booking.get("slot_id")
+        selected_date = booking.get("appointment_date")
+        selected_time = booking.get("appointment_time")
+        booking_timezone = booking.get("booking_timezone", "UTC")
+        booking_reason = booking.get("booking_reason")
+        policy_context = booking.get("policy_context", {})
+        if booking.get("doctor_name"):
+            selected_doctor = {"doctor_name": booking["doctor_name"]}
+
+    return {
+        "thread_id": request.thread_id,
+        "actor_user_id": request.actor_user_id,
+        "patient_user_id": request.patient_user_id,
+        "need_text": request.need_text,
+        "max_suggestions": request.max_suggestions,
+        "selected_doctor": selected_doctor,
+        "selected_slot_id": selected_slot_id,
+        "selected_appointment_date": selected_date,
+        "selected_appointment_time": selected_time,
+        "booking_timezone": booking_timezone,
+        "booking_reason": booking_reason,
+        "policy_context": policy_context,
+    }
+
+
+@app.post("/supervisor/unified", response_model=UnifiedAgentResponse)
+async def supervisor_unified(request: UnifiedAgentRequest):
+    """Unified endpoint that runs medication + appointment pipelines and returns an AI-generated message.
+
+    The response includes both the natural-language message and structured data
+    for frontend interactive elements.
+    """
+    rate_limiter = stream_manager.get_rate_limiter()
+    allowed, error_msg = rate_limiter.check_rate_limit(request.actor_user_id)
+    if not allowed:
+        raise HTTPException(status_code=429, detail=error_msg)
+
+    # 1. Run medication pipeline if requested
+    med_result = None
+    if request.include_medication:
+        symptom = (request.symptom or request.need_text).strip()
+        med_result = medication_pipeline(
+            symptom=symptom,
+            user_id=request.patient_user_id,
+        )
+
+    # 2. Run doctor matching workflow if requested
+    doctor_result = None
+    if request.include_appointment:
+        doctor_state = _unified_doctor_state_from_request(request)
+        try:
+            doctor_result = await execute_doctor_match_workflow(doctor_state)
+        except Exception as exc:
+            if _env_flag("SPECIALIZED_DOCTOR_AUTO_FALLBACK", True) and _is_fallback_eligible(exc):
+                log.warning("Unified endpoint fallback triggered: %s", type(exc).__name__)
+                doctor_result = await execute_doctor_match_workflow_legacy(doctor_state)
+            else:
+                raise
+
+    # 3. Get patient profile (from doctor result or fresh lookup)
+    patient_profile = {}
+    if doctor_result and doctor_result.get("patient_profile_snapshot"):
+        patient_profile = doctor_result["patient_profile_snapshot"]
+    else:
+        try:
+            from .tools.doctor_matching_tools import profile_user as profile_user_tool
+            patient_profile = profile_user_tool(request.patient_user_id)
+        except Exception:
+            patient_profile = {"user_id": request.patient_user_id}
+
+    # 4. Synthesize
+    synthesized = synthesize_response(
+        patient_profile=patient_profile,
+        symptom=request.symptom or request.need_text,
+        need_text=request.need_text,
+        medication_result=med_result,
+        doctor_result=doctor_result,
+        structured_errors=doctor_result.get("structured_errors", []) if doctor_result else [],
+    )
+
+    return synthesized
+
+
+@app.post("/supervisor/unified/stream")
+async def supervisor_unified_stream(request: UnifiedAgentRequest):
+    """Stream the AI message token-by-token (ChatGPT-style).
+
+    Yields SSE events:
+        data: {"type": "delta", "content": "..."}
+        ...
+        data: {"type": "complete", "response": {...}}
+    """
+    rate_limiter = stream_manager.get_rate_limiter()
+    allowed, error_msg = rate_limiter.check_rate_limit(request.actor_user_id)
+    if not allowed:
+        raise HTTPException(status_code=429, detail=error_msg)
+
+    async def event_generator():
+        # 1. Run medication pipeline if requested
+        med_result = None
+        if request.include_medication:
+            symptom = (request.symptom or request.need_text).strip()
+            med_result = medication_pipeline(
+                symptom=symptom,
+                user_id=request.patient_user_id,
+            )
+
+        # 2. Run doctor matching workflow if requested
+        doctor_result = None
+        if request.include_appointment:
+            doctor_state = _unified_doctor_state_from_request(request)
+            try:
+                doctor_result = await execute_doctor_match_workflow(doctor_state)
+            except Exception as exc:
+                if _env_flag("SPECIALIZED_DOCTOR_AUTO_FALLBACK", True) and _is_fallback_eligible(exc):
+                    log.warning("Unified stream fallback triggered: %s", type(exc).__name__)
+                    doctor_result = await execute_doctor_match_workflow_legacy(doctor_state)
+                else:
+                    error_event = {"type": "error", "message": str(exc)}
+                    yield f"data: {json.dumps(error_event)}\n\n"
+                    return
+
+        # 3. Get patient profile
+        patient_profile = {}
+        if doctor_result and doctor_result.get("patient_profile_snapshot"):
+            patient_profile = doctor_result["patient_profile_snapshot"]
+        else:
+            try:
+                from .tools.doctor_matching_tools import profile_user as profile_user_tool
+                patient_profile = profile_user_tool(request.patient_user_id)
+            except Exception:
+                patient_profile = {"user_id": request.patient_user_id}
+
+        # 4. Stream synthesis
+        try:
+            async for chunk in stream_synthesize_response(
+                patient_profile=patient_profile,
+                symptom=request.symptom or request.need_text,
+                need_text=request.need_text,
+                medication_result=med_result,
+                doctor_result=doctor_result,
+                structured_errors=doctor_result.get("structured_errors", []) if doctor_result else [],
+            ):
+                yield f"data: {json.dumps(chunk)}\n\n"
+        except Exception as exc:
+            log.error("Unified stream synthesis failed: %s", exc)
+            error_event = {"type": "error", "message": "Internal server error"}
+            yield f"data: {json.dumps(error_event)}\n\n"
+
+    return _build_sse_response(event_generator())

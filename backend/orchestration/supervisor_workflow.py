@@ -33,6 +33,7 @@ from ..tools.doctor_matching_tools import (
 )
 from .supervisor_routing import ToolTask, build_parallel_stages, execute_parallel_plan
 from ..middleware import stream_manager
+from .synthesis import synthesize_node
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +82,12 @@ class SupervisorState(TypedDict, total=False):
     max_suggestions: int
     suggestion_cards: list[dict[str, Any]]
 
+    # Phase 5: AI synthesis response
+    ai_message: str
+    ai_message_type: str
+    unified_response: dict[str, Any]
+    medication_result: dict[str, Any] | None
+
 
 CHECKPOINT_VERSION = "phase3-v1"
 THREAD_LOCK_TIMEOUT_SECONDS = 5.0
@@ -90,6 +97,7 @@ _DOCTOR_GRAPH_NODE_ORDER = [
     "suggest_cards_node",
     "profile_view_node",
     "conditional_book_node",
+    "synthesize_node",
 ]
 _BOOKING_COMMITTED_FIELDS = {
     "booking_attempted",
@@ -861,10 +869,12 @@ def _build_doctor_matching_graph():
         _route_booking_path,
         {
             "conditional_book_node": "conditional_book_node",
-            "suggest_only_end": END,
+            "suggest_only_end": "synthesize_node",
         },
     )
-    graph.add_edge("conditional_book_node", END)
+    graph.add_node("synthesize_node", synthesize_node)
+    graph.add_edge("conditional_book_node", "synthesize_node")
+    graph.add_edge("synthesize_node", END)
     return graph.compile(checkpointer=MemorySaver())
 
 
@@ -948,6 +958,10 @@ def _doctor_workflow_response(out: SupervisorState) -> dict[str, Any]:
         "structured_errors": out.get("structured_errors", []),
         "doctor_resolution_status": out.get("doctor_resolution_status", ""),
         "doctor_resolution_candidates": out.get("doctor_resolution_candidates", []),
+        # Phase 5: synthesis
+        "ai_message": out.get("ai_message", ""),
+        "ai_message_type": out.get("ai_message_type", ""),
+        "unified_response": out.get("unified_response"),
     }
     return _augment_booking_contract_fields(response)
 

@@ -14,6 +14,7 @@ def test_doctor_graph_order_constant_is_expected():
         "suggest_cards_node",
         "profile_view_node",
         "conditional_book_node",
+        "synthesize_node",
     ]
 
 
