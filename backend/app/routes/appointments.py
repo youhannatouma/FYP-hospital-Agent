@@ -1,192 +1,217 @@
 from datetime import datetime
 from uuid import UUID
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user, require_role
 from app.database import get_db
-from app.models.appointment import Appointment
-from app.models.enums import AppointmentStatus
 from app.models.time_slot import TimeSlot
 from app.models.user import User
 from app.schemas.appointment import BookingCreate
+from app.skills.booking_skill import BookingSkill
+from app.skills.error_handling_skill import ErrorHandlingSkill
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
-
 
 # Patient: view my appointments
 @router.get("/my")
 def my_appointments(
-    db: Session = Depends(get_db),
-    user: User = Depends(require_role("patient")),
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("patient"))],
 ):
-    appointments = db.query(Appointment).filter(Appointment.patient_id == user.user_id).all()
-    result = []
-    for a in appointments:
-        doctor = db.query(User).filter(User.user_id == a.doctor_id).first()
-        result.append({
-            "appointment_id": str(a.appointment_id),
-            "doctor_id": str(a.doctor_id),
-            "doctor_name": f"{doctor.first_name or ''} {doctor.last_name or ''}".strip(),
-            "status": a.status.value,
-            "appointment_type": a.appointment_type,
-            "fee": float(a.fee) if a.fee is not None else None,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-        })
-    return result
+    try:
+        appointments = BookingSkill.get_patient_appointments(db, user, user.user_id)
+        result = []
+        for a in appointments:
+            doctor = db.query(User).filter(User.user_id == a.doctor_id).first()
+            slot = db.query(TimeSlot).filter(TimeSlot.slot_id == a.slot_id).first() if a.slot_id else None
+            result.append({
+                "appointment_id": str(a.appointment_id),
+                "doctor_id": str(a.doctor_id),
+                "doctor_name": f"{doctor.first_name or ''} {doctor.last_name or ''}".strip() if doctor else "Doctor",
+                "doctor_specialty": doctor.specialty if doctor else None,
+                "status": a.status.value,
+                "appointment_type": a.appointment_type,
+                "fee": float(a.fee) if a.fee is not None else None,
+                "date": slot.start_time.strftime("%b %d, %Y") if slot else None,
+                "time": slot.start_time.strftime("%I:%M %p") if slot else None,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "room_id": str(a.room_id) if a.room_id else None,
+            })
+        return result
+    except Exception as e:
+        raise ErrorHandlingSkill.handle(e)
 
 
 # Doctor: view my appointments
 @router.get("/doctor")
 def doctor_appointments(
-    db: Session = Depends(get_db),
-    user: User = Depends(require_role("doctor")),
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("doctor"))],
 ):
-    appointments = db.query(Appointment).filter(Appointment.doctor_id == user.user_id).all()
-    result = []
-    for a in appointments:
-        patient = db.query(User).filter(User.user_id == a.patient_id).first()
-        result.append({
-            "appointment_id": str(a.appointment_id),
-            "patient_id": str(a.patient_id),
-            "patient_name": f"{patient.first_name or ''} {patient.last_name or ''}".strip(),
-            "status": a.status.value,
-            "appointment_type": a.appointment_type,
-            "fee": float(a.fee) if a.fee is not None else None,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-        })
-    return result
+    try:
+        appointments = BookingSkill.get_doctor_appointments(db, user, user.user_id)
+        result = []
+        for a in appointments:
+            patient = db.query(User).filter(User.user_id == a.patient_id).first()
+            slot = db.query(TimeSlot).filter(TimeSlot.slot_id == a.slot_id).first() if a.slot_id else None
+            result.append({
+                "appointment_id": str(a.appointment_id),
+                "patient_id": str(a.patient_id),
+                "patient_name": f"{patient.first_name or ''} {patient.last_name or ''}".strip() if patient else "Patient",
+                "patient_email": patient.email if patient else None,
+                "status": a.status.value,
+                "appointment_type": a.appointment_type,
+                "fee": float(a.fee) if a.fee is not None else None,
+                "date": slot.start_time.strftime("%b %d, %Y") if slot else None,
+                "time": slot.start_time.strftime("%I:%M %p") if slot else None,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "room_id": str(a.room_id) if a.room_id else None,
+            })
+        return result
+    except Exception as e:
+        raise ErrorHandlingSkill.handle(e)
 
 
-# Patient: book appointment (simple booking used by frontend)
+# Patient: book appointment
 @router.post("/bookings")
 def create_booking(
     payload: BookingCreate,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_role("patient")),
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("patient"))],
 ):
     try:
         doctor_id = UUID(payload.doctor_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid doctor_id")
-
-    # Optional: validate doctor exists and has role "doctor"
-    doctor = db.query(User).filter(User.user_id == doctor_id, User.role == "doctor").first()
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Doctor not found")
-
-    # For now we don't use TimeSlot granularity; we just create an appointment record.
-    appointment = Appointment(
-        patient_id=user.user_id,
-        doctor_id=doctor.user_id,
-        status=AppointmentStatus.scheduled,
-        appointment_type=payload.appointment_type,
-        fee=payload.fee,
-    )
-
-    db.add(appointment)
-    db.commit()
-    db.refresh(appointment)
-
-    return {
-        "appointment_id": str(appointment.appointment_id),
-        "status": appointment.status.value,
-    }
+        slot_id = UUID(payload.slot_id)
+        
+        appointment = BookingSkill.create_appointment(
+            db=db, 
+            requester=user,
+            patient_id=user.user_id, 
+            doctor_id=doctor_id, 
+            slot_id=slot_id,
+            appointment_type=payload.appointment_type or "General", 
+            fee=payload.fee or 0.0
+        )
+        
+        return {
+            "appointment_id": str(appointment.appointment_id),
+            "status": appointment.status.value,
+            "room_id": str(appointment.room_id),
+        }
+    except Exception as e:
+        raise ErrorHandlingSkill.handle(e)
 
 
 # Cancel
 @router.patch("/{appointment_id}/cancel")
 def cancel_appointment(
     appointment_id: str,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
-    appointment = (
-        db.query(Appointment)
-        .filter(Appointment.appointment_id == appointment_id)
-        .first()
-    )
-
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Not found")
-
-    if appointment.patient_id != user.user_id and appointment.doctor_id != user.user_id:
-        raise HTTPException(status_code=403)
-
-    appointment.status = AppointmentStatus.cancelled
-    db.commit()
-
-    return {"message": "Appointment cancelled"}
+    try:
+        BookingSkill.cancel_appointment(db, user, UUID(appointment_id))
+        return {"message": "Appointment cancelled"}
+    except Exception as e:
+        raise ErrorHandlingSkill.handle(e)
 
 
-# Reschedule (frontend sends new date/time but we only track status server-side for now)
+# Reschedule
 @router.patch("/{appointment_id}/reschedule")
-def reschedule(
+def reschedule_appointment(
     appointment_id: str,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    payload: dict,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ):
-    appointment = (
-        db.query(Appointment)
-        .filter(Appointment.appointment_id == appointment_id)
-        .first()
-    )
+    """Reschedule an existing appointment to a new date/time."""
+    try:
+        from app.skills.authorization_skill import AuthorizationSkill
+        from app.skills.validation_skill import ValidationSkill
+        from app.skills.transaction_skill import TransactionSkill
+        from app.models.appointment import Appointment
 
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Not found")
+        appointment = db.query(Appointment).filter(
+            Appointment.appointment_id == UUID(appointment_id)
+        ).first()
+        ValidationSkill.ensure_exists(appointment, "Appointment")
 
-    if appointment.patient_id != user.user_id:
-        raise HTTPException(status_code=403)
+        # Must be a participant (patient or doctor) or admin
+        AuthorizationSkill.authorize_resource_access(
+            user, [appointment.patient_id, appointment.doctor_id]
+        )
 
-    # In a more complete model we'd update slot/date/time here.
-    appointment.status = AppointmentStatus.scheduled
-    db.commit()
+        new_date = payload.get("date")  # "YYYY-MM-DD"
+        new_time = payload.get("time")  # "HH:MM AM/PM"
 
-    return {"message": "Rescheduled"}
+        if not new_date or not new_time:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Both date and time are required")
+
+        with TransactionSkill.run_transaction(db):
+            # Re-open the old slot
+            old_slot = db.query(TimeSlot).filter(
+                TimeSlot.slot_id == appointment.slot_id
+            ).first()
+            if old_slot:
+                old_slot.is_available = True
+
+            # Parse the new datetime
+            from datetime import datetime
+            try:
+                dt_str = f"{new_date} {new_time}"
+                # Handle both "09:00 AM" and "09:00" formats
+                try:
+                    new_dt = datetime.strptime(dt_str, "%Y-%m-%d %I:%M %p")
+                except ValueError:
+                    new_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+            except ValueError:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail="Invalid date/time format")
+
+            # Try to find an available slot at the new time
+            from sqlalchemy import cast, Date
+            available_slot = db.query(TimeSlot).filter(
+                TimeSlot.doctor_id == appointment.doctor_id,
+                TimeSlot.start_time == new_dt,
+                TimeSlot.is_available == True,
+            ).first()
+
+            if available_slot:
+                # Use existing slot
+                available_slot.is_available = False
+                appointment.slot_id = available_slot.slot_id
+            else:
+                # Create a new slot for the rescheduled time
+                import uuid
+                new_slot = TimeSlot(
+                    slot_id=uuid.uuid4(),
+                    doctor_id=appointment.doctor_id,
+                    start_time=new_dt,
+                    end_time=new_dt.replace(minute=new_dt.minute + 30) if new_dt.minute < 30 else new_dt.replace(hour=new_dt.hour + 1, minute=0),
+                    is_available=False,
+                )
+                db.add(new_slot)
+                db.flush()
+                appointment.slot_id = new_slot.slot_id
+
+        return {"message": "Appointment rescheduled", "appointment_id": str(appointment_id)}
+    except Exception as e:
+        raise ErrorHandlingSkill.handle(e)
 
 
 # Doctor: mark appointment completed
 @router.patch("/{appointment_id}/complete")
 def complete_appointment(
     appointment_id: str,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_role("doctor")),
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("doctor"))],
 ):
-    appointment = (
-        db.query(Appointment)
-        .filter(Appointment.appointment_id == appointment_id)
-        .first()
-    )
-
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Not found")
-
-    if appointment.doctor_id != user.user_id:
-        raise HTTPException(status_code=403)
-
-    appointment.status = AppointmentStatus.completed
-    db.commit()
-
-    return {"message": "Completed"}
-
-
-# Doctor: create slot (kept for future use)
-@router.post("/slots")
-def create_slot(
-    start_time: datetime,
-    end_time: datetime,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_role("doctor")),
-):
-    slot = TimeSlot(
-        doctor_id=user.user_id,
-        start_time=start_time,
-        end_time=end_time,
-        is_available=True,
-    )
-
-    db.add(slot)
-    db.commit()
-
-    return {"message": "slot created", "slot_id": slot.slot_id}
+    try:
+        BookingSkill.complete_appointment(db, user, UUID(appointment_id))
+        return {"message": "Completed"}
+    except Exception as e:
+        raise ErrorHandlingSkill.handle(e)

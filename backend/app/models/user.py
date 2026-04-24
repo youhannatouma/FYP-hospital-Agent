@@ -21,7 +21,6 @@ class User(Base):
     first_name = Column(Text)
     last_name = Column(Text)
     phone_number = Column(Text)
-    preferred_language = Column(Text)
 
     role = Column(Text, nullable=False)  # 'admin' | 'doctor' | 'patient'
 

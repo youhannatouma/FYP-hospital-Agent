@@ -37,6 +37,7 @@ export async function PATCH(
     const updatedUser = { ...USERS[userIndex], ...body };
     
     // In a real app, we would update DB here
+    //we have python fastapi backend, so we will send a request to update the user in the backend
     
     return NextResponse.json(updatedUser);
   } catch (error) {

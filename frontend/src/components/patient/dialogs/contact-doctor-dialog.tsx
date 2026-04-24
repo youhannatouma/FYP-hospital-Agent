@@ -223,6 +223,7 @@ export function ContactDoctorDialog({ open, onOpenChange }: ContactDoctorDialogP
         }}
         remoteName={doctor}
         role="patient"
+        roomId={`contact_${doctor.replace(/\s+/g, '_')}`}
       />
     </Dialog>
   )

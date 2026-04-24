@@ -4,7 +4,6 @@ import Link from "next/link";
 import { m } from "framer-motion";
 import { ArrowRight, Mic, Users, Star, Activity, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 
 export function HeroSection() {
@@ -111,20 +110,16 @@ export function HeroSection() {
                   <ArrowRight className="h-5 w-5" />
                 </Button>
               </Link>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-14 gap-2 border-primary/20 text-foreground px-8 text-lg font-semibold backdrop-blur-sm transition-all hover:bg-primary/5 hover:border-primary/40 active:scale-95"
-                onClick={() =>
-                  toast({
-                    title: "Initializing Clinical AI...",
-                    description: "Connecting to the medical knowledge base.",
-                  })
-                }
-              >
-                <Mic className="h-5 w-5 text-primary" />
-                Speak to AI
-              </Button>
+              <Link href="/sign-up">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-14 gap-2 border-primary/20 text-foreground px-8 text-lg font-semibold backdrop-blur-sm transition-all hover:bg-primary/5 hover:border-primary/40 active:scale-95"
+                >
+                  <Mic className="h-5 w-5 text-primary" />
+                  Speak to AI
+                </Button>
+              </Link>
             </m.div>
 
             <m.div

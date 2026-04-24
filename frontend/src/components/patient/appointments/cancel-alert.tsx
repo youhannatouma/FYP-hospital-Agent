@@ -31,7 +31,7 @@ export function CancelAppointmentAlert({ appointmentId, doctorName, onCancelled 
     try {
       const token = await getToken()
       const { booking } = useHospital()
-      await booking.cancelAppointment(appointmentId, token)
+      await booking.cancelAppointment(appointmentId, token || undefined)
 
       toast({
         title: "Appointment Cancelled",

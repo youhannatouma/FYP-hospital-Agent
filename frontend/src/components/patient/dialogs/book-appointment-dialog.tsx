@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { CalendarIcon, Clock, Sparkles, ChevronRight, User, Stethoscope } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useAuth } from "@clerk/nextjs"
+import apiClient from "@/lib/api-client"
+import { CalendarIcon, Clock, Sparkles, ChevronRight, User, Stethoscope, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -23,7 +25,22 @@ import { useToast } from "@/components/ui/use-toast"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion"
+
+
+interface Doctor {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  specialty: string | null
+  email: string
+}
+
+interface TimeSlot {
+  slot_id: string
+  start_time: string
+  end_time: string
+  time: string
+}
 
 interface BookAppointmentDialogProps {
   open: boolean
@@ -33,16 +50,72 @@ interface BookAppointmentDialogProps {
 
 export function BookAppointmentDialog({ open, onOpenChange, defaultDoctor }: BookAppointmentDialogProps) {
   const { toast } = useToast()
+  const { getToken } = useAuth()
   const [date, setDate] = useState<Date>()
-  const [time, setTime] = useState<string>()
+  const [selectedSlotId, setSelectedSlotId] = useState<string>()
   const [doctor, setDoctor] = useState(defaultDoctor || "")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false)
 
-  const handleBook = () => {
-    if (!date || !time || !doctor) {
+  const [slots, setSlots] = useState<TimeSlot[]>([])
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false)
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      if (!open) return
+      setIsLoadingDoctors(true)
+      try {
+        const token = await getToken()
+        const response = await apiClient.get("/doctors", {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        setDoctors(response.data)
+      } catch (error) {
+        console.error("Failed to fetch doctors:", error)
+        toast({
+          title: "Network Error",
+          description: "Could not retrieve clinician registry. Please try again later.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingDoctors(false)
+      }
+    }
+    fetchDoctors()
+  }, [open, getToken, toast])
+
+  // Fetch slots when doctor or date changes
+  useEffect(() => {
+    const fetchSlots = async () => {
+      if (!doctor || !date) {
+        setSlots([])
+        return
+      }
+      setIsLoadingSlots(true)
+      try {
+        const token = await getToken()
+        const dateStr = format(date, "yyyy-MM-dd")
+        const response = await apiClient.get(`/doctors/${doctor}/slots`, {
+          params: { date: dateStr },
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        setSlots(response.data)
+      } catch (error) {
+        console.error("Failed to fetch slots:", error)
+      } finally {
+        setIsLoadingSlots(false)
+      }
+    }
+    fetchSlots()
+  }, [doctor, date, getToken])
+
+  const handleBook = async () => {
+    if (!date || !selectedSlotId || !doctor) {
       toast({
         title: "Missing Information",
-        description: "Please select a doctor, date, and time.",
+        description: "Please select a doctor, date, and time slot.",
         variant: "destructive",
       })
       return
@@ -50,19 +123,52 @@ export function BookAppointmentDialog({ open, onOpenChange, defaultDoctor }: Boo
 
     setIsSubmitting(true)
 
-    // Mock API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      const token = await getToken()
+      const response = await apiClient.post(
+        "/appointments/bookings",
+        {
+          doctor_id: doctor,
+          slot_id: selectedSlotId,
+          day: format(date, "yyyy-MM-dd"),
+          time: slots.find(s => s.slot_id === selectedSlotId)?.time || "",
+          appointment_type: "Video Consultation",
+          fee: 150.0,
+          is_virtual: true,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+
       onOpenChange(false)
+
+      const selectedDoc = doctors.find((d) => d.id === doctor)
+      const selectedSlot = slots.find(s => s.slot_id === selectedSlotId)
+      const doctorLabel = selectedDoc
+        ? `Dr. ${selectedDoc.first_name} ${selectedDoc.last_name}`
+        : "your specialist"
+
       toast({
         title: "Appointment Booked!",
-        description: `Your appointment with ${doctor} is confirmed for ${format(date, "MMM d, yyyy")} at ${time}.`,
+        description: `Your appointment with ${doctorLabel} is confirmed for ${format(date, "MMM d, yyyy")} at ${selectedSlot?.time}.`,
       })
+
       // Reset form
       setDate(undefined)
-      setTime(undefined)
+      setSelectedSlotId(undefined)
       if (!defaultDoctor) setDoctor("")
-    }, 1000)
+    } catch (error: any) {
+      console.error("Booking failed:", error)
+      toast({
+        title: "Booking Failed",
+        description:
+          error.response?.data?.detail || "Could not complete the booking. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -102,30 +208,33 @@ export function BookAppointmentDialog({ open, onOpenChange, defaultDoctor }: Boo
                     <SelectValue placeholder="Identify specialist" />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-border/50 shadow-2xl">
-                    <SelectItem value="Dr. Michael Chen" className="rounded-xl font-bold py-3">
-                      <div className="flex flex-col">
-                        <span>Dr. Michael Chen</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Cardiology</span>
+                    {isLoadingDoctors ? (
+                      <div className="flex flex-col items-center justify-center py-8 gap-3">
+                        <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                        <span className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Synchronizing registry...</span>
                       </div>
-                    </SelectItem>
-                    <SelectItem value="Dr. Emily Watson" className="rounded-xl font-bold py-3">
-                      <div className="flex flex-col">
-                        <span>Dr. Emily Watson</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">General Practice</span>
+                    ) : doctors.length === 0 ? (
+                      <div className="py-8 text-center">
+                        <span className="text-xs font-bold text-muted-foreground italic">No available specialists identified.</span>
                       </div>
-                    </SelectItem>
-                    <SelectItem value="Dr. Sarah Kim" className="rounded-xl font-bold py-3">
-                      <div className="flex flex-col">
-                        <span>Dr. Sarah Kim</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Dermatology</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="Dr. Raj Patel" className="rounded-xl font-bold py-3">
-                      <div className="flex flex-col">
-                        <span>Dr. Raj Patel</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Endocrinology</span>
-                      </div>
-                    </SelectItem>
+                    ) : (
+                      doctors.map((doc) => (
+                        <SelectItem 
+                          key={doc.id} 
+                          value={doc.id} 
+                          className="rounded-xl font-bold py-3"
+                        >
+                          <div className="flex flex-col text-left">
+                            <span className="leading-tight">
+                              Dr. {doc.first_name} {doc.last_name}
+                            </span>
+                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
+                              {doc.specialty || "Medical Specialist"}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -167,14 +276,29 @@ export function BookAppointmentDialog({ open, onOpenChange, defaultDoctor }: Boo
                   <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                     <Clock className="h-3 w-3" /> Availability
                   </label>
-                  <Select value={time} onValueChange={setTime}>
+                  <Select value={selectedSlotId} onValueChange={setSelectedSlotId}>
                     <SelectTrigger className="h-14 rounded-2xl border-border/50 bg-background/50 font-bold text-sm shadow-subtle focus:ring-primary/20 transition-all">
-                      <SelectValue placeholder="Identify slot" />
+                      <SelectValue placeholder={!doctor || !date ? "Select doctor & date first" : "Identify slot"} />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-border/50 shadow-2xl">
-                      {["09:00 AM", "10:00 AM", "11:30 AM", "01:00 PM", "02:30 PM", "04:00 PM"].map((t) => (
-                        <SelectItem key={t} value={t} className="rounded-xl font-bold py-3">{t}</SelectItem>
-                      ))}
+                      {isLoadingSlots ? (
+                        <div className="flex flex-col items-center justify-center py-6 gap-2">
+                          <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                          <span className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Checking slots...</span>
+                        </div>
+                      ) : slots.length === 0 ? (
+                        <div className="py-6 text-center">
+                          <span className="text-xs font-bold text-muted-foreground italic">
+                            {!doctor || !date ? "Pending selection" : "No slots available"}
+                          </span>
+                        </div>
+                      ) : (
+                        slots.map((s) => (
+                          <SelectItem key={s.slot_id} value={s.slot_id} className="rounded-xl font-bold py-3">
+                            {s.time}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

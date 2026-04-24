@@ -9,6 +9,8 @@ export function useHospital() {
     booking: managers.booking,
     admin: managers.admin,
     payment: managers.payment,
+    medicalRecords: managers.medicalRecords,
+    stats: managers.stats,
     
     /**
      * Helper to wrap any action with logging or agent hooks.

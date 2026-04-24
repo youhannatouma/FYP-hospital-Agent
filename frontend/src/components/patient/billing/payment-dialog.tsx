@@ -40,7 +40,7 @@ export function PaymentDialog({
     setStep("processing")
     try {
       const token = await getToken()
-      const success = await payment.processPayment(invoice.patientDue, invoice.id, token)
+      const success = await payment.processPayment(invoice.patientDue, invoice.id, token || undefined)
       if (success) {
         setStep("success")
       } else {

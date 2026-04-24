@@ -1,47 +1,63 @@
-import { NextResponse } from 'next/server';
-import { USERS, User } from '@/lib/hospital-data-manifest';
+import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+
+const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const role = searchParams.get('role');
-  
-  let filteredUsers = USERS;
-  
-  if (role) {
-    filteredUsers = USERS.filter(user => user.role.toLowerCase() === role.toLowerCase());
+  try {
+    const { getToken } = await auth();
+    const token = await getToken();
+    const { searchParams } = new URL(request.url);
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Proxy to FastAPI backend
+    const res = await fetch(`${BACKEND}/users/?${searchParams}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error("[users GET] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch users" },
+      { status: 500 },
+    );
   }
-  
-  return NextResponse.json(filteredUsers);
 }
 
-export async function POST(request: Request) {
+export async function PATCH(request: Request) {
   try {
+    const { getToken } = await auth();
+    const token = await getToken();
     const body = await request.json();
-    
-    // Validate required fields
-    if (!body.email || !body.name || !body.role) {
-      return NextResponse.json(
-        { error: 'Missing required fields: email, name, role' },
-        { status: 400 }
-      );
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      joined: new Date().toISOString(),
-      status: 'Pending',
-      lastActive: 'Just now',
-      ...body
-    };
-    
-    // In a real app, we would save to DB here
-    // For mock, we just return the new user as if it was created
-    
-    return NextResponse.json(newUser, { status: 201 });
+
+    // Proxy to FastAPI backend - update current user
+    const res = await fetch(`${BACKEND}/users/me`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
+    console.error("[users PATCH] Error:", error);
     return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
+      { error: "Failed to update user" },
+      { status: 500 },
     );
   }
 }

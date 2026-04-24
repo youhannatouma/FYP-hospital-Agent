@@ -1,45 +1,69 @@
-import { NextResponse } from 'next/server';
-import { MEDICAL_RECORDS, MedicalRecord } from '@/lib/hospital-data-manifest';
+import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+
+const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const records = MEDICAL_RECORDS.filter(rec => rec.patientId === id);
-  
-  return NextResponse.json(records);
+  try {
+    const { getToken } = await auth();
+    const token = await getToken();
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Proxy to FastAPI backend - get medical records
+    // Use /my endpoint for current user's records
+    const res = await fetch(`${BACKEND}/medical-records/my`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error("[patient records GET] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch medical records" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = await params;
+    const { getToken } = await auth();
+    const token = await getToken();
     const body = await request.json();
-    
-    // Validate required fields
-    if (!body.doctorId || !body.date || !body.diagnosis) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
-    const newRecord: MedicalRecord = {
-      id: `REC-${Date.now()}`,
-      patientId: id,
-      patientName: "Unknown", // In real app, fetch from DB
-      status: 'Active',
-      ...body
-    };
-    
-    return NextResponse.json(newRecord, { status: 201 });
+
+    // Proxy to FastAPI backend
+    const res = await fetch(`${BACKEND}/medical-records/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
+    console.error("[patient records POST] Error:", error);
     return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
+      { error: "Failed to create medical record" },
+      { status: 500 },
     );
   }
 }

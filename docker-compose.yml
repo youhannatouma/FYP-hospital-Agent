@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18
+    image: postgres:16
     container_name: myapp_db
     env_file:
       - backend/.env
@@ -9,6 +9,7 @@ services:
       POSTGRES_USER: "postgres"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5433:5432"
     healthcheck:
@@ -37,6 +38,9 @@ services:
       DB_HOST: "db"
       DB_PORT: "5432"
       DB_NAME: "FYP"
+      CLERK_SECRET_KEY: "${CLERK_SECRET_KEY}"
+      CLERK_JWKS_URL: "https://allowing-hamster-30.clerk.accounts.dev/.well-known/jwks.json"
+      CORS_ORIGINS: "http://localhost:3000"
       GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
       LANGSMITH_API_KEY: "${LANGSMITH_API_KEY}"
       LANGSMITH_TRACING_V2: "${LANGSMITH_TRACING_V2}"
@@ -45,14 +49,16 @@ services:
       MEMORY_SNAPSHOT_PATH: "data/memory_snapshot.json"
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
+    # volumes:
+    #   - ./backend:/app
     networks:
       - appnet
 
   frontend:
     build: ./frontend
     container_name: myapp_frontend
+    env_file:
+      - frontend/.env.local
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -61,7 +67,8 @@ services:
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_URL: "http://backend:8000"
+      # Browser fetches from localhost:8000 (not Docker internal hostname)
+      NEXT_PUBLIC_API_URL: "http://localhost:8000/api"
     networks:
       - appnet
 

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import Image from "next/image"
 import { X } from "lucide-react"
 import ThreeAvatar from "./ThreeAvatar"
 
@@ -35,7 +34,7 @@ export function FloatingAvatar() {
       }
       longPressTimer.current = setTimeout(() => {
         setIsDragging(true)
-      }, 300)
+      }, 35)
     },
     [],
   )
@@ -176,12 +175,6 @@ export function FloatingAvatar() {
         <div className="absolute right-0 bottom-0 h-4 w-4 rounded-full border-2 border-card bg-emerald-500 shadow-sm shadow-emerald-500/50" />
       </div>
 
-      {/* Close hint when expanded */}
-      {expanded && (
-        <div className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border shadow-md">
-          <X className="h-3 w-3 text-muted-foreground" />
-        </div>
-      )}
     </div>
   )
 }

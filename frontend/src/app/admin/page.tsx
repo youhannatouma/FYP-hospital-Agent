@@ -24,6 +24,7 @@ import {
   Brain,
   BarChart3
 } from "lucide-react"
+import { Stethoscope } from "lucide-react"
 import { m } from "framer-motion"
 
 import { useToast } from "@/hooks/use-toast"
@@ -36,6 +37,7 @@ import { HealthTrends } from "@/components/admin/health-trends"
 
 export default function AdminDashboard() {
   const { admin } = useHospital()
+  const { getToken } = useAuth()
   const { toast } = useToast()
   const [dynamicStats, setDynamicStats] = React.useState<any>(null)
   const [pendingApprovals, setPendingApprovals] = React.useState([
@@ -107,7 +109,7 @@ export default function AdminDashboard() {
   React.useEffect(() => {
     const fetchStats = async () => {
       const token = await getToken()
-      const data = await admin.getStats(token)
+      const data = await admin.getStats(token ?? undefined)
       setDynamicStats(data)
       // If we had a real API for pending approvals:
       // const approvals = await admin.getPendingApprovals()
