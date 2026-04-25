@@ -1,38 +1,17 @@
 "use client"
 
-import { Pill, RefreshCw, ChevronRight, AlertCircle, Info } from "lucide-react"
+import { Pill, AlertCircle} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
-import { useState, useEffect } from "react"
-import { apiClient } from "@/lib/api-client"
-import { useAuth } from "@clerk/nextjs"
 import { Loader2 } from "lucide-react"
+import { usePrescriptions } from "@/hooks/use-prescriptions"
 
 export function CurrentMedications() {
-  const { getToken } = useAuth()
-  const [medications, setMedications] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchPrescriptions = async () => {
-      try {
-        const token = await getToken()
-        const response = await apiClient.get("/prescriptions/my", {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        setMedications(response.data)
-      } catch (error) {
-        console.error("Failed to fetch prescriptions:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchPrescriptions()
-  }, [getToken])
+  const { prescriptions: medications, loading: isLoading } = usePrescriptions()
 
   return (
     <div className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden h-full flex flex-col">

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { apiClient } from "@/lib/api-client";
+import { getServiceContainer } from "@/lib/services/service-container";
 import {
   User,
   MapPin,
@@ -63,6 +63,26 @@ export default function PatientOnboarding() {
   const { toast } = useToast();
   const [step, setStep] = React.useState(3);
   const [progress, setProgress] = React.useState(25);
+
+  // Check if user already has completed onboarding (has patient role)
+  React.useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    const role = user.publicMetadata?.role as string | undefined;
+    
+    // If user already has patient role, they've completed onboarding
+    // Redirect them directly to patient dashboard
+    if (role === "patient") {
+      router.replace("/patient");
+      return;
+    }
+
+    // If user is a doctor, redirect them away
+    if (role === "doctor") {
+      router.replace("/doctor");
+      return;
+    }
+  }, [isLoaded, user, router]);
 
   // Form State
   const [formData, setFormData] = React.useState({
@@ -699,7 +719,8 @@ export default function PatientOnboarding() {
                         ],
                       };
 
-                      await apiClient.patch("/users/me", profileUpdate);
+                      const container = getServiceContainer();
+                      await container.user.updateProfile(profileUpdate);
 
                       // 2. Set role in Clerk metadata
                       const roleRes = await fetch("/api/v1/set-role", {

@@ -1,14 +1,26 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
-import apiClient from "@/lib/api-client";
+"use client";
 
+import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { getServiceContainer } from "@/lib/services/service-container";
+import {
+  Doctor,
+  TimeSlot,
+} from "@/lib/services/repositories/doctor-repository";
+
+/**
+ * useDoctors Hook
+ * Follows: Single Responsibility Principle (SRP)
+ * - Only handles state and effects
+ * - Delegates data fetching to DoctorRepository
+ */
 export function useDoctors(specialty?: string) {
   const { isLoaded, isSignedIn } = useAuth();
-  const [doctors, setDoctors] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDoctors = async () => {
+  const fetchDoctors = useCallback(async () => {
     if (!isLoaded || !isSignedIn) {
       setLoading(false);
       return;
@@ -16,11 +28,9 @@ export function useDoctors(specialty?: string) {
 
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (specialty) params.append("specialty", specialty);
-
-      const res = await apiClient.get(`/doctors/?${params.toString()}`);
-      setDoctors(res.data || []);
+      const container = getServiceContainer();
+      const data = await container.doctor.getAvailableDoctors(specialty);
+      setDoctors(data || []);
       setError(null);
     } catch (err: any) {
       setError(err.message || "Failed to fetch doctors");
@@ -28,11 +38,11 @@ export function useDoctors(specialty?: string) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isLoaded, isSignedIn, specialty]);
 
   useEffect(() => {
     fetchDoctors();
-  }, [isLoaded, isSignedIn, specialty]);
+  }, [fetchDoctors]);
 
   return {
     doctors,
@@ -42,9 +52,13 @@ export function useDoctors(specialty?: string) {
   };
 }
 
+/**
+ * useDoctorById Hook
+ * Follows: Single Responsibility Principle (SRP)
+ */
 export function useDoctorById(doctorId?: string) {
   const { isLoaded, isSignedIn } = useAuth();
-  const [doctor, setDoctor] = useState<any | null>(null);
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(!!doctorId);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,8 +71,9 @@ export function useDoctorById(doctorId?: string) {
     const fetchDoctor = async () => {
       setLoading(true);
       try {
-        const res = await apiClient.get(`/doctors/${doctorId}`);
-        setDoctor(res.data || null);
+        const container = getServiceContainer();
+        const data = await container.doctor.getDoctorById(doctorId);
+        setDoctor(data || null);
         setError(null);
       } catch (err: any) {
         setError(err.message || "Failed to fetch doctor");
@@ -74,9 +89,13 @@ export function useDoctorById(doctorId?: string) {
   return { doctor, loading, error };
 }
 
+/**
+ * useDoctorAvailability Hook
+ * Follows: Single Responsibility Principle (SRP)
+ */
 export function useDoctorAvailability(doctorId?: string, date?: string) {
   const { isLoaded, isSignedIn } = useAuth();
-  const [slots, setSlots] = useState<any[]>([]);
+  const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(!!doctorId);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,13 +108,12 @@ export function useDoctorAvailability(doctorId?: string, date?: string) {
     const fetchSlots = async () => {
       setLoading(true);
       try {
-        const params = new URLSearchParams();
-        if (date) params.append("date", date);
-
-        const res = await apiClient.get(
-          `/doctors/${doctorId}/slots?${params.toString()}`,
+        const container = getServiceContainer();
+        const data = await container.doctor.getTimeSlots(
+          doctorId,
+          date || new Date().toISOString().split("T")[0],
         );
-        setSlots(res.data || []);
+        setSlots(data || []);
         setError(null);
       } catch (err: any) {
         setError(err.message || "Failed to fetch availability");

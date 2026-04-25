@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Bot, ChevronRight, Stethoscope, Sparkles, ShieldAlert, Activity, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +22,7 @@ interface AiSymptomDialogProps {
 }
 
 export function AiSymptomDialog({ open, onOpenChange, initialSymptom = "" }: AiSymptomDialogProps) {
+  const router = useRouter()
   const [analyzing, setAnalyzing] = useState(true)
   const [complete, setComplete] = useState(false)
 
@@ -165,7 +167,10 @@ export function AiSymptomDialog({ open, onOpenChange, initialSymptom = "" }: AiS
             </Button>
             {complete && (
               <Button 
-                onClick={() => handleOpenChange(false)} 
+                onClick={() => {
+                  handleOpenChange(false)
+                  router.push('/patient/appointments')
+                }} 
                 className={cn(
                   "h-12 flex-1 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-primary font-black text-[10px] uppercase tracking-widest shadow-glow transition-all active:scale-95 flex items-center gap-2"
                 )}

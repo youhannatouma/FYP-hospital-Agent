@@ -28,40 +28,7 @@ interface Notification {
   type: NotificationType
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: "1",
-    type: "appointment",
-    title: "Appointment Confirmed",
-    description: "Your appointment with Dr. Smith is confirmed for tomorrow at 10:00 AM.",
-    time: "2 hours ago",
-    unread: true,
-  },
-  {
-    id: "2",
-    type: "message",
-    title: "New Message",
-    description: "Dr. Adams sent you a new message regarding your recovery plan.",
-    time: "5 hours ago",
-    unread: true,
-  },
-  {
-    id: "3",
-    type: "lab",
-    title: "Lab Results Ready",
-    description: "Your recent blood test results are now available for review.",
-    time: "1 day ago",
-    unread: false,
-  },
-  {
-    id: "4",
-    type: "appointment",
-    title: "Appointment Reminder",
-    description: "Reminder: You have a follow-up session in 3 days.",
-    time: "2 days ago",
-    unread: false,
-  },
-]
+import { useNotifications } from "@/hooks/use-notifications"
 
 const getIcon = (type: NotificationType) => {
   switch (type) {
@@ -78,12 +45,7 @@ const getIcon = (type: NotificationType) => {
 }
 
 export function NotificationsDropdown() {
-  const [notifications, setNotifications] = React.useState<Notification[]>(MOCK_NOTIFICATIONS)
-  const unreadCount = notifications.filter((n) => n.unread).length
-
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
-  }
+  const { notifications, unreadCount, markAllAsRead } = useNotifications()
 
   return (
     <DropdownMenu>
@@ -125,7 +87,7 @@ export function NotificationsDropdown() {
                   key={notification.id}
                   className={cn(
                     "flex flex-col items-start gap-1 p-3 cursor-pointer focus:bg-accent/50",
-                    notification.unread && "bg-primary/5 focus:bg-primary/10"
+                    !notification.is_read && "bg-primary/5 focus:bg-primary/10"
                   )}
                   asChild
                 >
@@ -133,27 +95,27 @@ export function NotificationsDropdown() {
                     <div className="flex w-full items-start gap-3">
                       <div className={cn(
                         "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full shrink-0",
-                        notification.unread ? "bg-primary/10" : "bg-muted"
+                        !notification.is_read ? "bg-primary/10" : "bg-muted"
                       )}>
-                        {getIcon(notification.type)}
+                        {getIcon(notification.type as NotificationType)}
                       </div>
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center justify-between">
                           <p className={cn(
                             "text-sm font-semibold leading-none",
-                            notification.unread ? "text-foreground" : "text-muted-foreground"
+                            !notification.is_read ? "text-foreground" : "text-muted-foreground"
                           )}>
                             {notification.title}
                           </p>
                           <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
-                            {notification.time}
+                            {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                          {notification.description}
+                          {notification.message}
                         </p>
                       </div>
-                      {notification.unread && (
+                      {!notification.is_read && (
                         <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                       )}
                     </div>

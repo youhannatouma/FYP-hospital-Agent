@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { apiClient } from "@/lib/api-client";
+import { getServiceContainer } from "@/lib/services/service-container";
 import * as React from "react";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
@@ -27,10 +27,11 @@ export function AppointmentsTable({ onSelectAppointment }: AppointmentsTableProp
     const fetchAppointments = async () => {
       try {
         setIsLoading(true);
-        const response = await apiClient.get('/appointments/doctor');
-        setAppointments(response.data);
+        const container = getServiceContainer();
+        const data = await container.appointment.getDoctorAppointments();
+        setAppointments(data);
       } catch (error) {
-        console.error('Failed to fetch doctor appointments', error);
+        console.error('[AppointmentsTable] Failed to fetch doctor appointments:', error);
       } finally {
         setIsLoading(false);
       }

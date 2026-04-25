@@ -23,20 +23,38 @@ import {
 import { Plus, Send } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
-import { useDataStore } from "@/hooks/use-data-store"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
+import React from "react"
+import { getServiceContainer } from "@/lib/services/service-container"
 
 export function NewMessageDialog() {
   const { toast } = useToast()
-  const { getDoctors, addMessage } = useDataStore()
+  const { getToken } = useAuth()
+  const { booking } = useHospital()
   const [open, setOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("")
   const [subject, setSubject] = useState("")
   const [content, setContent] = useState("")
+  const [doctors, setDoctors] = useState<any[]>([])
 
-  const doctors = getDoctors()
+  React.useEffect(() => {
+    if (open) {
+      const fetchDoctors = async () => {
+        try {
+          const token = await getToken()
+          const docs = await booking.getAvailableDoctors(undefined, token || undefined)
+          setDoctors(docs || [])
+        } catch (e) {
+          console.error("Failed to fetch doctors", e)
+        }
+      }
+      fetchDoctors()
+    }
+  }, [open, booking, getToken])
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!selectedDoctorId || !subject || !content) {
       toast({
         title: "Incomplete Form",
@@ -46,25 +64,17 @@ export function NewMessageDialog() {
       return
     }
 
-    const doctor = doctors.find((d: any) => d.id === selectedDoctorId)
+    const doctor = doctors.find((d: any) => (d.id || d.user_id) === selectedDoctorId)
     if (!doctor) return
 
     setSending(true)
 
-    // Patient ID for Sarah Johnson
-    const patientId = "pat-1"
-    const patientName = "Sarah Johnson"
-
     try {
-      addMessage({
-        senderId: patientId,
-        senderName: patientName,
-        senderRole: 'Patient',
-        receiverId: doctor.id,
-        receiverName: doctor.name,
+      const container = getServiceContainer()
+      await container.message.sendMessage({
+        receiver_id: selectedDoctorId,
         subject,
-        content,
-        category: 'Medical',
+        body: content
       })
 
       setSending(false)
@@ -75,7 +85,7 @@ export function NewMessageDialog() {
 
       toast({
         title: "Message Sent",
-        description: `Your secure message has been delivered to ${doctor.name}.`,
+        description: `Your secure message has been delivered to ${doctor.name || doctor.first_name}.`,
       })
     } catch (error) {
       setSending(false)
@@ -112,8 +122,8 @@ export function NewMessageDialog() {
               </SelectTrigger>
               <SelectContent>
                 {doctors.map((doc: any) => (
-                  <SelectItem key={doc.id} value={doc.id}>
-                    {doc.name} - {doc.specialty}
+                  <SelectItem key={doc.id || doc.user_id} value={doc.id || doc.user_id}>
+                    {doc.name || `${doc.first_name} ${doc.last_name}`} - {doc.specialty || 'General'}
                   </SelectItem>
                 ))}
               </SelectContent>

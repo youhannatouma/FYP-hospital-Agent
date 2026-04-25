@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
-from app.models import user, appointment, time_slot
-from app.routes import auth, users, appointments, doctors, payments, admin, medical_records, prescriptions, notifications
+from app.models import user, appointment, time_slot, message
+from app.routes import auth, users, appointments, doctors, payments, admin, medical_records, prescriptions, notifications, messages
 
 log = logging.getLogger("hospital")
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 async def lifespan(app: FastAPI):
     """Startup / shutdown hooks."""
     # ── Create tables ──────────────────────────────────────────────────────
-    from app.models import user, appointment, time_slot, medical_record, prescription, notification
+    from app.models import user, appointment, time_slot, medical_record, prescription, notification, message
     Base.metadata.create_all(bind=engine)
     log.info("Database tables ensured.")
 
@@ -75,6 +75,7 @@ api_router.include_router(admin.router)
 api_router.include_router(medical_records.router)
 api_router.include_router(prescriptions.router)
 api_router.include_router(notifications.router)
+api_router.include_router(messages.router)
 
 app.include_router(api_router)
 app.mount("/ws", sio_app)

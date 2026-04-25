@@ -32,17 +32,15 @@ export function PharmacyOrderDialog({
 
   const handleOrder = () => {
     setIsSubmitting(true)
-
-    // Mock API
     setTimeout(() => {
       setIsSubmitting(false)
       onOpenChange(false)
       toast({
-        title: "Order Placed Successfully",
-        description: `Your medications will be ready for ${method === "pickup" ? "pickup at" : "delivery from"} ${pharmacy.name}.`,
+        title: "Feature Coming Soon",
+        description: "The Pharmacy API integration is currently under development. Please check back later.",
+        variant: "default"
       })
-      setMethod("pickup")
-    }, 1000)
+    }, 500)
   }
 
   return (

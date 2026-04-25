@@ -1,9 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useAuth } from "@clerk/nextjs"
-import { useRouter } from "next/navigation"
-import { apiClient } from "@/lib/api-client"
 import { Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,34 +7,16 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { m, AnimatePresence } from "framer-motion"
 import { ChevronRight, Stethoscope, FileText, AlertTriangle, ChevronDown } from "lucide-react"
-import { useHospital } from "@/hooks/use-hospital"
+import { useMedicalRecords } from "@/hooks/use-medical-records"
 import { cn } from "@/lib/utils"
 
 const filterTabs = ["All", "Consultation", "Lab Result", "Surgery"]
 
 export function MedicalHistoryTimeline() {
   const { toast } = useToast()
-  const { getToken } = useAuth()
   const router = useRouter()
-  const { medicalRecords } = useHospital()
+  const { records, loading: isLoading } = useMedicalRecords()
   const [activeFilter, setActiveFilter] = useState("All")
-  const [records, setRecords] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchRecords = async () => {
-      try {
-        const token = await getToken()
-        const data = await medicalRecords.getMyRecords(token || undefined)
-        setRecords(data)
-      } catch (error) {
-        console.error("Failed to fetch records:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchRecords()
-  }, [getToken, medicalRecords])
 
   const handleViewDetails = (recordId: string, title: string) => {
     toast({

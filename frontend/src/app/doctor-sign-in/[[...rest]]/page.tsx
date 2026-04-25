@@ -61,7 +61,7 @@ export default function DoctorSignInPage() {
           <SignIn
             path="/doctor-sign-in"
             routing="path"
-            forceRedirectUrl="/onboarding"
+            forceRedirectUrl="/doctor"
             appearance={{
               elements: {
                 formButtonPrimary:
