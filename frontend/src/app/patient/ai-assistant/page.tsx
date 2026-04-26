@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import apiClient from "@/lib/api-client"
+import { getServiceContainer } from "@/lib/services/service-container"
 import {
   Bot,
   Send,
@@ -87,12 +87,12 @@ export default function AIAssistantPage() {
     setIsTyping(true)
 
     try {
-      // Future: Replace with actual AI endpoint
-      const response = await apiClient.post('/ai/chat', { message: content });
+      const container = getServiceContainer();
+      const response = await container.ai.chat({ message: content });
       const aiMessage: ChatMessage = {
         id: messages.length + 2,
         role: "assistant",
-        content: response.data.reply,
+        content: response.reply || response.message || "I couldn't process that request.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       }
       setMessages((prev) => [...prev, aiMessage]);

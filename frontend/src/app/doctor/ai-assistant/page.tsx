@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Bot, Send, User, Sparkles, Stethoscope, FlaskConical, FileText, CalendarDays } from "lucide-react"
-import apiClient from "@/lib/api-client"
+import { getServiceContainer } from "@/lib/services/service-container"
 
 interface ChatMessage {
   id: number
@@ -65,11 +65,12 @@ export default function DoctorAIAssistantPage() {
     setIsTyping(true)
 
     try {
-      const response = await apiClient.post('/ai/chat', {
+      const container = getServiceContainer();
+      const response = await container.ai.chat({
         message: content.trim(),
         context: 'doctor',
       })
-      const reply = response.data?.reply || response.data?.message || "I couldn't process that request."
+      const reply = response.reply || response.message || "I couldn't process that request."
       setMessages((prev) => [...prev, {
         id: Date.now() + 1,
         role: "assistant",

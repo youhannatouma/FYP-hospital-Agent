@@ -51,18 +51,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 
-const MOCK_USERS = [
-  { id: "1", name: "Sarah Johnson", email: "sarah.j@example.com", role: "Patient", status: "Active", joined: "Jan 12, 2024", lastActive: "2 hours ago" },
-  { id: "2", name: "Dr. Michael Smith", email: "m.smith@med.com", role: "Doctor", status: "Active", joined: "Feb 05, 2024", lastActive: "1 day ago", verified: true },
-  { id: "3", name: "PharmaPlus North", email: "contact@pharmaplus.com", role: "Pharmacy", status: "Pending", joined: "Feb 08, 2024", lastActive: "Never" },
-  { id: "4", name: "Robert Wilson", email: "r.wilson@mail.com", role: "Patient", status: "Suspended", joined: "Dec 15, 2023", lastActive: "2 weeks ago" },
-  { id: "5", name: "Dr. Elena Popova", email: "e.popova@clinic.org", role: "Doctor", status: "Active", joined: "Jan 28, 2024", lastActive: "5 hours ago", verified: true },
-]
 
-const MOCK_DISPUTES = [
-  { id: "D-101", reporter: "Sarah Johnson", subject: "Overcharged for consultation", against: "Dr. Michael Smith", date: "Feb 09, 2024", status: "Open" },
-  { id: "D-102", reporter: "Robert Wilson", subject: "Rude behavior", against: "PharmaPlus North", date: "Feb 07, 2024", status: "Resolved" },
-]
 
 import { useHospital } from "@/hooks/use-hospital"
 import { useAuth } from "@clerk/nextjs"
@@ -86,9 +75,26 @@ export default function UserManagementPage() {
   const loadUsers = React.useCallback(async () => {
     setLoading(true)
     const token = await getToken()
-    const data = await admin.getAllUsers(token || undefined)
-    setUsers(data || [])
-    setLoading(false)
+    try {
+      const data = await admin.getAllUsers(token || undefined)
+      if (Array.isArray(data)) {
+        const mappedUsers = data.map((u: any) => ({
+          id: u.user_id,
+          name: `${u.first_name} ${u.last_name}`,
+          email: u.email,
+          role: u.role ? u.role.charAt(0).toUpperCase() + u.role.slice(1) : "Unknown",
+          status: u.status || "Active",
+          joined: u.created_at ? new Date(u.created_at).toLocaleDateString() : "Unknown",
+          lastActive: "Recent", // Requires proper last_login tracking in backend
+          verified: true
+        }))
+        setUsers(mappedUsers)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
   }, [admin, getToken])
 
   React.useEffect(() => {
@@ -336,40 +342,11 @@ export default function UserManagementPage() {
 
         <TabsContent value="disputes" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {MOCK_DISPUTES.map((dispute) => (
-              <Card key={dispute.id} className="border-border/50 bg-card/50">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="text-[10px] uppercase font-bold">
-                      Case #{dispute.id}
-                    </Badge>
-                    <Badge className={dispute.status === "Open" ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500"}>
-                      {dispute.status}
-                    </Badge>
-                  </div>
-                  <CardTitle className="mt-2">{dispute.subject}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Reporter</p>
-                      <p className="font-bold">{dispute.reporter}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted-foreground">Against</p>
-                      <p className="font-bold">{dispute.against}</p>
-                    </div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/40 text-xs text-muted-foreground italic">
-                    "The consultation ended 15 minutes early and I was still charged the full $120. I'd like a partial refund if possible."
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <Button size="sm" variant="outline" className="flex-1">Review Chat Logs</Button>
-                    <Button size="sm" className="flex-1 bg-primary text-primary-foreground">Mediate Case</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground w-full col-span-full opacity-60">
+              <AlertCircle className="h-10 w-10 mb-4" />
+              <p className="font-bold uppercase tracking-widest text-sm">Dispute Module Offline</p>
+              <p className="text-xs mt-2 max-w-md">The dispute resolution system is currently being integrated with the new clinical operations core. Check back later.</p>
+            </div>
           </div>
         </TabsContent>
       </Tabs>

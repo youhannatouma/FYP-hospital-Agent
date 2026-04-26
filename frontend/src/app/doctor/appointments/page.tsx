@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
-import { useHospital } from "@/hooks/use-hospital"
-import { useAuth } from "@clerk/nextjs"
+import { getServiceContainer } from "@/lib/services/service-container"
 import {
   CalendarDays,
   Video,
@@ -30,31 +29,6 @@ import { CompleteSessionDialog } from "@/components/doctor/dialogs/complete-sess
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
-// ─── Mock patient records (will load from API) ────────────────────────────────
-const MOCK_PATIENT_RECORDS: Record<string, MedicalRecord> = {
-  "Sarah Johnson": {
-    id: "1",
-    patientId: "P-1842",
-    name: "Sarah Johnson",
-    lastVisit: "2024-01-25",
-    diagnosis: "Hyperlipidemia",
-    status: "Active",
-    age: 42,
-    gender: "Female",
-    bloodType: "O+",
-    phone: "(555) 123-4455",
-    email: "sarah.j@example.com",
-    address: "789 Pine Rd, Springfield",
-    height: 165,
-    weight: 68,
-    bloodPressure: "135/85",
-    heartRate: 74,
-    temperature: 36.6,
-    medications: ["Atorvastatin 20mg"],
-    treatmentPlan: "Daily statin, low cholesterol diet, and regular exercise.",
-    notes: "Patient shows good progress but requires regular lipid panel monitoring.",
-  },
-}
 
 // Helper to get status styles for the badge
 const getStatusStyles = (status: string) => {
@@ -85,13 +59,9 @@ export default function DoctorAppointmentsPage() {
   // ── Appointment list ─────────────────────────────────────────────────────────
   const [appointmentList, setAppointmentList] = React.useState<any[]>([])
 
-  const { booking } = useHospital()
-  const { getToken } = useAuth()
-
-  // Load appointments from API on mount
   const load = React.useCallback(async () => {
-    const token = await getToken()
-    const data = await booking.getDoctorAppointments(token || undefined)
+    const container = getServiceContainer()
+    const data = await container.appointment.getDoctorAppointments()
     if (Array.isArray(data)) {
       const ui = data.map((a: any) => {
         // Normalize status: backend returns 'scheduled'/'completed'/'cancelled'
@@ -120,7 +90,7 @@ export default function DoctorAppointmentsPage() {
       })
       setAppointmentList(ui)
     }
-  }, [booking, getToken])
+  }, [])
 
   React.useEffect(() => {
     load()
@@ -139,18 +109,37 @@ export default function DoctorAppointmentsPage() {
     setAppointmentList((prev) => [newAppt, ...prev])
   }
 
-  // Open patient record dialog
-  const handleViewPatient = (patientName: string) => {
-    const record = MOCK_PATIENT_RECORDS[patientName] || {
-      id: Math.random().toString(),
-      name: patientName,
-      patientId: `P-${Math.floor(Math.random() * 9000) + 1000}`,
-      lastVisit: new Date().toISOString().split("T")[0],
-      diagnosis: "New Patient",
-      status: "Active",
+  const handleViewPatient = async (patientId: string, patientName: string) => {
+    try {
+      const container = getServiceContainer()
+      const users = await container.user.getAllUsers()
+      const patientData = users.find((u: any) => u.user_id === patientId)
+      
+      const record = {
+        id: patientId || Math.random().toString(),
+        name: patientName,
+        patientId: patientId,
+        lastVisit: new Date().toISOString().split("T")[0],
+        diagnosis: "New Patient",
+        status: "Active",
+        email: patientData?.email || "",
+        phone: patientData?.phone_number || "",
+      }
+      setSelectedPatientRecord(record as any)
+      setIsDetailOpen(true)
+    } catch (error) {
+      console.error(error);
+      const fallbackRecord = {
+        id: patientId || Math.random().toString(),
+        name: patientName,
+        patientId: patientId,
+        lastVisit: new Date().toISOString().split("T")[0],
+        diagnosis: "New Patient",
+        status: "Active",
+      }
+      setSelectedPatientRecord(fallbackRecord as any)
+      setIsDetailOpen(true)
     }
-    setSelectedPatientRecord(record)
-    setIsDetailOpen(true)
   }
 
   // FIX: accepts the full appointment object so we have the id for the room
@@ -401,19 +390,19 @@ export default function DoctorAppointmentsPage() {
                                 size="lg"
                                 variant="outline"
                                 className="h-12 w-12 rounded-xl flex items-center justify-center border-border/50 text-muted-foreground hover:bg-muted/50"
-                                onClick={() => handleViewPatient(appt.patientName)}
-                              >
-                                <Users className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
+                                  onClick={() => handleViewPatient(appt.patient_id, appt.patientName)}
+                                >
+                                  <Users className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
 
-                          {appt.status !== "Upcoming" && (
-                            <Button
-                              variant="ghost"
-                              className="h-12 w-12 rounded-xl border border-border/30"
-                              onClick={() => handleViewPatient(appt.patientName)}
-                            >
+                            {appt.status !== "Upcoming" && (
+                              <Button
+                                variant="ghost"
+                                className="h-12 w-12 rounded-xl border border-border/30"
+                                onClick={() => handleViewPatient(appt.patient_id, appt.patientName)}
+                              >
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           )}

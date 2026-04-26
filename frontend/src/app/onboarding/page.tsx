@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
-import apiClient from "@/lib/api-client";
+import { getServiceContainer } from "@/lib/services/service-container";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function OnboardingPage() {
         // 1. Check Clerk metadata first
         const metaRole = user?.publicMetadata?.role as string | undefined;
         if (metaRole === "doctor") {
-          router.push("/onboarding/doctor");
+          router.push("/doctor");
           return;
         } else if (metaRole === "patient") {
           router.push("/onboarding/patient");
@@ -30,13 +30,12 @@ export default function OnboardingPage() {
 
         // 2. Check backend database to see if user exists with a role already set
         try {
-          const res = await apiClient.get("/users/me");
-          if (res.data && res.data.role) {
+          const container = getServiceContainer();
+          const profile = await container.user.getProfile();
+          if (profile && profile.role) {
             // User exists in database with role set
-            if (res.data.role === "doctor") {
+            if (profile.role === "doctor") {
               router.push("/doctor");
-            } else if (res.data.role === "patient") {
-              router.push("/patient");
             } else {
               // Role set but unknown - show role selection
               router.push("/onboarding/patient");
@@ -54,7 +53,7 @@ export default function OnboardingPage() {
         // 3. Check URL query param (set by sign-in redirect)
         const queryRole = searchParams.get("role");
         if (queryRole === "doctor") {
-          router.push("/onboarding/doctor");
+          router.push("/doctor");
           return;
         } else if (queryRole === "patient") {
           router.push("/onboarding/patient");

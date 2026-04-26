@@ -21,7 +21,6 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarPlus, CheckCircle2, Clock, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useDataStore } from "@/hooks/use-data-store"
 import { useHospital } from "@/hooks/use-hospital"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@clerk/nextjs"
@@ -49,7 +48,6 @@ export function BookAppointmentDialog({
   const { toast } = useToast()
   const { getToken } = useAuth()
   const { booking } = useHospital()
-  const { getDoctors, addAppointment } = useDataStore()  // keep for fallback
   const [step, setStep] = useState(1)
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
@@ -64,16 +62,16 @@ export function BookAppointmentDialog({
     setInternalOpen(val)
   }
 
+  const [allDoctors, setAllDoctors] = useState<any[]>([])
+
   // Sync selectedDoctorId when dialog opens with a specific doctor
   React.useEffect(() => {
-    if (open && initialDoctorId) {
+    if (open && initialDoctorId && allDoctors.length > 0) {
       setSelectedDoctorId(initialDoctorId)
-      const doc = getDoctors().find((d: any) => d.id === initialDoctorId)
+      const doc = allDoctors.find((d: any) => d.id === initialDoctorId)
       if (doc) setSelectedSpecialty(doc.specialty || null)
     }
-  }, [open, initialDoctorId, getDoctors])
-
-  const [allDoctors, setAllDoctors] = useState<any[]>([])
+  }, [open, initialDoctorId, allDoctors])
   React.useEffect(() => {
     const loadDoctors = async () => {
       const token = await getToken()
@@ -121,24 +119,9 @@ export function BookAppointmentDialog({
         is_virtual: appointmentType === "Video",
       }, token || undefined)
 
-      // Also update local mock store so the UI reflects the new appointment immediately
-      addAppointment({
-        patientId,
-        patientName,
-        doctorId: selectedDoctor.id,
-        doctorName: selectedDoctor.name,
-        specialty: selectedDoctor.specialty,
-        date: formattedDate,
-        time: selectedTime,
-        status: 'Scheduled',
-        type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
-        price: 150,
-        isVirtual: appointmentType === "Video",
-      })
-
       toast({
         title: "Appointment Booked!",
-        description: `Your appointment with ${selectedDoctor.name} on ${date.toDateString()} at ${selectedTime} has been confirmed.`,
+        description: `Your appointment with ${selectedDoctor.name || selectedDoctor.first_name} on ${date.toDateString()} at ${selectedTime} has been confirmed.`,
       })
       setOpen(false)
       onBooked?.()
@@ -201,8 +184,8 @@ export function BookAppointmentDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {filteredDoctors.map((d: any) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name} {d.specialty ? `(${d.specialty})` : ""}
+                      <SelectItem key={d.id || d.user_id} value={d.id || d.user_id}>
+                        {d.name || `${d.first_name} ${d.last_name}`} {d.specialty ? `(${d.specialty})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -256,7 +239,7 @@ export function BookAppointmentDialog({
               <div className="rounded-lg bg-muted p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-primary" />
-                  <span className="font-medium">{selectedDoctor?.name}</span>
+                  <span className="font-medium">{selectedDoctor?.name || `${selectedDoctor?.first_name} ${selectedDoctor?.last_name}`}</span>
                   <span className="text-xs text-muted-foreground">({selectedDoctor?.specialty})</span>
                 </div>
                 <div className="flex items-center gap-2">

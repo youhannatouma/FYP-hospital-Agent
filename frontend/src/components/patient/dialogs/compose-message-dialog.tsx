@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Send, Paperclip } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { getServiceContainer } from "@/lib/services/service-container"
 
 interface ComposeMessageDialogProps {
   open: boolean
@@ -37,8 +38,24 @@ export function ComposeMessageDialog({
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
   const [isSending, setIsSending] = useState(false)
+  const [doctorsList, setDoctorsList] = useState<any[]>([])
 
-  const handleSend = () => {
+  useEffect(() => {
+    if (open) {
+      const fetchDoctors = async () => {
+        try {
+          const container = getServiceContainer()
+          const data = await container.doctor.getAvailableDoctors()
+          setDoctorsList(data)
+        } catch (err) {
+          console.error("[ComposeMessageDialog] Failed to fetch doctors:", err)
+        }
+      }
+      fetchDoctors()
+    }
+  }, [open])
+
+  const handleSend = async () => {
     if (!recipient || !subject.trim() || !message.trim()) {
       toast({
         title: "Missing Information",
@@ -50,18 +67,33 @@ export function ComposeMessageDialog({
 
     setIsSending(true)
 
-    // Mock API
-    setTimeout(() => {
+    try {
+      const container = getServiceContainer()
+      await container.message.sendMessage({
+        receiver_id: recipient,
+        subject: subject,
+        body: message
+      })
+      
       setIsSending(false)
       onOpenChange(false)
+      const selectedDoc = doctorsList.find(d => d.id === recipient || d.user_id === recipient)
+      const docName = selectedDoc ? `Dr. ${(selectedDoc as any).last_name || (selectedDoc as any).first_name || 'Provider'}` : 'the provider'
       toast({
         title: "Message Sent",
-        description: `Your message to ${recipient} has been sent successfully.`,
+        description: `Your message to ${docName} has been sent successfully.`,
       })
       setRecipient("")
       setSubject("")
       setMessage("")
-    }, 1000)
+    } catch (error) {
+      setIsSending(false)
+      toast({
+        title: "Error",
+        description: "Failed to send message.",
+        variant: "destructive"
+      })
+    }
   }
 
   return (
@@ -82,10 +114,11 @@ export function ComposeMessageDialog({
                 <SelectValue placeholder="Select a recipient" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Dr. Michael Chen">Dr. Michael Chen (Cardiology)</SelectItem>
-                <SelectItem value="Dr. Emily Watson">Dr. Emily Watson (Primary Care)</SelectItem>
-                <SelectItem value="Billing Department">Billing Department</SelectItem>
-                <SelectItem value="Pharmacy Support">Pharmacy Support</SelectItem>
+                {doctorsList.map(doc => (
+                  <SelectItem key={doc.id || doc.user_id} value={doc.id || doc.user_id}>
+                    Dr. {(doc as any).first_name} {(doc as any).last_name} ({doc.specialty || "Specialist"})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

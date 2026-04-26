@@ -1,8 +1,30 @@
 "use client";
 
+import { useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { DoctorSidebar } from "@/components/doctor/doctor-sidebar";
 import { DoctorTopNav } from "@/components/doctor/doctor-top-nav";
+
+function DoctorRoleInitializer() {
+  const { user, isLoaded } = useUser();
+
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    // If doctor doesn't have role set, automatically set it
+    const role = user.publicMetadata?.role as string | undefined;
+    if (role !== "doctor") {
+      fetch("/api/v1/set-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "doctor" }),
+      }).catch((err) => console.error("Failed to set doctor role:", err));
+    }
+  }, [user, isLoaded]);
+
+  return null;
+}
 
 export default function DoctorLayout({
   children,
@@ -11,6 +33,7 @@ export default function DoctorLayout({
 }) {
   return (
     <SidebarProvider>
+      <DoctorRoleInitializer />
       <DoctorSidebar />
       <SidebarInset>
       <DoctorTopNav />

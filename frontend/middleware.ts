@@ -36,7 +36,7 @@ export default clerkMiddleware(async (auth, req) => {
       if (role !== "doctor") {
         if (role === "patient") return NextResponse.redirect(new URL("/patient", req.url));
         if (role === "admin")   return NextResponse.redirect(new URL("/admin", req.url));
-        return NextResponse.redirect(new URL("/onboarding", req.url));
+        // No role yet - allow access, role will be set on load
       }
     }
 
@@ -45,7 +45,8 @@ export default clerkMiddleware(async (auth, req) => {
       if (role !== "patient") {
         if (role === "doctor") return NextResponse.redirect(new URL("/doctor", req.url));
         if (role === "admin")  return NextResponse.redirect(new URL("/admin", req.url));
-        return NextResponse.redirect(new URL("/onboarding", req.url));
+        // No role yet - proceed to onboarding
+        if (userId && !role) return NextResponse.redirect(new URL("/onboarding/patient", req.url));
       }
     }
 

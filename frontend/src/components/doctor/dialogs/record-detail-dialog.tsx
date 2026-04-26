@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useDataStore, MedicalRecord } from "@/hooks/use-data-store"
+import { useHospital } from "@/hooks/use-hospital"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -20,46 +20,31 @@ import { Calendar, Download, Edit, Trash2, Check, X } from "lucide-react"
 interface RecordDetailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  record: MedicalRecord | null
+  record: any | null
 }
 
 export function RecordDetailDialog({ open, onOpenChange, record }: RecordDetailDialogProps) {
   const { toast } = useToast()
-  const { updateRecord, deleteRecord } = useDataStore()
-  const [isEditing, setIsEditing] = React.useState(false)
-  const [editDiagnosis, setEditDiagnosis] = React.useState("")
-  const [editNotes, setEditNotes] = React.useState("")
-
-  React.useEffect(() => {
-    if (record) {
-      setEditDiagnosis(record.diagnosis)
-      setEditNotes(record.notes || "")
-    }
-  }, [record])
-
+  const { medicalRecords } = useHospital()
   if (!record) return null
 
-  const handleUpdate = () => {
-    updateRecord(record.id, {
-      diagnosis: editDiagnosis,
-      notes: editNotes
-    })
-    setIsEditing(false)
-    toast({
-      title: "Record Updated",
-      description: `Medical record for ${record.patientName} has been updated.`,
-    })
-  }
-
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm("Are you sure you want to delete this clinical record?")) {
-      deleteRecord(record.id)
-      onOpenChange(false)
-      toast({
-        title: "Record Deleted",
-        description: "Clinical entry has been removed from history.",
-        variant: "destructive"
-      })
+      try {
+        await medicalRecords.deleteRecord(record.record_id || record.id)
+        onOpenChange(false)
+        toast({
+          title: "Record Deleted",
+          description: "Clinical entry has been removed from history.",
+          variant: "destructive"
+        })
+      } catch (e) {
+        toast({
+          title: "Error",
+          description: "Could not delete record.",
+          variant: "destructive"
+        })
+      }
     }
   }
 
@@ -70,21 +55,13 @@ export function RecordDetailDialog({ open, onOpenChange, record }: RecordDetailD
           <div className="flex items-center justify-between pr-6">
             <DialogTitle>Clinical Record Detail</DialogTitle>
             <div className="flex gap-2">
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                className={`h-8 w-8 ${isEditing ? 'text-primary' : ''}`} 
-                onClick={() => setIsEditing(!isEditing)}
-              >
-                {isEditing ? <X className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
-              </Button>
               <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={handleDelete}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
           <DialogDescription>
-            Record ID: {record.id} • Clinical Date: {record.date}
+            Record ID: {record.record_id || record.id} • Clinical Date: {record.created_at ? new Date(record.created_at).toLocaleDateString() : record.date}
           </DialogDescription>
         </DialogHeader>
         
@@ -92,36 +69,24 @@ export function RecordDetailDialog({ open, onOpenChange, record }: RecordDetailD
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground uppercase tracking-wider">Patient</Label>
-              <p className="font-bold text-foreground">{record.patientName}</p>
+              <p className="font-bold text-foreground">{record.patient_name || record.patientName}</p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground uppercase tracking-wider">Provider</Label>
-              <p className="font-medium text-foreground">{record.doctorName}</p>
+              <p className="font-medium text-foreground">{record.doctor_name || record.doctorName}</p>
             </div>
           </div>
 
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground underline uppercase tracking-wider">Diagnosis</Label>
-            {isEditing ? (
-              <Input value={editDiagnosis} onChange={(e) => setEditDiagnosis(e.target.value)} />
-            ) : (
-              <p className="text-base font-semibold text-primary">{record.diagnosis}</p>
-            )}
+            <p className="text-base font-semibold text-primary">{record.diagnosis}</p>
           </div>
 
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground underline uppercase tracking-wider">Clinical Notes</Label>
-            {isEditing ? (
-              <Textarea 
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                className="min-h-[150px]"
-              />
-            ) : (
-              <div className="text-sm border rounded-lg p-4 bg-muted/40 whitespace-pre-wrap leading-relaxed shadow-inner">
-                {record.notes || "No clinical notes provided."}
-              </div>
-            )}
+            <div className="text-sm border rounded-lg p-4 bg-muted/40 whitespace-pre-wrap leading-relaxed shadow-inner">
+              {record.clinical_notes || record.notes || "No clinical notes provided."}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg border border-primary/10">
@@ -136,21 +101,9 @@ export function RecordDetailDialog({ open, onOpenChange, record }: RecordDetailD
             Export to PDF
           </Button>
           <div className="flex gap-2">
-            {!isEditing ? (
-              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                Close
-              </Button>
-            ) : (
-              <>
-                <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
-                  Cancel
-                </Button>
-                <Button size="sm" onClick={handleUpdate} className="gap-2">
-                  <Check className="h-4 w-4" />
-                  Apply Updates
-                </Button>
-              </>
-            )}
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

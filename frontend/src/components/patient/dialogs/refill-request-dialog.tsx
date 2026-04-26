@@ -42,17 +42,16 @@ export function RefillRequestDialog({
     }
 
     setIsSubmitting(true)
-
-    // Mock API
     setTimeout(() => {
       setIsSubmitting(false)
       onOpenChange(false)
       toast({
-        title: "Refill Requested",
-        description: `Your refill request for ${prescription.name} has been sent to ${prescription.doctor}.`,
+        title: "Feature Coming Soon",
+        description: "The Pharmacy API integration is currently under development. Please check back later.",
+        variant: "default"
       })
       setPharmacy("")
-    }, 1000)
+    }, 500)
   }
 
   return (

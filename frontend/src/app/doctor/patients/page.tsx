@@ -18,75 +18,66 @@ import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useState } from "react"
-
-const stats = [
-  {
-    label: "Total Patient Census",
-    value: "1,284",
-    trend: "+12.5%",
-    icon: Users,
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
-  },
-  {
-    label: "Newly Registered",
-    value: "48",
-    trend: "+5.2%",
-    icon: UserPlus,
-    color: "text-emerald-500",
-    bg: "bg-emerald-500/10",
-  },
-  {
-    label: "High Priority",
-    value: "12",
-    trend: "Critical",
-    icon: Sparkles,
-    color: "text-amber-500",
-    bg: "bg-amber-500/10",
-  }
-]
-
-const MOCK_PATIENTS: Patient[] = [
-  {
-    id: "728ed52f",
-    name: "Sarah Johnson",
-    status: "active",
-    email: "s.johnson@example.com",
-    lastVisit: "2 hours ago",
-  },
-  {
-    id: "489fc2b1",
-    name: "Michael Chen",
-    status: "active",
-    email: "m.chen@example.com",
-    lastVisit: "Yesterday",
-  },
-  {
-    id: "a12bc3d4",
-    name: "Emily Davis",
-    status: "pending",
-    email: "e.davis@example.com",
-    lastVisit: "3 days ago",
-  },
-  {
-    id: "e56fg7h8",
-    name: "Robert Brown",
-    status: "inactive",
-    email: "r.brown@example.com",
-    lastVisit: "2 weeks ago",
-  },
-  {
-    id: "x90yz1w2",
-    name: "Linda Taylor",
-    status: "active",
-    email: "l.taylor@example.com",
-    lastVisit: "5 hours ago",
-  }
-]
+import { useState, useEffect } from "react"
+import { getServiceContainer } from "@/lib/services/service-container"
+import { Loader2 } from "lucide-react"
 
 export default function DoctorPatientsPage() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [patients, setPatients] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const container = getServiceContainer()
+        const users = await container.user.getAllUsers()
+        
+        const patientData = users
+          .filter((u: any) => u.role === 'patient')
+          .map((p: any) => ({
+            id: p.user_id,
+            name: `${p.first_name} ${p.last_name}`,
+            status: p.status || 'active',
+            email: p.email,
+            lastVisit: p.created_at ? new Date(p.created_at).toLocaleDateString() : 'Unknown',
+          }))
+        setPatients(patientData)
+      } catch (error) {
+        console.error("Failed to fetch patients:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchPatients()
+  }, [])
+
+  const stats = [
+    {
+      label: "Total Patient Census",
+      value: patients.length.toString(),
+      trend: "Active",
+      icon: Users,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+    },
+    {
+      label: "Newly Registered",
+      value: patients.filter(p => p.lastVisit === new Date().toLocaleDateString()).length.toString(),
+      trend: "Today",
+      icon: UserPlus,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+    },
+    {
+      label: "High Priority",
+      value: "0",
+      trend: "Critical",
+      icon: Sparkles,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+    }
+  ]
 
   return (
     <m.div 
@@ -161,14 +152,21 @@ export default function DoctorPatientsPage() {
         </div>
 
         <Card className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden">
-          <CardContent className="p-0">
-            <DataTable 
-              columns={columns} 
-              data={MOCK_PATIENTS.filter(p => 
-                p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                p.email.toLowerCase().includes(searchQuery.toLowerCase())
-              )} 
-            />
+          <CardContent className="p-0 min-h-[400px]">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-[400px] gap-4">
+                 <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                 <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Loading Patients...</p>
+              </div>
+            ) : (
+              <DataTable 
+                columns={columns} 
+                data={patients.filter(p => 
+                  p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  p.email.toLowerCase().includes(searchQuery.toLowerCase())
+                )} 
+              />
+            )}
           </CardContent>
         </Card>
       </div>

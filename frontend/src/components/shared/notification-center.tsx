@@ -1,71 +1,29 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Bell, Loader2, CheckCircle2 } from "lucide-react"
-import { useAuth } from "@clerk/nextjs"
-import { apiClient } from "@/lib/api-client"
+import { useEffect, useCallback } from "react"
+import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useNotifications } from "@/hooks/use-notifications"
 
 export function NotificationCenter() {
-  const { getToken } = useAuth()
-  const [notifications, setNotifications] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(0)
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    refetch,
+  } = useNotifications()
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const token = await getToken()
-      const response = await apiClient.get("/notifications/", {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setNotifications(response.data)
-      setUnreadCount(response.data.filter((n: any) => !n.is_read).length)
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error)
-    }
-  }, [getToken])
-
-  useEffect(() => {
-    fetchNotifications()
-    // Poll every minute for notifications
-    const interval = setInterval(fetchNotifications, 60000)
-    return () => clearInterval(interval)
-  }, [fetchNotifications])
-
-  const markRead = async (id: string) => {
-    try {
-      const token = await getToken()
-      await apiClient.patch(`/notifications/${id}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      fetchNotifications()
-    } catch (error) {
-      console.error("Failed to mark notification as read:", error)
-    }
-  }
-
-  const markAllRead = async () => {
-    try {
-      const token = await getToken()
-      await apiClient.patch("/notifications/read-all", {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      fetchNotifications()
-    } catch (error) {
-      console.error("Failed to mark all as read:", error)
-    }
-  }
 
   return (
-    <DropdownMenu onOpenChange={(open) => open && fetchNotifications()}>
+    <DropdownMenu onOpenChange={(open) => open && refetch()}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -83,16 +41,14 @@ export function NotificationCenter() {
         <div className="p-4 bg-primary/5 flex items-center justify-between border-b border-primary/10">
           <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Alert Center</h3>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={markAllRead} className="h-6 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 p-0">
+            <Button variant="ghost" size="sm" onClick={markAllAsRead} className="h-6 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 p-0">
               Clear All
             </Button>
           )}
         </div>
         
         <div className="max-h-64 overflow-y-auto custom-scrollbar">
-          {isLoading ? (
-            <div className="p-8 flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-primary" /></div>
-          ) : notifications.length === 0 ? (
+          {notifications.length === 0 ? (
             <div className="p-10 text-center text-[10px] font-medium text-muted-foreground italic">
               No new notifications.
             </div>
@@ -100,7 +56,7 @@ export function NotificationCenter() {
             notifications.map((n) => (
               <DropdownMenuItem 
                 key={n.id} 
-                onClick={() => markRead(n.id)}
+                onClick={() => markAsRead(n.id)}
                 className="p-4 flex flex-col items-start gap-1 focus:bg-primary/5 cursor-pointer border-b border-border/30 last:border-0"
               >
                 <div className="flex items-center justify-between w-full">

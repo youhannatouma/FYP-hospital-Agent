@@ -1,8 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useUser, useAuth } from "@clerk/nextjs"
-import { apiClient } from "@/lib/api-client"
+import { getServiceContainer } from "@/lib/services/service-container"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -31,9 +30,7 @@ interface AddRecordDialogProps {
 
 export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
   const { toast } = useToast()
-  const { user } = useUser()
   const [patients, setPatients] = React.useState<any[]>([])
-  
   const [loading, setLoading] = React.useState(false)
   const [selectedPatientId, setSelectedPatientId] = React.useState("")
   const [diagnosis, setDiagnosis] = React.useState("")
@@ -44,12 +41,11 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
     if (open) {
       const fetchPatients = async () => {
         try {
-          const res = await apiClient.get("/users/")
-          if (Array.isArray(res.data)) {
-            setPatients(res.data.filter((u: any) => u.role === 'patient'))
-          }
+          const container = getServiceContainer()
+          const allUsers = await container.user.getAllUsers()
+          setPatients(allUsers.filter((u) => u.role === 'patient'))
         } catch (err) {
-          console.error("Failed to fetch patients:", err)
+          console.error("[AddRecordDialog] Failed to fetch patients:", err)
         }
       }
       fetchPatients()
@@ -64,30 +60,27 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
     }
 
     setLoading(true)
-    
     const patient = patients.find((p: any) => p.user_id === selectedPatientId)
-    
     try {
-      await apiClient.post("/medical-records/", {
+      const container = getServiceContainer()
+      await container.medicalRecord.createRecord({
         patient_id: selectedPatientId,
         record_type: "General Entry",
-        diagnosis,
-        treatment: "See clinical notes",
-        clinical_notes: details,
+        title: diagnosis,
+        description: details,
+        date,
       })
 
       toast({
         title: "Record Added",
         description: `Medical record for ${patient?.first_name} ${patient?.last_name} has been successfully saved.`,
       })
-      
-      // Reset form
       setSelectedPatientId("")
       setDiagnosis("")
       setDetails("")
       onOpenChange(false)
     } catch (err) {
-      console.error("Failed to add record:", err)
+      console.error("[AddRecordDialog] Failed to add record:", err)
       toast({ title: "Error", description: "Failed to save record. Please try again.", variant: "destructive" })
     } finally {
       setLoading(false)
