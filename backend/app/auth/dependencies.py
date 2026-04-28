@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -19,32 +20,38 @@ _CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
 clerk = Clerk(bearer_auth=_CLERK_SECRET_KEY) if _CLERK_SECRET_KEY else None
 
 # Cache for JWKS (1-hour TTL)
-_jwks_cache: TTLCache = TTLCache(maxsize=1, ttl=3600)
+_jwks_cache: TTLCache = TTLCache(maxsize=8, ttl=3600)
 
 
-def _get_clerk_jwks():
+def _normalize_issuer_url(issuer: str | None) -> str | None:
+    if not issuer:
+        return None
+    parsed = urlparse(issuer)
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return None
+
+
+def _get_clerk_jwks(issuer: str | None = None):
     """Fetch and cache Clerk's public JWKS."""
-    if "jwks" in _jwks_cache:
-        return _jwks_cache["jwks"]
-    
-    # Build JWKS URL from environment or derive from publishable key
+    issuer_base = _normalize_issuer_url(issuer)
+    cache_key = issuer_base or "default"
+    if cache_key in _jwks_cache:
+        return _jwks_cache[cache_key]
+
+    # Build JWKS URL from environment first, then issuer, then fallback.
     jwks_url = os.getenv("CLERK_JWKS_URL")
     if not jwks_url:
-        # Fallback: construct from Clerk domain if available
-        publishable_key = os.getenv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "")
-        if publishable_key.startswith("pk_"):
-            # Extract domain and construct URL
-            raising_domain = "https://api.clerk.com/.well-known/jwks.json"
-            jwks_url = raising_domain
+        if issuer_base:
+            jwks_url = f"{issuer_base}/.well-known/jwks.json"
         else:
-            raising_domain = "https://api.clerk.com/.well-known/jwks.json"
-            jwks_url = raising_domain
-    
+            jwks_url = "https://api.clerk.com/.well-known/jwks.json"
+
     try:
         response = httpx.get(jwks_url, timeout=10)
         response.raise_for_status()
         jwks = response.json()
-        _jwks_cache["jwks"] = jwks
+        _jwks_cache[cache_key] = jwks
         return jwks
     except Exception as e:
         print(f"[JWKS] Error fetching JWKS from {jwks_url}: {e}")
@@ -55,16 +62,27 @@ def _get_clerk_jwks():
 def _verify_clerk_token(token: str) -> dict:
     """Verify a Clerk JWT against their public JWKS."""
     try:
-        # First, decode WITHOUT verification to get the header
         unverified = jose_jwt.get_unverified_header(token)
-        
-        jwks = _get_clerk_jwks()
-        
-        # Use python-jose's decode which validates signature against JWKS
-        # The jwks parameter should be the entire JWKS object, not individual keys
+        kid = unverified.get("kid")
+        if not kid:
+            raise ValueError("Missing 'kid' in token header")
+
+        issuer = None
+        try:
+            claims = jose_jwt.get_unverified_claims(token)
+            issuer = claims.get("iss")
+        except Exception:
+            issuer = None
+
+        jwks = _get_clerk_jwks(issuer=issuer)
+        keys = jwks.get("keys", []) if isinstance(jwks, dict) else []
+        signing_key = next((key for key in keys if key.get("kid") == kid), None)
+        if not signing_key:
+            raise ValueError(f"No matching JWKS key for kid={kid}")
+
         payload = jose_jwt.decode(
             token,
-            jwks,
+            signing_key,
             algorithms=["RS256"],
             options={"verify_aud": False},
         )

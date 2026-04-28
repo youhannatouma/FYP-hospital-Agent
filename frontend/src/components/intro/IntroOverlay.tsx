@@ -43,6 +43,7 @@ export function IntroOverlay({ onFinish }: IntroOverlayProps) {
         await controls.start("taglineVisible");
 
         // Phase 3: exit
+        exitingRef.current = true;
         await controls.start("exit");
 
         if (mounted) onFinish();

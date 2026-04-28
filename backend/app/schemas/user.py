@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from uuid import UUID
+from datetime import date
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -35,7 +36,7 @@ class UserProfileUpdate(BaseModel):
     license_number: Optional[str] = None
     years_of_experience: Optional[int] = None
     qualifications: Optional[list] = None
-    date_of_birth: Optional[str] = None
+    date_of_birth: Optional[date] = None
     gender: Optional[str] = None
     blood_type: Optional[str] = None
     allergies: Optional[list] = None

@@ -20,6 +20,7 @@ const DURATION = {
 
 const logoVariants: Variants = {
   hidden: { opacity: 0, scale: 0.85, y: 12 },
+  taglineVisible: { opacity: 1, scale: 1, y: 0 },
   logoVisible: {
     opacity: 1,
     scale: 1,
@@ -36,6 +37,7 @@ const logoVariants: Variants = {
 
 const taglineVariants: Variants = {
   hidden: { opacity: 0, y: 8 },
+  logoVisible: { opacity: 0, y: 8 },
   taglineVisible: {
     opacity: 1,
     y: 0,
@@ -46,6 +48,8 @@ const taglineVariants: Variants = {
 
 const overlayVariants: Variants = {
   hidden: { opacity: 1 },
+  logoVisible: { opacity: 1 },
+  taglineVisible: { opacity: 1 },
   exit: { opacity: 0, transition: { duration: DURATION.EXIT } },
 };
 

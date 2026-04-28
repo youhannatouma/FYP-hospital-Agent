@@ -12,21 +12,18 @@ import {
   Star,
   MapPin,
   Clock,
-  Video,
   Bot,
   Stethoscope,
   Sparkles,
-  ArrowRight,
   ChevronRight,
   Filter,
   ShieldCheck,
 } from "lucide-react"
 
 import { useToast } from "@/components/ui/use-toast"
-import { AiSymptomDialog } from "@/components/patient/dialogs/ai-symptom-dialog"
 import { BookAppointmentDialog } from "@/components/patient/dialogs/book-appointment-dialog"
 import { m, AnimatePresence } from "framer-motion"
-import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
 
 const specialties = [
   "All Specialties",
@@ -105,13 +102,12 @@ const doctors = [
 
 export default function FindDoctorPage() {
   const { toast } = useToast()
+  const router = useRouter()
   
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSpecialty, setSelectedSpecialty] = useState("All Specialties")
   
   const [symptomText, setSymptomText] = useState("")
-  const [showAiDialog, setShowAiDialog] = useState(false)
-  
   const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null)
   const [showBookDialog, setShowBookDialog] = useState(false)
 
@@ -124,7 +120,7 @@ export default function FindDoctorPage() {
       })
       return
     }
-    setShowAiDialog(true)
+    router.push(`/patient/ai-assistant?prompt=${encodeURIComponent(`Please help assess these symptoms: ${symptomText}`)}`)
   }
 
   const handleBookNow = (doctorName: string) => {
@@ -316,11 +312,6 @@ export default function FindDoctorPage() {
         </AnimatePresence>
       </div>
 
-      <AiSymptomDialog 
-        open={showAiDialog} 
-        onOpenChange={setShowAiDialog}
-        initialSymptom={symptomText}
-      />
       <BookAppointmentDialog 
         open={showBookDialog} 
         onOpenChange={setShowBookDialog}

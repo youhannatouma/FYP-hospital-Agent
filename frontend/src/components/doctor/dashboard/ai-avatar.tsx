@@ -1,10 +1,10 @@
-import { Bot, Brain, MessageCircle, Mic, Sparkles, Activity } from "lucide-react"
+import { Bot, Brain, MessageCircle, Mic, Activity } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import ThreeAvatar from "../../ThreeAvatar"
 import { m } from "framer-motion"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 const suggestedTasks = [
   "Analyze population health trends",
@@ -14,6 +14,15 @@ const suggestedTasks = [
 
 export function DoctorAIAvatar() {
   const { toast } = useToast()
+  const router = useRouter()
+
+  const openAssistant = (prompt?: string) => {
+    if (prompt) {
+      router.push(`/doctor/ai-assistant?prompt=${encodeURIComponent(prompt)}`)
+      return
+    }
+    router.push("/doctor/ai-assistant")
+  }
   return (
     <m.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -78,7 +87,7 @@ export function DoctorAIAvatar() {
               <m.button
                 key={i}
                 whileHover={{ x: 4, backgroundColor: "rgba(255,255,255,0.1)" }}
-                onClick={() => toast({ title: "Clinical Inquiry", description: `Fetching: ${task}...` })}
+                onClick={() => openAssistant(task)}
                 className="rounded-xl bg-white/5 border border-white/5 px-4 py-2.5 text-left text-[11px] font-bold text-white/90 transition-all hover:text-white group-hover:border-white/10"
               >
                 {task}
@@ -102,6 +111,7 @@ export function DoctorAIAvatar() {
                 title: "Voice Transcription",
                 description: "Clinical-note agent is listening...",
               })
+              openAssistant("Transcribe this clinical note and summarize key findings")
             }}
           >
             <Mic className="mr-2 h-4 w-4" />
