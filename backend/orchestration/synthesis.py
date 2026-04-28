@@ -13,12 +13,20 @@ from typing import Any, AsyncIterator, Literal
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from ..app.schemas.unified_agent_response import (
-    ActionButton,
-    AppointmentResult,
-    MedicationResult,
-    UnifiedAgentResponse,
-)
+try:
+    from app.schemas.unified_agent_response import (
+        ActionButton,
+        AppointmentResult,
+        MedicationResult,
+        UnifiedAgentResponse,
+    )
+except ImportError:  # Fallback for backend package context
+    from ..app.schemas.unified_agent_response import (
+        ActionButton,
+        AppointmentResult,
+        MedicationResult,
+        UnifiedAgentResponse,
+    )
 
 log = logging.getLogger(__name__)
 

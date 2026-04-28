@@ -21,7 +21,7 @@ def process_payment(payload: PaymentPayload, db: Session = Depends(get_db), curr
     payment = PaymentSkill.create_payment_record(
         db, 
         appointment_id=payload.appointmentId,
-        patient_id=current_user.id,
+        patient_id=current_user.user_id,
         amount=payload.amount,
         method=payload.method
     )
@@ -34,4 +34,4 @@ def process_payment(payload: PaymentPayload, db: Session = Depends(get_db), curr
 
 @router.get("/my")
 def get_my_payments(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    return PaymentSkill.get_patient_payments(db, current_user.id)
+    return PaymentSkill.get_patient_payments(db, current_user.user_id)

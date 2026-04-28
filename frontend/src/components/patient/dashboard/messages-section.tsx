@@ -2,22 +2,24 @@
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Mail, Plus, Bot, Bell, CreditCard, CalendarDays, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
 
 export interface MessagesSectionProps {
   onNewMessage?: () => void
-  onAction?: (action: string, message: any) => void
+  onAction?: (action: string, message: unknown) => void
+  aiAssistantPath?: string
 }
 
-export function MessagesSection({ onNewMessage, onAction }: MessagesSectionProps) {
+export function MessagesSection({ onNewMessage, onAction, aiAssistantPath = "/patient/ai-assistant" }: MessagesSectionProps) {
   const { toast } = useToast()
+  const router = useRouter()
   const [filter, setFilter] = useState<"unread" | "all">("unread")
-  const [messages, setMessages] = useState([
+  const [messages] = useState([
     {
       id: 1,
       sender: "Dr. Michael Chen",
@@ -208,7 +210,7 @@ export function MessagesSection({ onNewMessage, onAction }: MessagesSectionProps
                   className="mt-4 w-full bg-amber-500 text-white hover:bg-amber-600 font-black text-[9px] uppercase tracking-widest rounded-lg shadow-lg shadow-amber-500/10 active:scale-95 transition-all"
                   onClick={(e) => {
                     e.stopPropagation()
-                    toast({ title: "AI Sync", description: "Initializing AI Assistant..." })
+                    router.push(aiAssistantPath)
                   }}
                 >
                   <Bot className="mr-2 h-3.5 w-3.5" />

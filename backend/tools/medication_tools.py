@@ -20,13 +20,29 @@ _DB = dict(
     host=os.getenv("DB_HOST", "localhost"),
     port=int(os.getenv("DB_PORT", "5432")),
 )
-_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+_llm: ChatGoogleGenerativeAI | None = None
 _EMPTY_PROFILE: dict[str, Any] = {
     "name": "Unknown", "allergies": [], "current_medications": [],
     "conditions": [], "age": None, "pregnant": False,
 }
 _ENGINE_CACHE: dict[tuple[str, str, int, str, str], Any] = {}
 _ENGINE_CACHE_LOCK = RLock()
+
+
+def _get_llm() -> ChatGoogleGenerativeAI | None:
+    global _llm
+    if _llm is not None:
+        return _llm
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        log.warning("Gemini API key missing; medication LLM steps will use safe fallbacks.")
+        return None
+    try:
+        _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+    except Exception as exc:
+        log.warning("Failed to initialize Gemini client; using safe fallbacks: %s", exc)
+        _llm = None
+    return _llm
 
 
 # ── DB helpers (all catch psycopg2 errors) ──────────────────────────────
@@ -296,7 +312,13 @@ def llm_safety_check(
     ]
     sep = (",", ":")
     try:
-        resp = _llm.invoke(_SAFETY_PROMPT.format(
+        llm = _get_llm()
+        if llm is None:
+            return {
+                "safe": [],
+                "flagged": allergy_flagged + _flag_all(compact, "AI safety checker unavailable")["flagged"],
+            }
+        resp = llm.invoke(_SAFETY_PROMPT.format(
             user_profile=json.dumps(user_profile, separators=sep),
             drugs=json.dumps(compact, separators=sep)))
         try:
@@ -421,7 +443,14 @@ def generate_medication_response(
         display = enriched or candidates
 
     try:
-        return _llm.invoke(_ANSWER_PROMPT.format(
+        llm = _get_llm()
+        if llm is None:
+            names = ", ".join((c.get("brand_names") or ["Unknown"])[0] for c in candidates)
+            return (
+                f"Based on your profile, these may help with '{symptom}': {names}. "
+                "Please consult a doctor or pharmacist before starting any new medication."
+            )
+        return llm.invoke(_ANSWER_PROMPT.format(
             symptom=symptom,
             candidates=json.dumps(display, separators=(",", ":")))).content
     except Exception as e:

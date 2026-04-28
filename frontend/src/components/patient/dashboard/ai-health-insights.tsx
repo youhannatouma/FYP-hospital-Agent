@@ -1,8 +1,9 @@
 "use client"
 
 import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
 
-import { Lightbulb, Heart, AlertTriangle, Apple, Bot, ChevronRight, Sparkles } from "lucide-react"
+import { Heart, AlertTriangle, Apple, Bot, ChevronRight, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { m, AnimatePresence } from "framer-motion"
@@ -10,12 +11,10 @@ import { cn } from "@/lib/utils"
 
 export function AIHealthInsights() {
   const { toast } = useToast()
+  const router = useRouter()
 
   const handleAnalystClick = () => {
-    toast({
-      title: "Interactive Analyst Initializing",
-      description: "Connecting to your personalized health AI...",
-    })
+    router.push("/patient/ai-assistant")
   }
 
   const handleInsightAction = (action: string) => {
@@ -23,6 +22,7 @@ export function AIHealthInsights() {
       title: "Action Initiated",
       description: `Preparing interface for: ${action}`,
     })
+    router.push(`/patient/ai-assistant?prompt=${encodeURIComponent(`Help me with this health insight action: ${action}`)}`)
   }
 
   const insights = [
