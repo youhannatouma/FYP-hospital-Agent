@@ -174,6 +174,14 @@ The specialized workflow now includes structured telemetry hooks and rollout con
 - `fallback_triggered`
 - `workflow_completed`
 - `workflow_failed`
+- `assistant_request_started`
+- `assistant_request_completed`
+- `assistant_request_failed`
+- `assistant_request_cancelled`
+
+Assistant telemetry is also exposed via `GET /api/assistant/telemetry/summary`.
+Use this endpoint as primary request-count truth for the app.
+Provider dashboards may show token activity before request totals appear in overview due to aggregation lag.
 
 ### Telemetry and rollout environment flags
 

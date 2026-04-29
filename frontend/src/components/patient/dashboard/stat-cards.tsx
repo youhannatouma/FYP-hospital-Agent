@@ -7,40 +7,60 @@ import { m } from "framer-motion"
 import { useState, useEffect } from "react"
 import { useHospital } from "@/hooks/use-hospital"
 import { useAuth } from "@clerk/nextjs"
+import { useUserProfile } from "@/hooks/use-user-profile"
+import { calculateAgeFromDob, getHeartRateBaselineByAge, midpoint } from "@/lib/health/heart-rate"
+import { classifyHttpError } from "@/lib/network/http-error"
+
+type PatientStats = {
+  upcoming_appointments?: number;
+  medical_records?: number;
+  active_prescriptions?: number;
+};
 
 export function StatCards() {
   const { stats } = useHospital();
-  const { getToken } = useAuth();
-  const [data, setData] = useState<any>(null);
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { profile } = useUserProfile();
+  const [data, setData] = useState<PatientStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
     const fetchStats = async () => {
       try {
         const token = await getToken();
-        const res = await stats.getPatientStats(token || undefined);
+        if (!token) return;
+        const res = await stats.getPatientStats(token);
         setData(res);
-      } catch (e) {
-        console.error(e);
+      } catch (e: unknown) {
+        const details = classifyHttpError(e);
+        if (details.kind !== "auth_unavailable") {
+          console.error("[PatientStats] Failed to fetch stats", details);
+        }
       } finally {
         setIsLoading(false);
       }
     };
     fetchStats();
-  }, [stats, getToken]);
+  }, [stats, getToken, isLoaded, isSignedIn]);
+
+  const age = calculateAgeFromDob(profile?.date_of_birth);
+  const hrBaseline = getHeartRateBaselineByAge(age);
+  const hrValue = midpoint(hrBaseline.min, hrBaseline.max);
 
   const statsItems = [
     {
       icon: Heart,
-      value: "72 bpm", // Mocked as we don't have vitals series yet
+      value: `${hrValue} bpm`,
       label: "Heart Rate",
-      status: "Optimal",
+      status: hrBaseline.label,
       statusColor: "text-emerald-500",
       iconBg: "bg-rose-500/10",
       iconColor: "text-rose-500",
-      updated: "2h ago",
+      updated: `${hrBaseline.min}-${hrBaseline.max} bpm`,
       primary: true,
-      description: "Consistent resting rhythm detected over the last 24 hours.",
+      description: "Estimated resting baseline from your age band.",
     },
     {
       icon: Droplets,

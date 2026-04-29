@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import { getServiceContainer } from "@/lib/services/service-container";
 import { UserProfile } from "@/lib/services/repositories/user-repository";
 import { formatUserProfile, FormattedUserProfile } from "@/lib/services/user-profile-formatter";
+import { classifyHttpError } from "@/lib/network/http-error";
 
 interface UseUserProfileReturn {
   profile: FormattedUserProfile | null;
@@ -19,6 +20,9 @@ interface UseUserProfileReturn {
 
 // Module-level cache to fetch profile only once per session
 let profileCache: UserProfile | null = null;
+export function clearUserProfileCache(): void {
+  profileCache = null;
+}
 
 /**
  * useUserProfile Hook
@@ -53,7 +57,12 @@ export function useUserProfile(): UseUserProfileReturn {
       setProfile(user);
     } catch (err: any) {
       console.error("[useUserProfile] Failed to fetch profile:", err);
-      setError(err?.response?.data?.message || "Could not load profile");
+      const details = classifyHttpError(err);
+      if (details.kind === "network_unreachable") {
+        setError("Could not reach backend API. Ensure backend is running at http://localhost:8000.");
+      } else {
+        setError(err?.response?.data?.message || "Could not load profile");
+      }
       setProfile(null);
     } finally {
       setIsLoading(false);

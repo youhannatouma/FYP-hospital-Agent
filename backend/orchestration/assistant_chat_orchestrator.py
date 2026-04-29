@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
+from datetime import date
 from typing import Any, AsyncIterator
 
 try:
@@ -10,22 +12,29 @@ try:
     from orchestration.synthesis import stream_synthesize_response
     from orchestration.supervisor_workflow import execute_doctor_match_workflow
     from tools.medication_tools import medication_pipeline
+    from shared.gemini import AssistantConfigError, assistant_llm_is_configured, log_assistant_llm_status_once
 except ImportError:  # Fallback for backend package context
     from app.models.user import User
     from backend.memory import memory_tools
     from backend.orchestration.synthesis import stream_synthesize_response
     from backend.orchestration.supervisor_workflow import execute_doctor_match_workflow
     from backend.tools.medication_tools import medication_pipeline
+    from backend.shared.gemini import AssistantConfigError, assistant_llm_is_configured, log_assistant_llm_status_once
 
 log = logging.getLogger(__name__)
 
 
 def _build_user_profile(user: User) -> dict[str, Any]:
+    age = None
+    if user.date_of_birth:
+        today = date.today()
+        dob = user.date_of_birth
+        age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
     return {
         "user_id": str(user.user_id),
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "age": None,
+        "age": age,
         "gender": user.gender,
         "allergies": user.allergies or [],
         "chronic_conditions": user.chronic_conditions or [],
@@ -34,9 +43,32 @@ def _build_user_profile(user: User) -> dict[str, Any]:
 
 def _detect_intents(message: str) -> dict[str, bool]:
     lowered = (message or "").lower()
+    medication_keywords = {
+        "medication", "medicine", "drug", "prescription", "dose", "dosage",
+        "pill", "tablet", "capsule", "pharmacy", "pharmacist", "take",
+        "recommend", "relief", "treat", "safe to take",
+    }
+    symptom_keywords = {
+        "headache", "migraine", "fever", "pain", "cough", "cold", "flu",
+        "sore throat", "runny nose", "allergy", "allergies", "rash",
+        "heartburn", "acid reflux", "indigestion", "diarrhea", "vomiting",
+        "nausea", "stomach ache", "toothache", "muscle ache",
+    }
+    appointment_keywords = {"appointment", "schedule", "book", "doctor", "visit", "clinic"}
+    health_guidance_keywords = {
+        "cholesterol", "ldl", "hdl", "triglycerides", "lipid", "lipids", "blood pressure",
+        "glucose", "a1c", "hemoglobin a1c", "lab", "labs", "test result", "results",
+        "wellness", "prevention", "healthy", "risk factor", "lifestyle", "diet", "exercise",
+    }
+    has_medication_keyword = any(k in lowered for k in medication_keywords)
+    has_symptom_keyword = any(k in lowered for k in symptom_keywords)
+    has_health_guidance_keyword = any(k in lowered for k in health_guidance_keywords)
+    asks_for_help = bool(re.search(r"\b(what|which|can|should|help|need|recommend)\b", lowered))
+    has_general_health = has_health_guidance_keyword and asks_for_help
     return {
-        "medication": any(k in lowered for k in ["medication", "medicine", "drug", "prescription", "dose", "dosage"]),
-        "appointment": any(k in lowered for k in ["appointment", "schedule", "book", "doctor", "visit", "clinic"]),
+        "medication": has_medication_keyword or (has_symptom_keyword and asks_for_help),
+        "appointment": any(k in lowered for k in appointment_keywords),
+        "general_health": has_general_health,
     }
 
 
@@ -61,6 +93,12 @@ async def stream_assistant_response(
     max_suggestions: int = 5,
     recent_messages: list[dict[str, str]] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
+    log_assistant_llm_status_once()
+    if not assistant_llm_is_configured():
+        raise AssistantConfigError(
+            "Assistant is unavailable: GOOGLE_API_KEY is missing in backend runtime."
+        )
+
     intents = _detect_intents(message)
     patient_profile = _build_user_profile(user)
     med_result = None
@@ -110,6 +148,10 @@ async def stream_assistant_response(
         except Exception as exc:
             log.warning("Doctor workflow failed: %s", exc)
             errors.append({"code": "DoctorWorkflowFailed", "message": str(exc)})
+
+    # Health education prompts should not fall into the generic error-only path.
+    if intents.get("general_health") and med_result is None and doctor_result is None and not errors:
+        log.info("Assistant general-health guidance intent selected for thread=%s", thread_id)
 
     async for chunk in stream_synthesize_response(
         patient_profile=patient_profile,

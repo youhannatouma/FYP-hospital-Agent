@@ -12,6 +12,10 @@ import logging
 from typing import Any, AsyncIterator, Literal
 
 from langchain_google_genai import ChatGoogleGenerativeAI
+try:
+    from shared.gemini import AssistantConfigError, classify_llm_error, get_gemini_llm
+except ImportError:  # Fallback for backend package context
+    from backend.shared.gemini import AssistantConfigError, classify_llm_error, get_gemini_llm
 
 try:
     from app.schemas.unified_agent_response import (
@@ -36,7 +40,7 @@ _llm: ChatGoogleGenerativeAI | None = None
 def _get_llm() -> ChatGoogleGenerativeAI:
     global _llm
     if _llm is None:
-        _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)
+        _llm = get_gemini_llm(temperature=0.7)
     return _llm
 
 
@@ -109,6 +113,20 @@ _ERROR_PROMPT = (
     "and suggesting next steps (try again, contact support, or visit the front desk).\n\n"
     "Error context: {error_context}\n\n"
     "Support message:"
+)
+
+_GENERAL_HEALTH_PROMPT = (
+    "You are a professional hospital health assistant.\n"
+    "Tone: clear, reassuring, and practical.\n"
+    "Instructions:\n"
+    "  - Provide concise educational guidance for the user's health question.\n"
+    "  - Do not diagnose disease or prescribe specific treatment.\n"
+    "  - Include 3-5 practical next steps for prevention or monitoring.\n"
+    "  - Suggest when to follow up with a clinician if warning signs are present.\n"
+    "  - Keep under 220 words.\n\n"
+    "Patient Profile: {patient_summary}\n"
+    "Question: {question}\n\n"
+    "Health guidance:"
 )
 
 
@@ -203,6 +221,44 @@ def _booking_summary(doctor_result: dict[str, Any] | None) -> str:
     return "Unknown booking state."
 
 
+def _fallback_tool_message(
+    *,
+    message_type: str,
+    symptom: str,
+    need_text: str,
+    medication_result: dict[str, Any] | None,
+    doctor_result: dict[str, Any] | None,
+) -> str:
+    if message_type == "medication" and medication_result:
+        return medication_result.get("response") or (
+            f"I found medication information for {symptom or need_text}. "
+            "Please consult your physician or pharmacist before starting any new medication."
+        )
+    if message_type == "appointment" and doctor_result:
+        return (
+            f"I found appointment information for {need_text or symptom}. "
+            f"{_doctor_summary(doctor_result)} {_booking_summary(doctor_result)}"
+        ).strip()
+    if message_type == "combined":
+        parts = []
+        if medication_result:
+            parts.append(medication_result.get("response") or _medication_summary(medication_result))
+        if doctor_result:
+            parts.append(f"{_doctor_summary(doctor_result)} {_booking_summary(doctor_result)}")
+        if parts:
+            return "\n\n".join(parts)
+    if message_type == "general_health":
+        return (
+            "Here are general health guidance points based on your question: "
+            "review recent lab trends, focus on diet and activity habits, and schedule a clinician follow-up "
+            "for personalized interpretation."
+        )
+    return (
+        "I apologize, but I'm unable to generate a detailed response at the moment. "
+        "Please contact our front desk for assistance."
+    )
+
+
 def _error_context(state: dict[str, Any]) -> str:
     errors = state.get("structured_errors", [])
     if not errors:
@@ -268,12 +324,12 @@ def synthesize_response(
     Returns both the natural-language message and structured data.
     """
     patient_summary = _patient_summary(patient_profile)
-    has_med = medication_result is not None and medication_result.get("drugs_found", 0) > 0
+    has_med = medication_result is not None
     has_appt = doctor_result is not None
 
     # Determine message type
     if structured_errors and not has_med and not has_appt:
-        message_type: Literal["medication", "appointment", "combined", "error"] = "error"
+        message_type: Literal["medication", "appointment", "combined", "general_health", "error"] = "error"
     elif has_med and has_appt:
         message_type = "combined"
     elif has_med:
@@ -281,7 +337,7 @@ def synthesize_response(
     elif has_appt:
         message_type = "appointment"
     else:
-        message_type = "error"
+        message_type = "general_health"
 
     # Build prompt
     if message_type == "error":
@@ -302,6 +358,11 @@ def synthesize_response(
             doctor_summary=_doctor_summary(doctor_result),
             booking_summary=_booking_summary(doctor_result),
         )
+    elif message_type == "general_health":
+        prompt = _GENERAL_HEALTH_PROMPT.format(
+            patient_summary=patient_summary,
+            question=need_text or symptom,
+        )
     else:  # combined
         prompt = _COMBINED_PROMPT.format(
             patient_summary=patient_summary,
@@ -314,16 +375,34 @@ def synthesize_response(
 
     # Invoke LLM
     try:
+        log.debug(
+            "Synthesis invoke start message_type=%s has_med=%s has_appt=%s",
+            message_type,
+            has_med,
+            has_appt,
+        )
         llm = _get_llm()
         resp = llm.invoke(prompt)
         message = str(resp.content).strip()
     except Exception as exc:
         log.error("Synthesis LLM call failed: %s", exc)
-        message = (
-            "I apologize, but I'm unable to generate a detailed response at the moment. "
-            "Please contact our front desk for assistance."
-        )
-        message_type = "error"
+        if message_type == "error":
+            message = (
+                "I apologize, but I'm unable to generate a detailed response at the moment. "
+                "Please contact our front desk for assistance."
+            )
+            message_type = "error"
+        else:
+            classified = classify_llm_error(exc)
+            if isinstance(classified, AssistantConfigError):
+                raise classified from exc
+            message = _fallback_tool_message(
+                message_type=message_type,
+                symptom=symptom,
+                need_text=need_text,
+                medication_result=medication_result,
+                doctor_result=doctor_result,
+            )
 
     # Build structured results
     med_struct = None
@@ -357,8 +436,8 @@ def synthesize_response(
         thread_id=str(doctor_result.get("thread_id", "") if doctor_result else ""),
         patient_user_id=str(patient_profile.get("user_id", "")),
         synthesis_source=[
-            *("medication" if has_med else []),
-            *("appointment" if has_appt else []),
+            *(["medication"] if has_med else []),
+            *(["appointment"] if has_appt else []),
         ],
     )
 
@@ -382,7 +461,7 @@ async def stream_synthesize_response(
     """
     # First, build the prompt exactly like the non-streaming version
     patient_summary = _patient_summary(patient_profile)
-    has_med = medication_result is not None and medication_result.get("drugs_found", 0) > 0
+    has_med = medication_result is not None
     has_appt = doctor_result is not None
 
     if structured_errors and not has_med and not has_appt:
@@ -394,7 +473,7 @@ async def stream_synthesize_response(
     elif has_appt:
         message_type = "appointment"
     else:
-        message_type = "error"
+        message_type = "general_health"
 
     if message_type == "error":
         prompt = _ERROR_PROMPT.format(
@@ -414,6 +493,11 @@ async def stream_synthesize_response(
             doctor_summary=_doctor_summary(doctor_result),
             booking_summary=_booking_summary(doctor_result),
         )
+    elif message_type == "general_health":
+        prompt = _GENERAL_HEALTH_PROMPT.format(
+            patient_summary=patient_summary,
+            question=need_text or symptom,
+        )
     else:
         prompt = _COMBINED_PROMPT.format(
             patient_summary=patient_summary,
@@ -427,6 +511,12 @@ async def stream_synthesize_response(
     # Stream tokens
     full_message = ""
     try:
+        log.debug(
+            "Synthesis stream start message_type=%s has_med=%s has_appt=%s",
+            message_type,
+            has_med,
+            has_appt,
+        )
         llm = _get_llm()
         # Gemini via langchain-google-genai supports streaming via astream
         for chunk in llm.stream(prompt):
@@ -435,14 +525,28 @@ async def stream_synthesize_response(
             yield {"type": "delta", "content": text}
     except Exception as exc:
         log.error("Streaming synthesis failed: %s", exc)
-        fallback = (
-            "I apologize, but I'm unable to generate a detailed response at the moment. "
-            "Please contact our front desk for assistance."
-        )
-        if not full_message:
-            full_message = fallback
-            yield {"type": "delta", "content": fallback}
-        message_type = "error"
+        if message_type == "error":
+            fallback = (
+                "I apologize, but I'm unable to generate a detailed response at the moment. "
+                "Please contact our front desk for assistance."
+            )
+            if not full_message:
+                full_message = fallback
+                yield {"type": "delta", "content": fallback}
+            message_type = "error"
+        else:
+            classified = classify_llm_error(exc)
+            if isinstance(classified, AssistantConfigError):
+                raise classified from exc
+            if not full_message:
+                full_message = _fallback_tool_message(
+                    message_type=message_type,
+                    symptom=symptom,
+                    need_text=need_text,
+                    medication_result=medication_result,
+                    doctor_result=doctor_result,
+                )
+                yield {"type": "delta", "content": full_message}
 
     # Build final structured response
     med_struct = None
@@ -476,8 +580,8 @@ async def stream_synthesize_response(
         thread_id=str(doctor_result.get("thread_id", "") if doctor_result else ""),
         patient_user_id=str(patient_profile.get("user_id", "")),
         synthesis_source=[
-            *("medication" if has_med else []),
-            *("appointment" if has_appt else []),
+            *(["medication"] if has_med else []),
+            *(["appointment"] if has_appt else []),
         ],
     )
 
