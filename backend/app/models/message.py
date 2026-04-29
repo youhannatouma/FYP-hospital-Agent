@@ -8,8 +8,8 @@ class Message(Base):
     __tablename__ = "messages"
 
     message_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
-    receiver_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("usr.user_id"), nullable=False)
+    receiver_id = Column(UUID(as_uuid=True), ForeignKey("usr.user_id"), nullable=False)
     subject = Column(String(255), nullable=True)
     body = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False)

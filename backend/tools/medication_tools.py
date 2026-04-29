@@ -1,6 +1,8 @@
 """Medication tools — query, rank, safety-check, recommend."""
 from __future__ import annotations
 import json, os, logging
+import re
+from pathlib import Path
 from threading import RLock
 from typing import Any
 from dotenv import load_dotenv
@@ -8,8 +10,15 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import QueuePool
+try:
+    from shared.gemini import get_gemini_llm
+except ImportError:  # Fallback for backend package context
+    from backend.shared.gemini import get_gemini_llm
 
-load_dotenv()
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+REPO_ROOT = BACKEND_DIR.parent
+load_dotenv(REPO_ROOT / ".env")
+load_dotenv(BACKEND_DIR / ".env", override=True)
 log = logging.getLogger(__name__)
 
 # ── DB config (single FYP database) ─────────────────────────────────────
@@ -27,18 +36,32 @@ _EMPTY_PROFILE: dict[str, Any] = {
 }
 _ENGINE_CACHE: dict[tuple[str, str, int, str, str], Any] = {}
 _ENGINE_CACHE_LOCK = RLock()
+_STOP_WORDS = {
+    "a", "an", "and", "are", "can", "for", "have", "help", "i", "is", "me",
+    "my", "of", "please", "should", "take", "the", "to", "what", "with",
+    "you", "your", "need", "some", "any",
+}
+_SYMPTOM_SYNONYMS = {
+    "headache": ["headache", "migraine", "pain", "fever"],
+    "migraine": ["migraine", "headache", "pain"],
+    "fever": ["fever", "pain", "headache"],
+    "cough": ["cough", "cold", "flu"],
+    "cold": ["cold", "cough", "runny", "sore throat"],
+    "allergy": ["allergy", "allergies", "sneezing", "runny nose"],
+    "allergies": ["allergy", "allergies", "sneezing", "runny nose"],
+    "heartburn": ["heartburn", "acid reflux", "indigestion"],
+    "reflux": ["acid reflux", "heartburn", "indigestion"],
+    "diarrhea": ["diarrhea", "vomiting", "dehydration"],
+    "vomiting": ["vomiting", "diarrhea", "dehydration"],
+}
 
 
 def _get_llm() -> ChatGoogleGenerativeAI | None:
     global _llm
     if _llm is not None:
         return _llm
-    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        log.warning("Gemini API key missing; medication LLM steps will use safe fallbacks.")
-        return None
     try:
-        _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+        _llm = get_gemini_llm(temperature=0)
     except Exception as exc:
         log.warning("Failed to initialize Gemini client; using safe fallbacks: %s", exc)
         _llm = None
@@ -120,6 +143,28 @@ def _t(val: str | None, n: int = 400) -> str:
     return (val or "")[:n]
 
 
+def _search_terms(symptom: str, max_terms: int = 8) -> list[str]:
+    lowered = (symptom or "").lower()
+    terms: list[str] = []
+    for key, synonyms in _SYMPTOM_SYNONYMS.items():
+        if key in lowered:
+            terms.extend(synonyms)
+
+    tokens = [
+        token
+        for token in re.findall(r"[a-z][a-z-]{2,}", lowered)
+        if token not in _STOP_WORDS
+    ]
+    terms.extend(tokens)
+
+    deduped: list[str] = []
+    for term in terms:
+        clean = term.strip()
+        if clean and clean not in deduped:
+            deduped.append(clean)
+    return deduped[:max_terms] or [symptom.strip()[:80]]
+
+
 # ── 1. query + rank ────────────────────────────────────────────────────
 def query_and_rank_drugs(symptom: str, limit: int = 7) -> list[dict[str, Any]]:
     """Query medication-native fields and map rows into pipeline format."""
@@ -127,25 +172,45 @@ def query_and_rank_drugs(symptom: str, limit: int = 7) -> list[dict[str, Any]]:
         log.warning("Empty symptom")
         return []
 
+    terms = _search_terms(symptom)
+    params = {f"p{i}": f"%{term}%" for i, term in enumerate(terms)}
+    params["l"] = limit
+    clauses = []
+    for i in range(len(terms)):
+        key = f"%(p{i})s"
+        clauses.append(
+            f"(name ILIKE {key} OR dosage ILIKE {key} OR warnings ILIKE {key} "
+            f"OR contradictions ILIKE {key} OR drug_interactions ILIKE {key} "
+            f"OR array_to_string(substances, ' ') ILIKE {key})"
+        )
+
     rows = _query(
         _DB,
-        """SELECT name, dosage, substances, warnings, contradictions, drug_interactions
+        f"""SELECT name, dosage, substances, warnings, contradictions, drug_interactions
            FROM medication
-           WHERE name ILIKE %(p)s
-              OR dosage ILIKE %(p)s
-              OR warnings ILIKE %(p)s
-              OR contradictions ILIKE %(p)s
-              OR drug_interactions ILIKE %(p)s
+           WHERE {' OR '.join(clauses)}
            LIMIT %(l)s""",
-        {"p": f"%{symptom.strip()[:200]}%", "l": limit},
+        params,
     )
 
     if not rows:
         log.info("No drugs found for: %s", symptom)
         return []
 
-    mapped = [
-        {
+    mapped = []
+    for r in rows:
+        searchable = " ".join(
+            [
+                str(r.get("name") or ""),
+                str(r.get("dosage") or ""),
+                " ".join(r.get("substances") or []),
+                str(r.get("warnings") or ""),
+                str(r.get("contradictions") or ""),
+                str(r.get("drug_interactions") or ""),
+            ]
+        ).lower()
+        score = sum(1 for term in terms if term.lower() in searchable)
+        mapped.append({
             "brand_names": [r.get("name")] if r.get("name") else [],
             "generic_names": [],
             "manufacturer": None,
@@ -156,13 +221,12 @@ def query_and_rank_drugs(symptom: str, limit: int = 7) -> list[dict[str, Any]]:
             "warnings": r.get("warnings") or "",
             "drug_interactions": r.get("drug_interactions") or "",
             "contradictions": r.get("contradictions") or "",
-        }
-        for r in rows
-    ]
+            "_score": score,
+        })
 
     def _k(d: dict) -> tuple:
         b = d.get("brand_names") or []
-        return (str(b[0]).upper() if b else "ZZZ",)
+        return (-int(d.get("_score") or 0), str(b[0]).upper() if b else "ZZZ")
 
     return sorted(mapped, key=_k)
 

@@ -8,50 +8,52 @@
 export interface RequestConfig {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   headers?: Record<string, string>;
-  data?: any;
-  params?: Record<string, any>;
+  data?: unknown;
+  params?: Record<string, unknown>;
 }
 
-export interface HttpResponse<T = any> {
+export interface HttpResponse<T = unknown> {
   status: number;
   data: T;
-  headers?: Record<string, any>;
+  headers?: Record<string, unknown>;
 }
 
 export interface IHttpClient {
-  get<T = any>(url: string, config?: RequestConfig): Promise<HttpResponse<T>>;
-  post<T = any>(
+  get<T = unknown>(url: string, config?: RequestConfig): Promise<HttpResponse<T>>;
+  post<T = unknown>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>>;
-  patch<T = any>(
+  patch<T = unknown>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>>;
-  put<T = any>(
+  put<T = unknown>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>>;
-  delete<T = any>(
+  delete<T = unknown>(
     url: string,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>>;
 }
 
 import axios, { AxiosInstance } from "axios";
-import { IAuthService } from "./auth-service";
+import { getAuthService, IAuthService } from "./auth-service";
+import { classifyHttpError } from "@/lib/network/http-error";
+import { resolveApiBaseUrl, warnIfSuspiciousApiBaseUrl } from "@/lib/network/runtime-config";
 
 export class AxiosHttpClient implements IHttpClient {
   private client: AxiosInstance;
 
   constructor(
     private authService: IAuthService,
-    baseURL: string = process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:8000/api",
+    baseURL: string = resolveApiBaseUrl(),
   ) {
+    warnIfSuspiciousApiBaseUrl(baseURL);
     this.client = axios.create({
       baseURL,
       headers: { "Content-Type": "application/json" },
@@ -61,7 +63,7 @@ export class AxiosHttpClient implements IHttpClient {
     this.client.interceptors.request.use(
       async (config) => {
         try {
-          const token = await this.authService.getToken();
+          const token = await this.authService.getToken({ waitForSession: true });
           if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
           }
@@ -77,17 +79,20 @@ export class AxiosHttpClient implements IHttpClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        const message =
-          error.response?.data?.message ||
-          error.response?.data?.detail ||
-          "An unexpected error occurred";
-        console.error("[HTTP Client Error]", message);
+        const details = classifyHttpError(error);
+        if (details.kind === "network_unreachable") {
+          console.error("[HTTP Client Error] Network issue detected", details);
+        } else if (details.kind === "auth_unavailable" && details.status === 401) {
+          console.debug("[HTTP Client Auth] Token unavailable/expired during request", details);
+        } else {
+          console.error("[HTTP Client Error]", details);
+        }
         return Promise.reject(error);
       },
     );
   }
 
-  async get<T = any>(
+  async get<T = unknown>(
     url: string,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>> {
@@ -99,9 +104,9 @@ export class AxiosHttpClient implements IHttpClient {
     };
   }
 
-  async post<T = any>(
+  async post<T = unknown>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>> {
     const response = await this.client.post(url, data, config);
@@ -112,9 +117,9 @@ export class AxiosHttpClient implements IHttpClient {
     };
   }
 
-  async patch<T = any>(
+  async patch<T = unknown>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>> {
     const response = await this.client.patch(url, data, config);
@@ -125,9 +130,9 @@ export class AxiosHttpClient implements IHttpClient {
     };
   }
 
-  async put<T = any>(
+  async put<T = unknown>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>> {
     const response = await this.client.put(url, data, config);
@@ -138,7 +143,7 @@ export class AxiosHttpClient implements IHttpClient {
     };
   }
 
-  async delete<T = any>(
+  async delete<T = unknown>(
     url: string,
     config?: RequestConfig,
   ): Promise<HttpResponse<T>> {
@@ -156,7 +161,6 @@ let httpClientInstance: IHttpClient | null = null;
 
 export function getHttpClient(authService?: IAuthService): IHttpClient {
   if (!httpClientInstance) {
-    const { getAuthService } = require("./auth-service");
     httpClientInstance = new AxiosHttpClient(authService || getAuthService());
   }
   return httpClientInstance;
