@@ -1,12 +1,14 @@
 "use client"
 
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { m, AnimatePresence } from "framer-motion"
-import { ChevronRight, Stethoscope, FileText, AlertTriangle, ChevronDown } from "lucide-react"
+import { ChevronRight, Stethoscope, FileText, AlertTriangle } from "lucide-react"
 import { useMedicalRecords } from "@/hooks/use-medical-records"
 import { cn } from "@/lib/utils"
 

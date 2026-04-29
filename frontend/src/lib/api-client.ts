@@ -1,6 +1,10 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
+import { getClerkToken } from '@/lib/network/auth-token';
+import { classifyHttpError } from '@/lib/network/http-error';
+import { resolveApiBaseUrl, warnIfSuspiciousApiBaseUrl } from '@/lib/network/runtime-config';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const BASE_URL = resolveApiBaseUrl();
+warnIfSuspiciousApiBaseUrl(BASE_URL);
 
 /**
  * API Client instance
@@ -14,30 +18,10 @@ const apiClient = axios.create({
 });
 
 
-type ClerkLike = {
-  session?: {
-    getToken: () => Promise<string | null>;
-  };
-};
-
-async function _getClerkToken(): Promise<string | null> {
-  if (typeof globalThis.window === 'undefined') return null;
-  try {
-    const clerkInstance = (globalThis as { Clerk?: ClerkLike }).Clerk;
-    if (clerkInstance?.session) {
-      return await clerkInstance.session.getToken();
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-
 // Request interceptor: automatically attach Clerk token if available
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await _getClerkToken();
+    const token = await getClerkToken({ waitForSession: true });
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -50,16 +34,10 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
-    let message = 'An unexpected error occurred';
-    let status: number | undefined;
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<{ message?: string; detail?: string }>;
-      status = axiosError.response?.status;
-      message = axiosError.response?.data?.message || axiosError.response?.data?.detail || message;
-    }
+    const details = classifyHttpError(error);
     // 401 is expected while auth is initializing or a session is refreshed.
-    if (status !== 401) {
-      console.error('[API Error]', message);
+    if (details.status !== 401) {
+      console.error('[API Error]', details);
     }
     return Promise.reject(error);
   }
@@ -117,7 +95,7 @@ export interface StreamHandlers {
   onDelta: (content: string) => void;
   onComplete: (message: { id: string; content: string; created_at: string; metadata?: Record<string, unknown> | null }) => void;
   onCancelled: () => void;
-  onError: (message: string) => void;
+  onError: (message: string, code?: string) => void;
 }
 
 export async function streamAssistantReply(
@@ -127,9 +105,9 @@ export async function streamAssistantReply(
   signal?: AbortSignal,
   options?: { clientMessageId?: string; mode?: string; metadata?: Record<string, unknown> },
 ): Promise<void> {
-  const token = await _getClerkToken();
+  const token = await getClerkToken({ waitForSession: true });
   if (!token) {
-    handlers.onError('Not authenticated');
+    handlers.onError('Not authenticated', 'auth_unavailable');
     return;
   }
 
@@ -163,7 +141,7 @@ export async function streamAssistantReply(
   }
 
   if (!res.body) {
-    handlers.onError('No response body');
+    handlers.onError('No response body', 'network_unreachable');
     return;
   }
 
@@ -194,7 +172,7 @@ export async function streamAssistantReply(
           } else if (event.type === 'cancelled') {
             handlers.onCancelled();
           } else if (event.type === 'error') {
-            handlers.onError(event.message || 'Streaming error');
+            handlers.onError(event.message || 'Streaming error', event.code);
           }
         } catch {
           // ignore malformed JSON

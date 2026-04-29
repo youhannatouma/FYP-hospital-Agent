@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@clerk/nextjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -105,9 +107,22 @@ const resources = [
 type ScreeningState = "intro" | "questions" | "results"
 
 export default function MentalHealthPage() {
+  const router = useRouter()
+  const { isLoaded, isSignedIn } = useAuth()
   const [screeningState, setScreeningState] = useState<ScreeningState>("intro")
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<number, string>>({})
+
+  useEffect(() => {
+    if (!isLoaded) return
+    if (!isSignedIn) {
+      router.replace("/auth/sign-in?redirect_url=/patient/mental-health")
+    }
+  }, [isLoaded, isSignedIn, router])
+
+  if (!isLoaded || !isSignedIn) {
+    return null
+  }
 
   const totalScore = Object.values(answers).reduce(
     (sum, val) => sum + parseInt(val || "0"),

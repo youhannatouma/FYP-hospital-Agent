@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
+import re
+from datetime import date
+from datetime import datetime, timezone
+from time import perf_counter
 from typing import Any, AsyncIterator
 from uuid import UUID
 
@@ -15,6 +18,11 @@ from app.auth.dependencies import get_current_user
 from app.database import get_db
 from app.models.chat import ChatMessage, ChatThread
 from app.models.user import User
+from app.assistant_telemetry import (
+    AssistantTelemetryEvent,
+    assistant_telemetry_store,
+    parse_summary_range,
+)
 from app.schemas.chat import (
     ChatStreamRequest,
     MessagePageResponse,
@@ -27,11 +35,83 @@ from app.schemas.chat import (
 try:
     from orchestration.assistant_chat_orchestrator import stream_assistant_response
     from middleware import stream_manager
+    from shared.gemini import AssistantConfigError, AssistantRuntimeError
 except ImportError:  # Fallback for backend package context
     from backend.orchestration.assistant_chat_orchestrator import stream_assistant_response
     from backend.middleware import stream_manager
+    from backend.shared.gemini import AssistantConfigError, AssistantRuntimeError
+try:
+    from telemetry import emit_telemetry_event
+except ImportError:
+    from backend.telemetry import emit_telemetry_event
 
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
+
+
+def _extract_profile_candidates(message: str) -> dict[str, Any]:
+    text = (message or "").strip()
+    lowered = text.lower()
+    out: dict[str, Any] = {}
+
+    dob_match = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", text)
+    if dob_match:
+        try:
+            out["date_of_birth"] = date(
+                int(dob_match.group(1)),
+                int(dob_match.group(2)),
+                int(dob_match.group(3)),
+            ).isoformat()
+        except ValueError:
+            pass
+    else:
+        year_match = re.search(r"\b(?:born in|birth year is|i was born in)\s*(\d{4})\b", lowered)
+        if year_match:
+            year = int(year_match.group(1))
+            if 1900 <= year <= date.today().year:
+                out["date_of_birth"] = f"{year:04d}-01-01"
+
+    allergy_match = re.search(r"\ballerg(?:y|ies)\s*(?:are|is|:)?\s*(.+)", text, re.IGNORECASE)
+    if allergy_match:
+        raw = allergy_match.group(1)
+        raw = re.split(r"[.?!]", raw)[0]
+        candidates = [a.strip(" -") for a in re.split(r",| and ", raw, flags=re.IGNORECASE)]
+        allergies = [a for a in candidates if a and len(a) < 80]
+        if allergies:
+            out["allergies"] = sorted(set(allergies), key=lambda x: x.lower())
+
+    return out
+
+
+def _is_confirmation_message(message: str) -> bool:
+    lowered = (message or "").strip().lower()
+    confirmations = {
+        "yes", "y", "confirm", "confirmed", "save it", "save", "go ahead", "proceed", "correct",
+    }
+    return lowered in confirmations or any(token in lowered for token in ("yes save", "confirm save", "please save"))
+
+
+def _find_latest_pending_profile_update(db: Session, thread_id: UUID) -> dict[str, Any] | None:
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.thread_id == thread_id, ChatMessage.role == "assistant")
+        .order_by(ChatMessage.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    for row in rows:
+        metadata = row.message_metadata or {}
+        if metadata.get("profile_update_state") == "pending_confirmation" and metadata.get("profile_update_pending"):
+            pending = metadata.get("profile_update_pending")
+            if isinstance(pending, dict):
+                return pending
+    return None
+
+
+def _extract_ui_source(metadata: dict[str, Any] | None) -> str:
+    if not metadata:
+        return "unknown"
+    value = metadata.get("ui_source")
+    return str(value) if value else "unknown"
 
 
 def _normalize_content(content: str) -> str:
@@ -229,57 +309,220 @@ async def stream_thread_reply(
 
     stream_key = f"{user.user_id}:{thread.thread_id}"
     stream_manager.create_stream_token(stream_key)
+    ui_source = _extract_ui_source(payload.metadata or {})
+    request_started_at = datetime.now(timezone.utc)
+    started_perf = perf_counter()
+    chunk_count = 0
+    emit_telemetry_event(
+        "assistant_request_started",
+        workflow_family="assistant",
+        request_path="/assistant/threads/{thread_id}/stream",
+        sample_key=f"{user.user_id}:{thread.thread_id}:assistant_request_started",
+        payload={
+            "thread_id": str(thread.thread_id),
+            "actor_user_id": str(user.user_id),
+            "ui_source": ui_source,
+        },
+    )
+    assistant_telemetry_store.record(
+        AssistantTelemetryEvent(
+            event_name="assistant_request_started",
+            occurred_at=request_started_at,
+            thread_id=str(thread.thread_id),
+            user_id=str(user.user_id),
+            ui_source=ui_source,
+        )
+    )
 
     async def event_generator() -> AsyncIterator[str]:
+        nonlocal chunk_count
         assistant_text = ""
         assistant_metadata: dict[str, Any] = {}
         cancelled = False
         error_message = None
 
         try:
-            recent_messages = (
-                db.query(ChatMessage)
-                .filter(ChatMessage.thread_id == thread.thread_id)
-                .order_by(ChatMessage.created_at.desc())
-                .limit(10)
-                .all()
-            )
-            recent_messages_payload = [
-                {"role": msg.role, "content": msg.content}
-                for msg in reversed(recent_messages)
-                if msg.content
-            ]
+            candidate_profile_update = _extract_profile_candidates(payload.message)
+            if candidate_profile_update and not _is_confirmation_message(payload.message):
+                confirmation_text = (
+                    "I captured profile details from your message. "
+                    f"Date of birth: {candidate_profile_update.get('date_of_birth', 'not provided')}; "
+                    f"allergies: {', '.join(candidate_profile_update.get('allergies', [])) or 'not provided'}. "
+                    "Reply with 'confirm' to save these details to your profile."
+                )
+                assistant_text = confirmation_text
+                assistant_metadata = {
+                    "status": "complete",
+                    "profile_update_state": "pending_confirmation",
+                    "profile_update_pending": candidate_profile_update,
+                }
+                yield f"data: {json.dumps({'type': 'delta', 'content': confirmation_text})}\n\n"
+            elif _is_confirmation_message(payload.message):
+                pending = _find_latest_pending_profile_update(db, thread.thread_id)
+                if pending:
+                    if pending.get("date_of_birth"):
+                        try:
+                            user.date_of_birth = date.fromisoformat(str(pending["date_of_birth"]))
+                        except ValueError:
+                            pass
+                    if isinstance(pending.get("allergies"), list):
+                        user.allergies = [str(a) for a in pending["allergies"] if str(a).strip()]
+                    db.commit()
+                    assistant_text = (
+                        "Confirmed. I saved your date of birth and allergies to your patient profile."
+                    )
+                    assistant_metadata = {
+                        "status": "complete",
+                        "profile_update_state": "applied",
+                        "profile_update_applied": {
+                            "date_of_birth": pending.get("date_of_birth"),
+                            "allergies": pending.get("allergies", []),
+                        },
+                    }
+                    yield f"data: {json.dumps({'type': 'delta', 'content': assistant_text})}\n\n"
 
-            async for chunk in stream_assistant_response(
-                user=user,
-                thread_id=str(thread.thread_id),
-                message=payload.message,
-                recent_messages=recent_messages_payload,
-            ):
-                if stream_manager.is_cancelled(stream_key):
-                    cancelled = True
-                    yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
-                    break
+            if not assistant_text:
+                recent_messages = (
+                    db.query(ChatMessage)
+                    .filter(ChatMessage.thread_id == thread.thread_id)
+                    .order_by(ChatMessage.created_at.desc())
+                    .limit(10)
+                    .all()
+                )
+                recent_messages_payload = [
+                    {"role": msg.role, "content": msg.content}
+                    for msg in reversed(recent_messages)
+                    if msg.content
+                ]
 
-                if chunk.get("type") == "delta":
-                    delta = chunk.get("content", "")
-                    if delta:
-                        assistant_text += delta
-                        yield f"data: {json.dumps({'type': 'delta', 'content': delta})}\n\n"
-                elif chunk.get("type") == "complete":
-                    assistant_metadata = chunk.get("response", {}) or {}
+                async for chunk in stream_assistant_response(
+                    user=user,
+                    thread_id=str(thread.thread_id),
+                    message=payload.message,
+                    recent_messages=recent_messages_payload,
+                ):
+                    if stream_manager.is_cancelled(stream_key):
+                        cancelled = True
+                        yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
+                        break
+
+                    if chunk.get("type") == "delta":
+                        delta = chunk.get("content", "")
+                        if delta:
+                            chunk_count += 1
+                            assistant_text += delta
+                            yield f"data: {json.dumps({'type': 'delta', 'content': delta})}\n\n"
+                    elif chunk.get("type") == "complete":
+                        assistant_metadata = chunk.get("response", {}) or {}
         except Exception as exc:
             error_message = str(exc)
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Streaming failed'})}\n\n"
+            error_code = "assistant_stream_error"
+            safe_message = "Streaming failed"
+            if isinstance(exc, AssistantConfigError):
+                error_code = exc.code
+                safe_message = "Assistant configuration is missing or invalid. Please contact support."
+            elif isinstance(exc, AssistantRuntimeError):
+                error_code = exc.code
+                safe_message = "Assistant is temporarily unavailable. Please try again."
+
+            assistant_metadata = {
+                **assistant_metadata,
+                "status": "error",
+                "error_code": error_code,
+                "error_message": safe_message,
+            }
+            yield f"data: {json.dumps({'type': 'error', 'code': error_code, 'message': safe_message})}\n\n"
         finally:
             stream_manager.remove_stream_token(stream_key)
 
         if cancelled:
             assistant_metadata = {**assistant_metadata, "status": "cancelled"}
+            duration_ms = int((perf_counter() - started_perf) * 1000)
+            emit_telemetry_event(
+                "assistant_request_cancelled",
+                workflow_family="assistant",
+                request_path="/assistant/threads/{thread_id}/stream",
+                sample_key=f"{user.user_id}:{thread.thread_id}:assistant_request_cancelled",
+                payload={
+                    "thread_id": str(thread.thread_id),
+                    "actor_user_id": str(user.user_id),
+                    "ui_source": ui_source,
+                    "duration_ms": duration_ms,
+                    "streamed_token_chunks": chunk_count,
+                },
+            )
+            assistant_telemetry_store.record(
+                AssistantTelemetryEvent(
+                    event_name="assistant_request_cancelled",
+                    occurred_at=datetime.now(timezone.utc),
+                    thread_id=str(thread.thread_id),
+                    user_id=str(user.user_id),
+                    ui_source=ui_source,
+                    duration_ms=duration_ms,
+                    streamed_token_chunks=chunk_count,
+                )
+            )
         elif error_message:
-            assistant_metadata = {**assistant_metadata, "status": "error", "error": error_message}
+            assistant_metadata = {
+                **assistant_metadata,
+                "status": "error",
+                "error": error_message,
+            }
+            duration_ms = int((perf_counter() - started_perf) * 1000)
+            error_code = assistant_metadata.get("error_code")
+            emit_telemetry_event(
+                "assistant_request_failed",
+                workflow_family="assistant",
+                request_path="/assistant/threads/{thread_id}/stream",
+                sample_key=f"{user.user_id}:{thread.thread_id}:assistant_request_failed",
+                payload={
+                    "thread_id": str(thread.thread_id),
+                    "actor_user_id": str(user.user_id),
+                    "ui_source": ui_source,
+                    "error_code": error_code,
+                    "duration_ms": duration_ms,
+                    "streamed_token_chunks": chunk_count,
+                },
+            )
+            assistant_telemetry_store.record(
+                AssistantTelemetryEvent(
+                    event_name="assistant_request_failed",
+                    occurred_at=datetime.now(timezone.utc),
+                    thread_id=str(thread.thread_id),
+                    user_id=str(user.user_id),
+                    ui_source=ui_source,
+                    error_code=str(error_code) if error_code else None,
+                    duration_ms=duration_ms,
+                    streamed_token_chunks=chunk_count,
+                )
+            )
         else:
             assistant_metadata = {**assistant_metadata, "status": "complete"}
+            duration_ms = int((perf_counter() - started_perf) * 1000)
+            emit_telemetry_event(
+                "assistant_request_completed",
+                workflow_family="assistant",
+                request_path="/assistant/threads/{thread_id}/stream",
+                sample_key=f"{user.user_id}:{thread.thread_id}:assistant_request_completed",
+                payload={
+                    "thread_id": str(thread.thread_id),
+                    "actor_user_id": str(user.user_id),
+                    "ui_source": ui_source,
+                    "duration_ms": duration_ms,
+                    "streamed_token_chunks": chunk_count,
+                },
+            )
+            assistant_telemetry_store.record(
+                AssistantTelemetryEvent(
+                    event_name="assistant_request_completed",
+                    occurred_at=datetime.now(timezone.utc),
+                    thread_id=str(thread.thread_id),
+                    user_id=str(user.user_id),
+                    ui_source=ui_source,
+                    duration_ms=duration_ms,
+                    streamed_token_chunks=chunk_count,
+                )
+            )
 
         if assistant_text or assistant_metadata:
             assistant_message = ChatMessage(
@@ -327,3 +570,13 @@ def cancel_stream(
     cancelled = stream_manager.cancel_stream(stream_key)
     message = "Stream cancelled" if cancelled else "No active stream"
     return {"message": message}
+
+
+@router.get("/telemetry/summary")
+def assistant_telemetry_summary(
+    start: str | None = Query(default=None),
+    end: str | None = Query(default=None),
+    _user: User = Depends(get_current_user),
+):
+    parsed_start, parsed_end = parse_summary_range(start=start, end=end)
+    return assistant_telemetry_store.summary(start=parsed_start, end=parsed_end)

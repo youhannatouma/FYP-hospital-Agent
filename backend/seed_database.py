@@ -1,4 +1,4 @@
-"""
+r"""
 Database Seed Script
 --------------------
 Populates the hospital database with realistic data:
@@ -32,6 +32,7 @@ from app.models.medical_record import MedicalRecord
 from app.models.prescription import Prescription
 from app.models.payment import Payment
 from app.models.notification import Notification
+from app.models.pharmacy import Medication, Pharmacy, PharmacyInventory
 from app.models.enums import AppointmentStatus
 
 # ─── Seed Data ───────────────────────────────────────────────────────────────
@@ -230,6 +231,113 @@ PATIENTS = [
     },
 ]
 
+MEDICATION_CATALOG = [
+    {
+        "name": "Paracetamol",
+        "dosage": "500 mg every 6 hours as needed; max 3000 mg/day unless directed by a clinician.",
+        "substances": ["Acetaminophen"],
+        "warnings": "Commonly used for headache, fever, mild pain, sore throat, and muscle aches. Avoid overdose and use caution with liver disease.",
+        "contradictions": "Severe liver disease or heavy alcohol use without clinician advice.",
+        "drug_interactions": "May interact with warfarin when used regularly.",
+        "price": 4.50,
+    },
+    {
+        "name": "Ibuprofen",
+        "dosage": "200-400 mg every 6-8 hours as needed with food; max 1200 mg/day OTC.",
+        "substances": ["Ibuprofen"],
+        "warnings": "Commonly used for headache, fever, inflammation, tooth pain, muscle pain, and period pain.",
+        "contradictions": "Avoid with ibuprofen allergy, active stomach ulcer, severe kidney disease, or late pregnancy.",
+        "drug_interactions": "Can interact with anticoagulants, aspirin, ACE inhibitors, and some blood pressure medicines.",
+        "price": 5.75,
+    },
+    {
+        "name": "Loratadine",
+        "dosage": "10 mg once daily.",
+        "substances": ["Loratadine"],
+        "warnings": "Commonly used for allergies, sneezing, runny nose, itchy eyes, and hay fever.",
+        "contradictions": "Use caution with severe liver disease.",
+        "drug_interactions": "Few common interactions; check with pharmacist for complex regimens.",
+        "price": 6.25,
+    },
+    {
+        "name": "Omeprazole",
+        "dosage": "20 mg once daily before breakfast for short-term heartburn relief.",
+        "substances": ["Omeprazole"],
+        "warnings": "Commonly used for heartburn, acid reflux, and indigestion.",
+        "contradictions": "Seek care for chest pain, black stools, vomiting blood, or unexplained weight loss.",
+        "drug_interactions": "Can interact with clopidogrel, warfarin, and some antifungals.",
+        "price": 8.00,
+    },
+    {
+        "name": "Dextromethorphan Syrup",
+        "dosage": "Follow product label dosing based on age and concentration.",
+        "substances": ["Dextromethorphan"],
+        "warnings": "Commonly used for dry cough. Avoid combining with multiple cough products unless advised.",
+        "contradictions": "Avoid with MAOI antidepressants or serotonin syndrome risk without clinician advice.",
+        "drug_interactions": "Can interact with SSRIs, SNRIs, MAOIs, and linezolid.",
+        "price": 7.50,
+    },
+    {
+        "name": "Oral Rehydration Salts",
+        "dosage": "Dissolve one sachet in the labeled water volume and sip frequently.",
+        "substances": ["Sodium chloride", "Potassium chloride", "Glucose"],
+        "warnings": "Commonly used for diarrhea, vomiting, and dehydration support.",
+        "contradictions": "Seek urgent care for severe dehydration, blood in stool, confusion, or persistent vomiting.",
+        "drug_interactions": "Use caution with severe kidney disease or potassium-restricted diets.",
+        "price": 3.25,
+    },
+]
+
+
+def ensure_medication_catalog(db):
+    pharmacy = db.query(Pharmacy).filter(Pharmacy.name == "Hospital Main Pharmacy").first()
+    if not pharmacy:
+        pharmacy = Pharmacy(
+            name="Hospital Main Pharmacy",
+            address="Main Hospital Campus",
+            phone_number="+971-50-200-0001",
+            opening_hours="08:00-22:00",
+            open_24_hours=False,
+        )
+        db.add(pharmacy)
+        db.flush()
+
+    created = 0
+    for item in MEDICATION_CATALOG:
+        medication = db.query(Medication).filter(Medication.name == item["name"]).first()
+        if not medication:
+            medication = Medication(
+                name=item["name"],
+                dosage=item["dosage"],
+                substances=item["substances"],
+                warnings=item["warnings"],
+                contradictions=item["contradictions"],
+                drug_interactions=item["drug_interactions"],
+            )
+            db.add(medication)
+            db.flush()
+            created += 1
+
+        inventory = (
+            db.query(PharmacyInventory)
+            .filter(
+                PharmacyInventory.pharmacy_id == pharmacy.pharmacy_id,
+                PharmacyInventory.medication_id == medication.medication_id,
+            )
+            .first()
+        )
+        if not inventory:
+            db.add(
+                PharmacyInventory(
+                    pharmacy_id=pharmacy.pharmacy_id,
+                    medication_id=medication.medication_id,
+                    quantity_available=100,
+                    price=item["price"],
+                )
+            )
+
+    print("[Seed]   %s medication catalog (%d new medications)" % ("+" if created else "~", created))
+
 
 def seed_database():
     """
@@ -238,10 +346,13 @@ def seed_database():
     """
     db = SessionLocal()
     try:
+        ensure_medication_catalog(db)
+
         # Check if data already exists
         existing_doctors = db.query(User).filter(User.role == "doctor").count()
         if existing_doctors >= 8:
             print("[Seed] Database already seeded (found %d doctors). Skipping." % existing_doctors)
+            db.commit()
             return
 
         print("[Seed] Seeding database with real data...")

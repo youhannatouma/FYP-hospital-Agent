@@ -77,7 +77,7 @@ class UnifiedAgentResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     message: str
-    message_type: Literal["medication", "appointment", "combined", "error"]
+    message_type: Literal["medication", "appointment", "combined", "general_health", "error"]
 
     # Structured payloads for frontend interactive elements
     medication_result: MedicationResult | None = None

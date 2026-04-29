@@ -10,7 +10,6 @@ export default function OnboardingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoaded } = useUser();
-  const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -24,29 +23,32 @@ export default function OnboardingPage() {
           router.push("/doctor");
           return;
         } else if (metaRole === "patient") {
-          router.push("/onboarding/patient");
+          router.push("/patient");
           return;
         }
 
         // 2. Check backend database to see if user exists with a role already set
         try {
           const container = getServiceContainer();
-          const profile = await container.user.getProfile();
+          const profile = await container.user.getCurrentUser();
           if (profile && profile.role) {
             // User exists in database with role set
             if (profile.role === "doctor") {
               router.push("/doctor");
+            } else if (profile.role === "patient") {
+              router.push("/patient");
             } else {
               // Role set but unknown - show role selection
               router.push("/onboarding/patient");
             }
             return;
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Unknown error";
           // Backend error (maybe user just created) - continue to role selection
           console.log(
             "[Onboarding] Backend check failed (OK for new users):",
-            err.message,
+            message,
           );
         }
 
@@ -56,17 +58,17 @@ export default function OnboardingPage() {
           router.push("/doctor");
           return;
         } else if (queryRole === "patient") {
-          router.push("/onboarding/patient");
+          router.push("/patient");
           return;
         }
 
         // 4. If no role anywhere, default to patient onboarding
         console.log("[Onboarding] Defaulting to patient onboarding");
         router.push("/onboarding/patient");
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "An error occurred";
         console.error("[Onboarding] Unexpected error:", err);
-        setError(err.message || "An error occurred");
-        setLoading(false);
+        setError(message);
       }
     };
 

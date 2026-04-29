@@ -46,6 +46,16 @@ const quickActions = [
   { label: "Book Visit", icon: CalendarPlus },
 ]
 
+function mapAssistantError(code: string | undefined, fallback: string): string {
+  if (code === "assistant_config_error") {
+    return "Assistant is temporarily unavailable due to configuration. Please contact support."
+  }
+  if (code === "assistant_runtime_error") {
+    return "Assistant is temporarily unavailable. Please try again in a moment."
+  }
+  return fallback
+}
+
 export default function PatientAIAssistantPage() {
   const searchParams = useSearchParams()
   const [threads, setThreads] = useState<Thread[]>([])
@@ -185,13 +195,14 @@ export default function PatientAIAssistantPage() {
             setStreamingText("")
             setIsStreaming(false)
           },
-          onError: (errorMessage) => {
+          onError: (errorMessage, code) => {
+            const friendly = mapAssistantError(code, errorMessage)
             setMessages((prev) => [
               ...prev,
               {
                 message_id: `error-${Date.now()}`,
                 role: "assistant",
-                content: `Error: ${errorMessage}`,
+                content: `Error: ${friendly}`,
                 created_at: new Date().toISOString(),
               },
             ])

@@ -280,10 +280,10 @@ def test_synthesize_combined(monkeypatch, sample_patient, sample_medication_resu
     assert "Medication Guidance" in captured_prompt["text"] or "Appointment Scheduling" in captured_prompt["text"]
 
 
-def test_synthesize_error_no_tools(monkeypatch, sample_patient):
+def test_synthesize_error_no_tools_with_structured_errors(monkeypatch, sample_patient):
     class FakeLLM:
         def invoke(self, prompt):
-            return type("Resp", (), {"content": "I apologize, something went wrong."})()
+            return type("Resp", (), {"content": "Your cholesterol trends matter; focus on diet, exercise, and follow-up labs."})()
 
     monkeypatch.setattr(synth, "_llm", FakeLLM())
 
@@ -297,7 +297,26 @@ def test_synthesize_error_no_tools(monkeypatch, sample_patient):
     )
 
     assert result.message_type == "error"
-    assert "apologize" in result.message.lower() or "something went wrong" in result.message.lower()
+    assert "cholesterol" in result.message.lower()
+
+
+def test_synthesize_general_health_fallback(monkeypatch, sample_patient):
+    class BrokenLLM:
+        def invoke(self, prompt):
+            raise RuntimeError("provider timeout")
+
+    monkeypatch.setattr(synth, "_llm", BrokenLLM())
+
+    result = synth.synthesize_response(
+        patient_profile=sample_patient,
+        symptom="",
+        need_text="What should I know about my cholesterol levels?",
+        medication_result=None,
+        doctor_result=None,
+    )
+
+    assert result.message_type == "general_health"
+    assert "general health guidance" in result.message.lower()
 
 
 def test_synthesize_llm_failure_fallback(monkeypatch, sample_patient, sample_medication_result):
@@ -315,8 +334,8 @@ def test_synthesize_llm_failure_fallback(monkeypatch, sample_patient, sample_med
         doctor_result=None,
     )
 
-    assert result.message_type == "error"
-    assert "unable to generate" in result.message.lower()
+    assert result.message_type == "medication"
+    assert result.message == sample_medication_result["response"]
     assert result.medication_result is not None  # Structured data still present
 
 
@@ -374,9 +393,33 @@ async def test_stream_synthesize_fallback_on_error(monkeypatch, sample_patient, 
     completes = [c for c in chunks if c["type"] == "complete"]
 
     assert len(deltas) == 1
-    assert "unable to generate" in deltas[0]["content"].lower()
+    assert "dr. smith" in deltas[0]["content"].lower()
     assert len(completes) == 1
-    assert completes[0]["response"]["message_type"] == "error"
+    assert completes[0]["response"]["message_type"] == "appointment"
+
+
+@pytest.mark.asyncio
+async def test_stream_synthesize_general_health_path(monkeypatch, sample_patient):
+    class FakeStreamLLM:
+        def stream(self, prompt):
+            for token in ["Keep ", "an eye ", "on LDL."]:
+                yield type("Chunk", (), {"content": token})()
+
+    monkeypatch.setattr(synth, "_llm", FakeStreamLLM())
+
+    chunks = []
+    async for chunk in synth.stream_synthesize_response(
+        patient_profile=sample_patient,
+        symptom="What should I know about cholesterol?",
+        need_text="What should I know about cholesterol?",
+        medication_result=None,
+        doctor_result=None,
+    ):
+        chunks.append(chunk)
+
+    completes = [c for c in chunks if c["type"] == "complete"]
+    assert len(completes) == 1
+    assert completes[0]["response"]["message_type"] == "general_health"
 
 
 # ── LangGraph node test ─────────────────────────────────────────────────

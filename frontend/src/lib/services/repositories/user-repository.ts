@@ -39,6 +39,7 @@ export interface UserProfile {
  */
 export interface IUserRepository {
   getCurrentUser(): Promise<UserProfile>;
+  updateMyProfile(payload: Partial<UserProfile>): Promise<{ message: string; user_id: string; user: Record<string, unknown> }>;
   getUserById(id: string): Promise<UserProfile>;
   getAllUsers(): Promise<UserProfile[]>;
   deleteUser(id: string): Promise<void>;
@@ -50,6 +51,10 @@ export class UserRepository implements IUserRepository {
 
   async getCurrentUser(): Promise<UserProfile> {
     return this.apiHelper.get<UserProfile>('/users/me');
+  }
+
+  async updateMyProfile(payload: Partial<UserProfile>): Promise<{ message: string; user_id: string; user: Record<string, unknown> }> {
+    return this.apiHelper.patch<{ message: string; user_id: string; user: Record<string, unknown> }>('/users/me', payload);
   }
 
   async getUserById(id: string): Promise<UserProfile> {

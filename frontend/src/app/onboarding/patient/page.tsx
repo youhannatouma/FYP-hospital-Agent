@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import {
   User,
   MapPin,
@@ -59,6 +59,7 @@ import { m, AnimatePresence } from "framer-motion";
 export default function PatientOnboarding() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = React.useState(3);
   const [progress, setProgress] = React.useState(25);
@@ -729,13 +730,21 @@ export default function PatientOnboarding() {
                         ],
                       };
 
+                      const token = await getToken();
                       const profileRes = await fetch("/api/v1/users", {
                         method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
+                        headers: {
+                          "Content-Type": "application/json",
+                          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
                         body: JSON.stringify(profileUpdate),
                       });
 
                       if (!profileRes.ok) {
+                        if (profileRes.status === 401 || profileRes.status === 403) {
+                          router.push("/auth/sign-in?redirect_url=/onboarding/patient");
+                          return;
+                        }
                         const profileErr = await profileRes.json().catch(() => ({}));
                         throw new Error(profileErr?.error || profileErr?.detail || "Failed to save profile");
                       }
@@ -747,9 +756,23 @@ export default function PatientOnboarding() {
                         body: JSON.stringify({ role: "patient" }),
                       });
 
-                      if (!roleRes.ok) {
-                        throw new Error("Failed to set user role");
+                      let rolePayload: { success?: boolean; role?: string; fallback?: boolean } | null = null;
+                      try {
+                        rolePayload = await roleRes.json();
+                      } catch {
+                        rolePayload = null;
                       }
+
+                      if (!roleRes.ok || rolePayload?.success === false) {
+                        console.warn("Role sync failed, continuing with patient onboarding flow.");
+                      }
+
+                      // Persist a local onboarding completion marker for middleware fallback.
+                      document.cookie = "patient_onboarding_complete=1; Path=/; Max-Age=31536000; SameSite=Lax";
+
+                      // Trigger a fresh Clerk token so role claim changes propagate faster.
+                      await getToken({ skipCache: true });
+                      await user?.reload();
 
                       toast({
                         title: "Profile Complete",
