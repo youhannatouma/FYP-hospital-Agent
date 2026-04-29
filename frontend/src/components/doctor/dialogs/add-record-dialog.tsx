@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useUser, useAuth } from "@clerk/nextjs"
-import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,30 +22,46 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useHospital } from "@/hooks/use-hospital"
 
 interface AddRecordDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  recordType?: string
+  preSelectedPatientId?: string
 }
 
-export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
+export function AddRecordDialog({ 
+  open, 
+  onOpenChange, 
+  recordType = "General Entry",
+  preSelectedPatientId 
+}: AddRecordDialogProps) {
   const { toast } = useToast()
-  const { user } = useUser()
+  const { getToken } = useAuth()
+  const { medicalRecords, admin } = useHospital()
   const [patients, setPatients] = React.useState<any[]>([])
   
   const [loading, setLoading] = React.useState(false)
-  const [selectedPatientId, setSelectedPatientId] = React.useState("")
+  const [selectedPatientId, setSelectedPatientId] = React.useState(preSelectedPatientId || "")
   const [diagnosis, setDiagnosis] = React.useState("")
   const [details, setDetails] = React.useState("")
   const [date, setDate] = React.useState(new Date().toISOString().split('T')[0])
 
   React.useEffect(() => {
-    if (open) {
+    if (preSelectedPatientId) {
+      setSelectedPatientId(preSelectedPatientId)
+    }
+  }, [preSelectedPatientId])
+
+  React.useEffect(() => {
+    if (open && !preSelectedPatientId) {
       const fetchPatients = async () => {
         try {
-          const res = await apiClient.get("/users/")
-          if (Array.isArray(res.data)) {
-            setPatients(res.data.filter((u: any) => u.role === 'patient'))
+          const token = await getToken()
+          const data = await admin.getAllUsers(token || undefined)
+          if (Array.isArray(data)) {
+            setPatients(data.filter((u: any) => u.role === 'patient'))
           }
         } catch (err) {
           console.error("Failed to fetch patients:", err)
@@ -54,7 +69,7 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
       }
       fetchPatients()
     }
-  }, [open])
+  }, [open, preSelectedPatientId, getToken, admin])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,24 +80,23 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
 
     setLoading(true)
     
-    const patient = patients.find((p: any) => p.user_id === selectedPatientId)
-    
     try {
-      await apiClient.post("/medical-records/", {
+      const token = await getToken()
+      await medicalRecords.createRecord({
         patient_id: selectedPatientId,
-        record_type: "General Entry",
+        record_type: recordType,
         diagnosis,
         treatment: "See clinical notes",
         clinical_notes: details,
-      })
+      }, token || undefined)
 
       toast({
-        title: "Record Added",
-        description: `Medical record for ${patient?.first_name} ${patient?.last_name} has been successfully saved.`,
+        title: recordType === "Lab Result" ? "Lab Ordered" : "Record Added",
+        description: `Successfully saved ${recordType.toLowerCase()} entry.`,
       })
       
       // Reset form
-      setSelectedPatientId("")
+      if (!preSelectedPatientId) setSelectedPatientId("")
       setDiagnosis("")
       setDetails("")
       onOpenChange(false)
@@ -96,65 +110,71 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] rounded-3xl">
         <DialogHeader>
-          <DialogTitle>Add Medical Record</DialogTitle>
+          <DialogTitle>{recordType === "Lab Result" ? "Order New Lab Test" : "Add Medical Record"}</DialogTitle>
           <DialogDescription>
-            Create a new clinical entry. Select a patient and enter the diagnostic findings.
+            {recordType === "Lab Result" 
+              ? "Specify the laboratory test and diagnostic intent." 
+              : "Create a new clinical entry for the patient's timeline."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          {!preSelectedPatientId && (
+            <div className="grid gap-2">
+              <Label htmlFor="patient">Select Patient</Label>
+              <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Select a patient..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {patients.map((p: any) => (
+                    <SelectItem key={p.user_id} value={p.user_id}>
+                      {p.first_name} {p.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid gap-2">
-            <Label htmlFor="patient">Select Patient</Label>
-            <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a patient..." />
-              </SelectTrigger>
-              <SelectContent>
-                {patients.map((p: any) => (
-                  <SelectItem key={p.user_id} value={p.user_id}>
-                    {p.first_name} {p.last_name} ({p.email})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="diagnosis">Primary Diagnosis</Label>
+            <Label htmlFor="diagnosis">{recordType === "Lab Result" ? "Test Name / Indication" : "Primary Diagnosis"}</Label>
             <Input 
               id="diagnosis" 
-              placeholder="e.g. Hypertension" 
+              placeholder={recordType === "Lab Result" ? "e.g. Complete Blood Count" : "e.g. Hypertension"} 
               value={diagnosis}
               onChange={(e) => setDiagnosis(e.target.value)}
+              className="rounded-xl"
               required 
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="details">Clinical Details</Label>
+            <Label htmlFor="details">{recordType === "Lab Result" ? "Additional Lab Instructions" : "Clinical Details"}</Label>
             <Textarea 
               id="details" 
-              placeholder="Enter symptoms, observations, and assessment..." 
-              className="min-h-[100px]"
+              placeholder={recordType === "Lab Result" ? "Specify parameters or fasting requirements..." : "Enter symptoms, observations, and assessment..."} 
+              className="min-h-[100px] rounded-xl"
               value={details}
               onChange={(e) => setDetails(e.target.value)}
               required
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="date">Visit Date</Label>
+            <Label htmlFor="date">Service Date</Label>
             <Input 
               id="date" 
               type="date" 
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              className="rounded-xl"
             />
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Save Record"}
+            <Button type="submit" disabled={loading} className="rounded-xl bg-primary text-white">
+              {loading ? "Processing..." : (recordType === "Lab Result" ? "Initialize Order" : "Commit Record")}
             </Button>
           </DialogFooter>
         </form>

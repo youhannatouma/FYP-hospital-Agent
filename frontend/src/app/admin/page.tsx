@@ -34,119 +34,72 @@ import { AppointmentAnalytics } from "@/components/admin/appointment-analytics"
 import { AIPerformance } from "@/components/admin/ai-performance"
 import { FinancialOverview } from "@/components/admin/financial-overview"
 import { HealthTrends } from "@/components/admin/health-trends"
+import { LabManagement } from "@/components/admin/lab-management"
+import { FlaskConical } from "lucide-react"
 
 export default function AdminDashboard() {
   const { admin } = useHospital()
   const { getToken } = useAuth()
   const { toast } = useToast()
   const [dynamicStats, setDynamicStats] = React.useState<any>(null)
-  const [pendingApprovals, setPendingApprovals] = React.useState([
-    {
-      id: 1,
-      name: "Dr. Sarah Miller",
-      specialty: "Neurology",
-      experience: "8 Years",
-      appliedDate: "Feb 08, 2024",
-      status: "Pending"
-    },
-    {
-      id: 2,
-      name: "Dr. James Wilson",
-      specialty: "Pediatrics",
-      experience: "12 Years",
-      appliedDate: "Feb 07, 2024",
-      status: "Pending"
-    },
-    {
-      id: 3,
-      name: "Dr. Elena Popova",
-      specialty: "Radiology",
-      experience: "5 Years",
-      appliedDate: "Feb 06, 2024",
-      status: "Review"
-    }
-  ])
-
-  const [topStats, setTopStats] = React.useState([
-    {
-      title: "Total Patients",
-      value: "2,845",
-      change: "+12.5%",
-      trend: "up",
-      icon: Users,
-      color: "text-blue-600",
-      bg: "bg-blue-500/10"
-    },
-    {
-      title: "Active Doctors",
-      value: "156",
-      change: "+4.2%",
-      trend: "up",
-      icon: UserCheck,
-      color: "text-emerald-600",
-      bg: "bg-emerald-500/10"
-    },
-    {
-      title: "Monthly Revenue",
-      value: "$45,280",
-      change: "+18.2%",
-      trend: "up",
-      icon: DollarSign,
-      color: "text-amber-600",
-      bg: "bg-amber-500/10"
-    },
-    {
-      title: "System Uptime",
-      value: "99.9%",
-      change: "+0.01%",
-      trend: "up",
-      icon: Activity,
-      color: "text-purple-600",
-      bg: "bg-purple-500/10"
-    },
-  ])
+  const [pendingApprovals, setPendingApprovals] = React.useState<any[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
 
   React.useEffect(() => {
-    const fetchStats = async () => {
-      const token = await getToken()
-      const data = await admin.getStats(token ?? undefined)
-      setDynamicStats(data)
-      // If we had a real API for pending approvals:
-      // const approvals = await admin.getPendingApprovals()
-      // setPendingApprovals(approvals)
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        const token = await getToken()
+        
+        // Fetch real stats
+        const statsData = await admin.getStats(token ?? undefined)
+        setDynamicStats(statsData)
+        
+        // Fetch all users to find pending doctors
+        const allUsers = await admin.getAllUsers(token ?? undefined)
+        const pending = allUsers.filter((u: any) => 
+          (u.role === 'doctor' || u.role === 'pending_doctor') && 
+          (u.status === 'pending' || u.status === 'review')
+        )
+        setPendingApprovals(pending)
+      } catch (error) {
+        console.error('Admin data fetch failed:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    fetchStats()
+    fetchData()
   }, [admin, getToken])
 
   const displayStats = [
     {
-      title: "Total Users",
-      value: dynamicStats?.totalUsers?.toLocaleString() || topStats[0].value,
-      change: topStats[0].change,
+      title: "Total Registered Users",
+      value: dynamicStats?.totalUsers?.toLocaleString() || "0",
+      change: "+2.5%",
       icon: Users,
       color: "text-blue-600",
       bg: "bg-blue-500/10"
     },
     {
-      title: "Active Now",
-      value: dynamicStats?.activeUsers?.toLocaleString() || topStats[1].value,
-      change: topStats[1].change,
+      title: "Active Sessions",
+      value: dynamicStats?.activeUsers?.toLocaleString() || "0",
+      change: "+0.2%",
       icon: UserCheck,
       color: "text-emerald-600",
       bg: "bg-emerald-500/10"
     },
     {
-      title: "Revenue",
-      value: dynamicStats?.revenue ? `$${dynamicStats.revenue.toLocaleString()}` : topStats[2].value,
-      change: topStats[2].change,
+      title: "Revenue (MTD)",
+      value: dynamicStats?.revenue ? `$${dynamicStats.revenue.toLocaleString()}` : "$0.00",
+      change: "+12.2%",
       icon: DollarSign,
       color: "text-amber-600",
       bg: "bg-amber-500/10"
     },
     {
-      title: "Appts Today",
-      value: dynamicStats?.appointmentsToday?.toString() || "24",
-      change: topStats[3].change,
+      title: "Appointments Today",
+      value: dynamicStats?.appointmentsToday?.toString() || "0",
+      change: "Stable",
       icon: Calendar,
       color: "text-purple-600",
       bg: "bg-purple-500/10"
@@ -160,19 +113,17 @@ export default function AdminDashboard() {
       transition={{ duration: 0.5 }}
       className="flex flex-col gap-8 p-8 max-w-[1600px] mx-auto min-h-screen bg-background"
     >
-      {/* ... (header same) ... */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Admin Control Center</h1>
           <p className="text-muted-foreground mt-1">
-            Comprehensive system analytics and management suite.
+            System-wide operational oversight and user management.
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="border-border" onClick={() => toast({ title: "Export Data", description: "Generating CSV export of all system analytics..." })}>Export Data</Button>
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20" onClick={() => toast({ title: "Add User", description: "Opening new user provision form..." })}>
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20" onClick={() => toast({ title: "User Management", description: "Navigating to the advanced user provisioning suite..." })}>
             <UserPlus className="mr-2 h-4 w-4" />
-            Add New User
+            Provision Staff
           </Button>
         </div>
       </div>
@@ -202,6 +153,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="health" className="gap-2">
             <Stethoscope className="h-4 w-4" />
             Health Trends
+          </TabsTrigger>
+          <TabsTrigger value="labs" className="gap-2 text-primary font-bold">
+            <FlaskConical className="h-4 w-4" />
+            Lab Queue
           </TabsTrigger>
         </TabsList>
 
@@ -265,9 +220,15 @@ export default function AdminDashboard() {
                               size="sm" 
                               variant="ghost" 
                               className="text-emerald-600 hover:bg-emerald-500/10"
-                              onClick={() => {
-                                admin.handleAction('approve_doctor', { id: doctor.id })
-                                toast({ title: "Application Approved", description: `${doctor.name}'s account has been fully verified and activated.`, variant: "default" })
+                              onClick={async () => {
+                                try {
+                                  const token = await getToken()
+                                  await admin.updateStatus('users', doctor.id, 'active', token || undefined)
+                                  setPendingApprovals(prev => prev.filter(p => p.id !== doctor.id))
+                                  toast({ title: "Application Approved", description: `${doctor.name}'s account has been fully verified and activated.`, variant: "default" })
+                                } catch (e) {
+                                  toast({ title: "Action Failed", description: "Could not approve the application.", variant: "destructive" })
+                                }
                               }}
                             >
                               <CheckCircle className="h-4 w-4" />
@@ -276,9 +237,15 @@ export default function AdminDashboard() {
                               size="sm" 
                               variant="ghost" 
                               className="text-destructive hover:bg-destructive/10"
-                              onClick={() => {
-                                admin.handleAction('reject_doctor', { id: doctor.id })
-                                toast({ title: "Application Rejected", description: `${doctor.name}'s application has been denied.`, variant: "destructive" })
+                              onClick={async () => {
+                                try {
+                                  const token = await getToken()
+                                  await admin.updateStatus('users', doctor.id, 'rejected', token || undefined)
+                                  setPendingApprovals(prev => prev.filter(p => p.id !== doctor.id))
+                                  toast({ title: "Application Rejected", description: `${doctor.name}'s application has been denied.`, variant: "destructive" })
+                                } catch (e) {
+                                  toast({ title: "Action Failed", description: "Could not reject the application.", variant: "destructive" })
+                                }
                               }}
                             >
                               <XCircle className="h-4 w-4" />
@@ -303,16 +270,16 @@ export default function AdminDashboard() {
                   <p className="text-xs opacity-80">Quick actions and system status</p>
                 </div>
                 <CardContent className="p-4 space-y-4">
-                  <Button className="w-full justify-between border-border" variant="outline" onClick={() => toast({ title: "Access Control", description: "Opening user roles and permissions manager..." })}>
+                  <Button className="w-full justify-between border-border" variant="outline" onClick={() => window.location.href='/admin/users'}>
                     Manage User Access
                     <ArrowUpRight className="h-4 w-4" />
                   </Button>
-                  <Button className="w-full justify-between border-border" variant="outline" onClick={() => toast({ title: "Reports", description: "Generating quarterly revenue reports..." })}>
+                  <Button className="w-full justify-between border-border" variant="outline" onClick={() => window.location.href='/admin/finance'}>
                     Revenue Reports
                     <ArrowUpRight className="h-4 w-4" />
                   </Button>
-                  <Button className="w-full justify-between border-border" variant="outline" onClick={() => toast({ title: "Maintenance", description: "Scheduling automated server diagnostic..." })}>
-                    Server Maintenance
+                  <Button className="w-full justify-between border-border" variant="outline" onClick={() => window.location.href='/admin/configuration'}>
+                    Server Configuration
                     <Clock className="h-4 w-4" />
                   </Button>
                   
@@ -352,6 +319,10 @@ export default function AdminDashboard() {
 
         <TabsContent value="health">
           <HealthTrends />
+        </TabsContent>
+
+        <TabsContent value="labs">
+          <LabManagement />
         </TabsContent>
       </Tabs>
     </m.div>

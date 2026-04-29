@@ -2,14 +2,16 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
-import apiClient from "@/lib/api-client";
+import { useHospital } from "@/hooks/use-hospital";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
+  const { admin } = useHospital();
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -30,12 +32,13 @@ export default function OnboardingPage() {
 
         // 2. Check backend database to see if user exists with a role already set
         try {
-          const res = await apiClient.get("/users/me");
-          if (res.data && res.data.role) {
+          const token = await getToken();
+          const me = await admin.getMe(token || undefined);
+          if (me && me.role) {
             // User exists in database with role set
-            if (res.data.role === "doctor") {
+            if (me.role === "doctor") {
               router.push("/doctor");
-            } else if (res.data.role === "patient") {
+            } else if (me.role === "patient") {
               router.push("/patient");
             } else {
               // Role set but unknown - show role selection

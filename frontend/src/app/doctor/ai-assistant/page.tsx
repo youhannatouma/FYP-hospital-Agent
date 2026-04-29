@@ -1,12 +1,12 @@
 "use client"
-
 import { useState, useRef, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Bot, Send, User, Sparkles, Stethoscope, FlaskConical, FileText, CalendarDays } from "lucide-react"
-import apiClient from "@/lib/api-client"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 
 interface ChatMessage {
   id: number
@@ -16,10 +16,10 @@ interface ChatMessage {
 }
 
 const suggestedPrompts = [
-  "Summarize John Doe's recent lab results",
+  "Summarize latest lab results",
   "What are the latest treatment guidelines for hypertension?",
   "List patients with appointments today",
-  "Draft a referral note for Dr. Patel",
+  "Draft a referral note",
 ]
 
 const quickActions = [
@@ -33,12 +33,14 @@ const initialMessages: ChatMessage[] = [
   {
     id: 1,
     role: "assistant",
-    content: "Hello, Dr. Smith! I'm your Clinical AI Assistant. I can help you with patient summaries, lab result interpretations, treatment guidelines, and clinical documentation. How can I assist you today?",
+    content: "Hello! I'm your Clinical AI Assistant. I can help you with patient summaries, lab result interpretations, treatment guidelines, and clinical documentation. How can I assist you today?",
     timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
   },
 ]
 
 export default function DoctorAIAssistantPage() {
+  const { ai } = useHospital()
+  const { getToken } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [inputValue, setInputValue] = useState("")
   const [isTyping, setIsTyping] = useState(false)
@@ -65,11 +67,10 @@ export default function DoctorAIAssistantPage() {
     setIsTyping(true)
 
     try {
-      const response = await apiClient.post('/ai/chat', {
-        message: content.trim(),
-        context: 'doctor',
-      })
-      const reply = response.data?.reply || response.data?.message || "I couldn't process that request."
+      const token = await getToken()
+      const data = await ai.chat(content.trim(), 'doctor', token || undefined)
+      
+      const reply = data?.reply || data?.message || "I couldn't process that request."
       setMessages((prev) => [...prev, {
         id: Date.now() + 1,
         role: "assistant",

@@ -14,8 +14,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { apiClient } from "@/lib/api-client"
+import { useHospital } from "@/hooks/use-hospital"
 import { Pill, AlertTriangle, Info } from "lucide-react"
+
+import { useAuth } from "@clerk/nextjs"
 
 interface PrescriptionDialogProps {
   open: boolean
@@ -28,6 +30,8 @@ interface PrescriptionDialogProps {
 
 export function PrescriptionDialog({ open, onOpenChange, patient }: PrescriptionDialogProps) {
   const { toast } = useToast()
+  const { getToken } = useAuth()
+  const { pharmacy } = useHospital()
   const [loading, setLoading] = React.useState(false)
 
   const [medication, setMedication] = React.useState("")
@@ -41,14 +45,15 @@ export function PrescriptionDialog({ open, onOpenChange, patient }: Prescription
     setLoading(true)
     
     try {
+      const token = await getToken()
       const fullMedication = `${medication} ${dosage} - ${frequency} for ${duration}`.trim()
       
-      await apiClient.post("/prescriptions/", {
+      await pharmacy.createPrescription({
         patient_id: patient?.id,
         medications: [fullMedication],
         instructions: instructions || "Take as directed",
         days_valid: 30
-      })
+      }, token || undefined)
 
       toast({
         title: "Prescription Created",
@@ -142,11 +147,11 @@ export function PrescriptionDialog({ open, onOpenChange, patient }: Prescription
             </div>
           </div>
 
-          <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg flex gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-800">
-              <p className="font-bold">Drug Interaction Warning</p>
-              <p>This patient is currently taking Lisinopril. No severe interactions known for common antibiotics, but monitor BP regularly.</p>
+          <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg flex gap-3">
+            <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-blue-800">
+              <p className="font-bold">Interaction Check Active</p>
+              <p>AI is scanning {patient?.name || "the patient"}'s medical history for potential contraindications with {medication || "this medication"}.</p>
             </div>
           </div>
 

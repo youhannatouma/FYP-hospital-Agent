@@ -43,6 +43,16 @@ class User(Base):
     allergies = Column(ARRAY(Text))              # for patients
     chronic_conditions = Column(ARRAY(Text))     # for patients
     emergency_contact = Column(Text)             # for patients
+    
+    # Insurance info (for patients)
+    insurance_provider = Column(Text)
+    insurance_plan = Column(Text)
+    insurance_member_id = Column(Text)
+    insurance_group_number = Column(Text)
+    insurance_deductible = Column(Float, default=0.0)
+    insurance_deductible_met = Column(Float, default=0.0)
+    insurance_out_of_pocket_max = Column(Float, default=0.0)
+    insurance_out_of_pocket_used = Column(Float, default=0.0)
 
     # Account state used by admins (Active, Suspended, Pending, etc.)
     status = Column(Text, default="Active")

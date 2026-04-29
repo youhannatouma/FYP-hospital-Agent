@@ -6,3 +6,4 @@ from .medical_record import MedicalRecord
 from .prescription import Prescription
 from .notification import Notification
 from .payment import Payment
+from .invoice import Invoice

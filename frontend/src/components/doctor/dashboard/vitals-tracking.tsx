@@ -4,7 +4,7 @@ import { useHospital } from "@/hooks/use-hospital"
 import { useAuth } from "@clerk/nextjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Activity, Loader2 } from "lucide-react"
+import { Activity, Loader2, LineChart as ChartIcon } from "lucide-react"
 import {
   LineChart,
   Line,
@@ -16,18 +16,28 @@ import {
   Legend,
 } from "recharts"
 
-export function VitalsTracking() {
+interface VitalsTrackingProps {
+  selectedPatient?: any;
+}
+
+export function VitalsTracking({ selectedPatient }: VitalsTrackingProps) {
   const { medicalRecords } = useHospital();
   const { getToken } = useAuth();
   const [chartData, setChartData] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [period] = useState("7d")
 
   useEffect(() => {
+    if (!selectedPatient) {
+      setChartData([]);
+      return;
+    }
+
     const fetchVitals = async () => {
       try {
+        setIsLoading(true);
         const token = await getToken();
-        const records = await medicalRecords.getMyRecords(token || undefined);
+        const records = await medicalRecords.getPatientRecords(selectedPatient.id, token || undefined);
         
         const extracted = records
           .filter((r: any) => r.vitals && typeof r.vitals === 'object')
@@ -39,9 +49,7 @@ export function VitalsTracking() {
           }))
           .reverse();
         
-        setChartData(extracted.length > 0 ? extracted : [
-          { date: "No Data", systolic: 0, diastolic: 0, heartRate: 0 }
-        ]);
+        setChartData(extracted);
       } catch (e) {
         console.error(e);
       } finally {
@@ -49,7 +57,7 @@ export function VitalsTracking() {
       }
     };
     fetchVitals();
-  }, [medicalRecords, getToken]);
+  }, [medicalRecords, getToken, selectedPatient]);
 
   return (
     <Card className="premium-card rounded-[2.5rem] border-none shadow-premium overflow-hidden">
@@ -57,6 +65,11 @@ export function VitalsTracking() {
         <CardTitle className="flex items-center gap-2 text-xl font-black text-card-foreground">
           <Activity className="h-6 w-6 text-primary" />
           Vitals Tracking
+          {selectedPatient && (
+            <span className="text-xs font-bold text-muted-foreground ml-2">
+              - {selectedPatient.name}
+            </span>
+          )}
         </CardTitle>
         <Select defaultValue={period}>
           <SelectTrigger className="w-36 h-10 rounded-xl bg-muted/50 border-border/50 font-bold text-xs uppercase tracking-widest">
@@ -73,6 +86,26 @@ export function VitalsTracking() {
         {isLoading ? (
           <div className="flex h-80 w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : !selectedPatient ? (
+          <div className="flex h-80 w-full flex-col items-center justify-center gap-4 text-center">
+            <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center opacity-20">
+              <ChartIcon className="h-8 w-8" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-muted-foreground">No Patient Selected</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 mt-1">Select a patient from the list above to view trends</p>
+            </div>
+          </div>
+        ) : chartData.length === 0 ? (
+          <div className="flex h-80 w-full flex-col items-center justify-center gap-4 text-center">
+             <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center opacity-20">
+              <Activity className="h-8 w-8" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-muted-foreground">No Vitals Recorded</p>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 mt-1">This patient has no clinical vitals history recorded.</p>
+            </div>
           </div>
         ) : (
           <div className="h-80 w-full pr-4">

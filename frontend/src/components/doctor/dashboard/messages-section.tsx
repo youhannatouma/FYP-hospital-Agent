@@ -9,41 +9,47 @@ import { Mail, MessageSquare, Bell, ClipboardCheck, ArrowUpRight } from "lucide-
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth, useUser } from "@clerk/nextjs"
+import { Loader2 } from "lucide-react"
+import React, { useEffect, useState } from "react"
+
 export function DoctorMessagesSection() {
   const { toast } = useToast()
-  const [messages] = useState([
-    {
-      id: 1,
-      sender: "Michael Johnson",
-      avatar: "https://i.pravatar.cc/150?u=1",
-      initials: "MJ",
-      time: "10m ago",
-      message: "Dr. Smith, regarding my prescription adjustment, I'm feeling much better today.",
-      type: "Patient",
-      unread: true,
-    },
-    {
-      id: 2,
-      sender: "Lab Admin",
-      avatar: null,
-      icon: ClipboardCheck,
-      iconBg: "bg-primary/10 text-primary",
-      time: "1h ago",
-      message: "The results for Emily Davis (P-1003) have been uploaded to the portal.",
-      type: "Internal",
-      unread: true,
-    },
-    {
-      id: 3,
-      sender: "Sarah Miller (Admin)",
-      avatar: "https://i.pravatar.cc/150?u=3",
-      initials: "SM",
-      time: "3h ago",
-      message: "Your schedule for the upcoming clinical conference has been finalized.",
-      type: "Staff",
-      unread: false,
-    },
-  ])
+  const { messages: messageManager } = useHospital()
+  const { getToken } = useAuth()
+  const { user } = useUser()
+  const [messages, setMessages] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        setIsLoading(true)
+        const token = await getToken()
+        const data = await messageManager.getMyMessages(token || undefined)
+        
+        // Map backend messages to UI
+        const mapped = data.map((m: any) => ({
+          id: m.message_id,
+          sender: `${m.sender?.first_name} ${m.sender?.last_name}` || "System",
+          avatar: m.sender?.avatar_url,
+          initials: m.sender?.first_name ? `${m.sender.first_name[0]}${m.sender.last_name[0]}` : "S",
+          time: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          message: m.content,
+          type: m.sender?.role === 'patient' ? 'Patient' : 'Staff',
+          unread: !m.is_read,
+          raw: m
+        }))
+        setMessages(mapped.slice(0, 3)) // Show only top 3
+      } catch (error) {
+        console.error("Failed to fetch messages", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchMessages()
+  }, [messageManager, getToken])
 
   return (
     <Card className="border border-border bg-card shadow-sm overflow-hidden">
@@ -65,13 +71,23 @@ export function DoctorMessagesSection() {
       </CardHeader>
       <CardContent className="p-0">
         <div className="divide-y divide-border">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`p-4 transition-all hover:bg-muted/30 cursor-pointer ${
-                msg.unread ? "bg-primary/[0.02]" : ""
-              }`}
-            >
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Syncing Inbox...</p>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="py-10 text-center text-xs font-bold text-muted-foreground italic">
+              Your clinical inbox is clear.
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`p-4 transition-all hover:bg-muted/30 cursor-pointer ${
+                  msg.unread ? "bg-primary/[0.02]" : ""
+                }`}
+              >
               <div className="flex items-start gap-4">
                 {msg.avatar ? (
                   <Avatar className="h-10 w-10 border shadow-sm">
@@ -129,7 +145,8 @@ export function DoctorMessagesSection() {
                 </div>
               </div>
             </div>
-          ))}
+            ))
+          )}
         </div>
         <div className="p-4 bg-muted/10 border-t">
           <Link href="/doctor/messages">

@@ -33,6 +33,7 @@ from app.models.prescription import Prescription
 from app.models.payment import Payment
 from app.models.notification import Notification
 from app.models.enums import AppointmentStatus
+from app.models.invoice import Invoice
 
 # ─── Seed Data ───────────────────────────────────────────────────────────────
 
@@ -166,6 +167,14 @@ PATIENTS = [
         "allergies": ["Penicillin", "Sulfa Drugs"],
         "chronic_conditions": ["Hypertension"],
         "emergency_contact": "John Johnson (+971-55-987-6543)",
+        "insurance_provider": "BlueCross BlueShield",
+        "insurance_plan": "Premium Health Plus",
+        "insurance_member_id": "BCB-4521-8837",
+        "insurance_group_number": "GRP-1842",
+        "insurance_deductible": 1500.0,
+        "insurance_deductible_met": 820.0,
+        "insurance_out_of_pocket_max": 5000.0,
+        "insurance_out_of_pocket_used": 235.0,
         "status": "Active",
     },
     {
@@ -406,6 +415,37 @@ def seed_database():
                     print("[Seed]     * Scheduled: Dr %s (%s)" % (doc.last_name, doc.specialty))
         else:
             print("[Seed]   ~ Clinical history already exists or insufficient records")
+
+        # ── Invoices ──────────────────────────────────────────────────────────
+        existing_invoices = db.query(Invoice).count()
+        if existing_invoices == 0 and len(patient_records) >= 1:
+            first_patient = patient_records[0]
+            print("[Seed]   + Seeding Invoices for %s..." % first_patient.email)
+            
+            # Fetch completed appointments for this patient
+            comp_appts = db.query(Appointment).filter(
+                Appointment.patient_id == first_patient.user_id,
+                Appointment.status == AppointmentStatus.completed
+            ).all()
+            
+            for appt in comp_appts:
+                doc = db.query(User).filter(User.user_id == appt.doctor_id).first()
+                # Create an invoice for each completed appointment
+                invoice = Invoice(
+                    patient_id=first_patient.user_id,
+                    appointment_id=appt.appointment_id,
+                    date=appt.created_at.date(),
+                    description=f"Consultation with Dr. {doc.last_name} ({doc.specialty})",
+                    provider=f"Hospital Clinic - {doc.specialty}",
+                    total_amount=appt.fee or 150.0,
+                    insurance_paid=(appt.fee or 150.0) * 0.8, # Assume 80% coverage
+                    patient_due=(appt.fee or 150.0) * 0.2,   # Assume 20% due
+                    status="Due" if appt == comp_appts[0] else "Paid", # Make one due
+                    due_date=appt.created_at.date() + timedelta(days=30)
+                )
+                db.add(invoice)
+                
+            print("[Seed]   + Created %d invoices" % len(comp_appts))
 
         db.commit()
         print("[Seed] Database seeding completed successfully!")

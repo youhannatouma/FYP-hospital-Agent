@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useAuth } from "@clerk/nextjs"
-import { apiClient } from "@/lib/api-client"
 import { useToast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -18,9 +17,12 @@ interface CompleteSessionDialogProps {
   onSuccess: () => void
 }
 
+import { useHospital } from "@/hooks/use-hospital"
+
 export function CompleteSessionDialog({ isOpen, onClose, appointment, onSuccess }: CompleteSessionDialogProps) {
   const { getToken } = useAuth()
   const { toast } = useToast()
+  const { medicalRecords, pharmacy, booking } = useHospital()
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [diagnosis, setDiagnosis] = useState("")
@@ -39,30 +41,28 @@ export function CompleteSessionDialog({ isOpen, onClose, appointment, onSuccess 
       const token = await getToken()
       
       // 1. Create Medical Record
-      const recordResponse = await apiClient.post("/medical-records/", {
+      const record = await medicalRecords.createRecord({
         patient_id: appointment.patient_id,
         appointment_id: appointment.id,
         record_type: "Consultation",
         diagnosis,
         treatment,
         clinical_notes: notes
-      }, { headers: { Authorization: `Bearer ${token}` } })
+      }, token || undefined)
 
       // 2. Create Prescription if medications entered
       if (medications.trim()) {
         const medsList = medications.split(",").map(m => m.trim())
-        await apiClient.post("/prescriptions/", {
+        await pharmacy.createPrescription({
           patient_id: appointment.patient_id,
-          record_id: recordResponse.data.record_id,
+          record_id: record.record_id,
           medications: medsList,
           instructions: "As discussed during the consultation."
-        }, { headers: { Authorization: `Bearer ${token}` } })
+        }, token || undefined)
       }
 
       // 3. Update Appointment Status to Completed
-      await apiClient.patch(`/appointments/${appointment.id}/complete`, {}, { 
-        headers: { Authorization: `Bearer ${token}` } 
-      })
+      await booking.completeAppointment(appointment.id, token || undefined)
 
       toast({ title: "Session Completed", description: "Medical record has been saved and patient notified." })
       onSuccess()

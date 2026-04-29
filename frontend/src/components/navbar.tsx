@@ -28,7 +28,7 @@ export function Navbar() {
   const { user } = useUser();
 
   const role = user?.publicMetadata?.role as string | undefined;
-  const dashboardHref = role === "doctor" ? "/doctor" : role === "patient" ? "/patient" : "/onboarding";
+  const dashboardHref = role === "admin" ? "/admin" : role === "doctor" ? "/doctor" : "/patient";
 
   useEffect(() => {
     setMounted(true);
@@ -81,7 +81,7 @@ export function Navbar() {
           {/* Desktop Auth */}
           <div className="hidden items-center gap-2 lg:flex">
             <SignedOut>
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" forceRedirectUrl="/onboarding">
                 <Button variant="ghost" className="text-foreground font-bold">
                   Sign In
                 </Button>
@@ -143,7 +143,7 @@ export function Navbar() {
           </ul>
           <div className="mt-4 flex flex-col gap-2">
             <SignedOut>
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" forceRedirectUrl="/onboarding">
                 <Button
                   variant="ghost"
                   className="w-full justify-center text-foreground font-bold"

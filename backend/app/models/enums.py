@@ -10,5 +10,7 @@ class UserRole(str, enum.Enum):
 # Appointment status
 class AppointmentStatus(str, enum.Enum):
     scheduled = "scheduled"
+    accepted = "accepted"
+    in_progress = "in_progress"
     completed = "completed"
     cancelled = "cancelled"

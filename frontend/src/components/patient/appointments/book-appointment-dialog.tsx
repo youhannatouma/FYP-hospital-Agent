@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -21,11 +21,8 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarPlus, CheckCircle2, Clock, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useDataStore } from "@/hooks/use-data-store"
 import { useHospital } from "@/hooks/use-hospital"
-import { cn } from "@/lib/utils"
 import { useAuth } from "@clerk/nextjs"
-
 
 interface BookAppointmentDialogProps {
   patientId?: string
@@ -49,7 +46,7 @@ export function BookAppointmentDialog({
   const { toast } = useToast()
   const { getToken } = useAuth()
   const { booking } = useHospital()
-  const { getDoctors, addAppointment } = useDataStore()  // keep for fallback
+  
   const [step, setStep] = useState(1)
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
@@ -64,17 +61,9 @@ export function BookAppointmentDialog({
     setInternalOpen(val)
   }
 
-  // Sync selectedDoctorId when dialog opens with a specific doctor
-  React.useEffect(() => {
-    if (open && initialDoctorId) {
-      setSelectedDoctorId(initialDoctorId)
-      const doc = getDoctors().find((d: any) => d.id === initialDoctorId)
-      if (doc) setSelectedSpecialty(doc.specialty || null)
-    }
-  }, [open, initialDoctorId, getDoctors])
-
   const [allDoctors, setAllDoctors] = useState<any[]>([])
-  React.useEffect(() => {
+
+  useEffect(() => {
     const loadDoctors = async () => {
       const token = await getToken()
       const docs = await booking.getAvailableDoctors(selectedSpecialty || undefined, token || undefined)
@@ -82,6 +71,12 @@ export function BookAppointmentDialog({
     }
     loadDoctors()
   }, [selectedSpecialty, booking, getToken])
+
+  useEffect(() => {
+    if (open && initialDoctorId) {
+      setSelectedDoctorId(initialDoctorId)
+    }
+  }, [open, initialDoctorId])
 
   const specialties = [...new Set(allDoctors.map((d: any) => d.specialty).filter(Boolean))] as string[]
   const filteredDoctors = selectedSpecialty
@@ -91,7 +86,7 @@ export function BookAppointmentDialog({
 
   const [timeSlots, setTimeSlots] = useState<string[]>([])
 
-  React.useEffect(() => {
+  useEffect(() => {
     const loadSlots = async () => {
       if (selectedDoctor && date) {
         const token = await getToken()
@@ -110,7 +105,7 @@ export function BookAppointmentDialog({
     const formattedDate = date.toISOString().split('T')[0]
     try {
       const token = await getToken()
-      const result = await booking.submitBooking({
+      await booking.submitBooking({
         patientId,
         patientName,
         doctor_id: selectedDoctor.id,
@@ -119,26 +114,12 @@ export function BookAppointmentDialog({
         appointment_type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
         fee: 150,
         is_virtual: appointmentType === "Video",
+        status: "Pending",
       }, token || undefined)
 
-      // Also update local mock store so the UI reflects the new appointment immediately
-      addAppointment({
-        patientId,
-        patientName,
-        doctorId: selectedDoctor.id,
-        doctorName: selectedDoctor.name,
-        specialty: selectedDoctor.specialty,
-        date: formattedDate,
-        time: selectedTime,
-        status: 'Scheduled',
-        type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
-        price: 150,
-        isVirtual: appointmentType === "Video",
-      })
-
       toast({
-        title: "Appointment Booked!",
-        description: `Your appointment with ${selectedDoctor.name} on ${date.toDateString()} at ${selectedTime} has been confirmed.`,
+        title: "Appointment Request Sent!",
+        description: `Your request for an appointment with ${selectedDoctor.name} on ${date.toDateString()} at ${selectedTime} is now pending doctor approval.`,
       })
       setOpen(false)
       onBooked?.()
@@ -150,7 +131,7 @@ export function BookAppointmentDialog({
       }, 500)
     } catch (error) {
       toast({
-        title: "Unable to book appointment",
+        title: "Unable to send request",
         description: "Please try again or contact support.",
         variant: "destructive",
       })
@@ -270,7 +251,7 @@ export function BookAppointmentDialog({
               </div>
               <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/10 p-3 rounded-md">
                 <CheckCircle2 className="h-4 w-4" />
-                <span>Available for booking</span>
+                <span>Available for request</span>
               </div>
             </div>
           )}
@@ -294,7 +275,7 @@ export function BookAppointmentDialog({
             </Button>
           ) : (
             <Button onClick={handleBook} disabled={!selectedTime || !date}>
-              Confirm Booking
+              Send Request
             </Button>
           )}
         </DialogFooter>

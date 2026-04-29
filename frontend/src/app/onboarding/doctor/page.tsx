@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import {
   Stethoscope,
   ShieldCheck,
@@ -46,7 +46,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { m, AnimatePresence } from "framer-motion";
-import apiClient from "@/lib/api-client";
+import { useHospital } from "@/hooks/use-hospital";
 
 // Steps:
 // 1. Professional Info (specialty, license, experience)
@@ -88,6 +88,8 @@ export default function DoctorOnboarding() {
     newQualification: "",
   });
 
+  const { getToken } = useAuth();
+  const { admin } = useHospital();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const progress = (step / totalSteps) * 100;
@@ -128,7 +130,8 @@ export default function DoctorOnboarding() {
         console.error("Failed to set role in Clerk");
       }
 
-      // 2. Save doctor profile data to backend via apiClient
+      // 2. Save doctor profile data to backend via admin manager
+      const token = await getToken();
       const profileUpdate = {
         specialty: formData.specialty || null,
         license_number: formData.license_number || null,
@@ -140,7 +143,7 @@ export default function DoctorOnboarding() {
         clinic_address: formData.clinic_address || null,
       };
 
-      await apiClient.patch("/users/me", profileUpdate);
+      await admin.updateMe(profileUpdate, token || undefined);
 
       toast({
         title: "Profile Saved",

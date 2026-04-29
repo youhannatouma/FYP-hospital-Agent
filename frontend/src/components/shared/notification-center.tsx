@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { Bell, Loader2, CheckCircle2 } from "lucide-react"
 import { useAuth } from "@clerk/nextjs"
-import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -14,8 +13,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
+import { useHospital } from "@/hooks/use-hospital"
+
 export function NotificationCenter() {
   const { getToken } = useAuth()
+  const { notifications: notificationManager } = useHospital()
   const [notifications, setNotifications] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -23,15 +25,13 @@ export function NotificationCenter() {
   const fetchNotifications = useCallback(async () => {
     try {
       const token = await getToken()
-      const response = await apiClient.get("/notifications/", {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setNotifications(response.data)
-      setUnreadCount(response.data.filter((n: any) => !n.is_read).length)
+      const data = await notificationManager.getNotifications(token || undefined)
+      setNotifications(data)
+      setUnreadCount(data.filter((n: any) => !n.is_read).length)
     } catch (error) {
       console.error("Failed to fetch notifications:", error)
     }
-  }, [getToken])
+  }, [getToken, notificationManager])
 
   useEffect(() => {
     fetchNotifications()
@@ -43,9 +43,7 @@ export function NotificationCenter() {
   const markRead = async (id: string) => {
     try {
       const token = await getToken()
-      await apiClient.patch(`/notifications/${id}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await notificationManager.markRead(id, token || undefined)
       fetchNotifications()
     } catch (error) {
       console.error("Failed to mark notification as read:", error)
@@ -55,9 +53,7 @@ export function NotificationCenter() {
   const markAllRead = async () => {
     try {
       const token = await getToken()
-      await apiClient.patch("/notifications/read-all", {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await notificationManager.markAllRead(token || undefined)
       fetchNotifications()
     } catch (error) {
       console.error("Failed to mark all as read:", error)

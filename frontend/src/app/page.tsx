@@ -1,7 +1,7 @@
 import { Navbar } from "@/components/navbar"
 import { FloatingAvatar } from "@/components/floating-avatar"
 import { HeroSection } from "@/components/landing/LandingSections"
-import { LandingIntroClient } from "../components/intro/LandingIntroClient"
+import { LandingIntroWrapper } from "@/components/intro/LandingIntroWrapper"
 import { FeaturesSection } from "@/components/landing/FeaturesSection"
 import { DoctorsSection } from "@/components/landing/DoctorsSection"
 import { AISection } from "@/components/landing/AISection"
@@ -15,7 +15,7 @@ import { FooterSection } from "@/components/landing/FooterSection"
 
 export default function Page() {
   return (
-    <LandingIntroClient>
+    <LandingIntroWrapper>
       <main className="min-h-screen">
         <Navbar />
         <FloatingAvatar />
@@ -31,6 +31,6 @@ export default function Page() {
         <TrustSection />
         <FooterSection />
       </main>
-    </LandingIntroClient>
+    </LandingIntroWrapper>
   )
 }

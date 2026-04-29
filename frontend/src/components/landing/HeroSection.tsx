@@ -4,15 +4,24 @@ import Link from "next/link";
 import { m } from "framer-motion";
 import { ArrowRight, Mic, Users, Star, Activity, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useScrollAnimation } from "@/hooks/use-scroll-animation";
+import { useState, useEffect } from "react";
 
+/**
+ * HeroSection — uses a simple mount-based animation trigger.
+ * No IntersectionObserver needed since the hero is ALWAYS at the top of the viewport.
+ */
 export function HeroSection() {
-  const { ref, isVisible } = useScrollAnimation(0.1);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Small delay to ensure the DOM is settled after hydration
+    const timer = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <section
       id="home"
-      ref={ref}
       className="relative overflow-hidden pt-28 pb-20 lg:pt-36 lg:pb-28 bg-gradient-to-br from-blue-50 to-teal-50 dark:from-gray-900 dark:to-gray-800"
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -39,13 +48,13 @@ export function HeroSection() {
           {/* Left Content */}
           <m.div
             initial={{ opacity: 0, x: -50 }}
-            animate={isVisible ? { opacity: 1, x: 0 } : {}}
+            animate={mounted ? { opacity: 1, x: 0 } : { opacity: 0, x: -50 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="flex max-w-2xl flex-1 flex-col items-center text-center lg:items-start lg:text-left"
           >
             <m.div
               initial={{ opacity: 0, y: 20 }}
-              animate={isVisible ? { opacity: 1, y: 0 } : {}}
+              animate={mounted ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ delay: 0.2, duration: 0.5 }}
               className="mb-8 flex items-center gap-3 rounded-full border border-border bg-card/50 backdrop-blur-md px-5 py-2.5 shadow-sm"
             >
@@ -76,7 +85,7 @@ export function HeroSection() {
 
             <m.h1
               initial={{ opacity: 0, y: 20 }}
-              animate={isVisible ? { opacity: 1, y: 0 } : {}}
+              animate={mounted ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ delay: 0.3, duration: 0.6 }}
               className="text-balance text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-7xl font-heading"
             >
@@ -86,7 +95,7 @@ export function HeroSection() {
 
             <m.p
               initial={{ opacity: 0, y: 20 }}
-              animate={isVisible ? { opacity: 1, y: 0 } : {}}
+              animate={mounted ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ delay: 0.4, duration: 0.6 }}
               className="mt-6 max-w-lg text-pretty text-lg leading-relaxed text-muted-foreground"
             >
@@ -97,7 +106,7 @@ export function HeroSection() {
 
             <m.div
               initial={{ opacity: 0, y: 20 }}
-              animate={isVisible ? { opacity: 1, y: 0 } : {}}
+              animate={mounted ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ delay: 0.5, duration: 0.6 }}
               className="mt-10 flex flex-wrap items-center gap-4"
             >
@@ -124,7 +133,7 @@ export function HeroSection() {
 
             <m.div
               initial={{ opacity: 0 }}
-              animate={isVisible ? { opacity: 1 } : {}}
+              animate={mounted ? { opacity: 1 } : { opacity: 0 }}
               transition={{ delay: 0.7, duration: 1 }}
               className="mt-12 grid w-full grid-cols-3 gap-8 border-t border-border pt-8"
             >
@@ -148,7 +157,7 @@ export function HeroSection() {
           {/* Right Visual Element (AI Visual) */}
           <m.div
             initial={{ opacity: 0, scale: 0.8 }}
-            animate={isVisible ? { opacity: 1, scale: 1 } : {}}
+            animate={mounted ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.8 }}
             transition={{ duration: 1, ease: "easeOut" }}
             className="relative flex flex-1 items-center justify-center"
           >

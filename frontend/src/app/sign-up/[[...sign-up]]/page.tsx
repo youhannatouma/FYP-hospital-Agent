@@ -53,7 +53,7 @@ export default function SignUpPage() {
 
       {/* Right Side: SignUp Form */}
       <div className="flex-1 flex items-center justify-center p-8 md:p-12 overflow-y-auto">
-        <div className="w-full max-w-md py-12 space-y-8">
+        <div className="w-full max-w-md py-0 space-y-8">
           <div className="md:hidden flex justify-center mb-8">
             <Link href="/" className="flex items-center gap-2 text-primary">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
@@ -67,7 +67,7 @@ export default function SignUpPage() {
             appearance={{
               elements: {
                 formButtonPrimary: "bg-primary hover:bg-primary/90 text-sm font-bold h-11 rounded-xl shadow-lg shadow-primary/20",
-                card: "bg-transparent border-0 shadow-none p-0",
+                card: "bg-transparent border-0 shadow-none p-0 m-10",
                 headerTitle: "text-3xl font-extrabold tracking-tight text-foreground",
                 headerSubtitle: "text-muted-foreground font-medium",
                 socialButtonsBlockButton: "rounded-xl border-border bg-card/50 hover:bg-muted text-foreground transition-all h-11",

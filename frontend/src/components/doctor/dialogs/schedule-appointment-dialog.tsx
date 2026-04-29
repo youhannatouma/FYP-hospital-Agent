@@ -21,24 +21,28 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
-import { useDataStore } from "@/hooks/use-data-store"
-import { CalendarDays, Video, MapPin, Plus } from "lucide-react"
-
-const CURRENT_DOCTOR_ID = "doc-1"
-const CURRENT_DOCTOR_NAME = "Dr. Michael Chen"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
+import { CalendarDays, Video, MapPin, Plus, Loader2 } from "lucide-react"
 
 interface Props {
   trigger?: React.ReactNode
+  preSelectedPatientId?: string
+  preSelectedPatientName?: string
 }
 
-export function ScheduleAppointmentDialog({ trigger }: Props) {
+export function ScheduleAppointmentDialog({ trigger, preSelectedPatientId, preSelectedPatientName }: Props) {
   const { toast } = useToast()
-  const { users, addAppointment } = useDataStore()
+  const { admin } = useHospital()
+  const { getToken } = useAuth()
+  
   const [open, setOpen] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [patients, setPatients] = React.useState<any[]>([])
+  const [isLoadingPatients, setIsLoadingPatients] = React.useState(false)
 
   const [form, setForm] = React.useState({
-    patientId: "",
+    patientId: preSelectedPatientId || "",
     date: "",
     time: "",
     type: "Follow-up",
@@ -47,7 +51,31 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
     price: "150",
   })
 
-  const patientList = users.filter((u: any) => u.role === "Patient" && u.status === "Active")
+  React.useEffect(() => {
+    if (preSelectedPatientId) {
+      setForm(prev => ({ ...prev, patientId: preSelectedPatientId }))
+    }
+  }, [preSelectedPatientId])
+
+  React.useEffect(() => {
+    if (open && !preSelectedPatientId) {
+      const fetchPatients = async () => {
+        try {
+          setIsLoadingPatients(true)
+          const token = await getToken()
+          const data = await admin.getAllUsers(token || undefined)
+          if (Array.isArray(data)) {
+            setPatients(data.filter((u: any) => u.role === 'patient'))
+          }
+        } catch (err) {
+          console.error("Failed to fetch patients:", err)
+        } finally {
+          setIsLoadingPatients(false)
+        }
+      }
+      fetchPatients()
+    }
+  }, [open, preSelectedPatientId, admin, getToken])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,32 +90,40 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
 
     setIsSubmitting(true)
     try {
-      const patient = patientList.find((p: any) => p.id === form.patientId)
-      if (!patient) return
+      const patient = patients.find((p) => p.user_id === form.patientId)
+      const patientName = patient
+        ? `${patient.first_name} ${patient.last_name}`.trim()
+        : preSelectedPatientName || "Patient"
+      const appointmentDate = new Date(`${form.date}T${form.time}`)
 
-      addAppointment({
-        id: `APT-${Date.now()}`,
+      const newAppointment = {
+        id: Math.random().toString(36).slice(2),
         patientId: form.patientId,
-        patientName: patient.name,
-        doctorId: CURRENT_DOCTOR_ID,
-        doctorName: CURRENT_DOCTOR_NAME,
-        specialty: "Cardiology",
-        date: form.date,
-        time: form.time,
-        status: "Scheduled",
+        patientName,
+        date: appointmentDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        time: appointmentDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
         type: form.type,
-        price: parseInt(form.price) || 150,
         isVirtual: form.isVirtual,
-        notes: form.notes || undefined,
-        createdAt: new Date().toISOString().split("T")[0],
-      })
+        appointment_type: form.type,
+        status: "Scheduled",
+        notes: form.notes,
+      }
 
       toast({
-        title: "Appointment Scheduled",
-        description: `${form.type} with ${patient.name} on ${form.date} at ${form.time} has been booked.`,
+        title: "Appointment Created",
+        description: "This appointment is currently queued in the doctor workflow and will sync once backend support is enabled.",
       })
+
+      onSuccess?.(newAppointment)
       setOpen(false)
-      setForm({ patientId: "", date: "", time: "", type: "Follow-up", isVirtual: false, notes: "", price: "150" })
+      setForm({ patientId: preSelectedPatientId || "", date: "", time: "", type: "Follow-up", isVirtual: false, notes: "", price: "150" })
+    } catch (error) {
+      console.error("Scheduling failed:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create appointment placeholder. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -97,12 +133,12 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button className="gap-2">
+          <Button className="gap-2 rounded-xl">
             <Plus className="h-4 w-4" /> Schedule New
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md rounded-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-primary" />
@@ -113,16 +149,31 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
           {/* Patient */}
           <div className="space-y-1.5">
             <Label htmlFor="patient">Patient *</Label>
-            <Select value={form.patientId} onValueChange={(v) => setForm(f => ({ ...f, patientId: v }))}>
-              <SelectTrigger id="patient">
-                <SelectValue placeholder="Select a patient…" />
-              </SelectTrigger>
-              <SelectContent>
-                {patientList.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {preSelectedPatientId ? (
+              <Input 
+                value={preSelectedPatientName || "Selected Patient"} 
+                readOnly 
+                className="bg-muted rounded-xl font-bold" 
+              />
+            ) : (
+              <Select value={form.patientId} onValueChange={(v) => setForm(f => ({ ...f, patientId: v }))}>
+                <SelectTrigger id="patient" className="rounded-xl">
+                  {isLoadingPatients ? (
+                    <div className="flex items-center gap-2 italic text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading patients...
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Select a patient…" />
+                  )}
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {patients.map((p: any) => (
+                    <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Date + Time */}

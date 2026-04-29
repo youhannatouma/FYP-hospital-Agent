@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Calendar, Clock, MapPin, Video, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { apiClient } from "@/lib/api-client"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 
 interface AppointmentDetailDialogProps {
   open: boolean
@@ -24,25 +25,51 @@ interface AppointmentDetailDialogProps {
 
 export function AppointmentDetailDialog({ open, onOpenChange, appointment }: AppointmentDetailDialogProps) {
   const { toast } = useToast()
+  const { booking } = useHospital()
+  const { getToken } = useAuth()
   const [loading, setLoading] = React.useState(false)
 
   if (!appointment) return null
 
-  const handleStatusChange = async (newStatus: 'scheduled' | 'completed' | 'cancelled') => {
+  const normalizeStatus = (status: string) => {
+    const raw = String(status || "").toLowerCase()
+    switch (raw) {
+      case "scheduled":
+      case "upcoming":
+        return "Scheduled"
+      case "completed":
+        return "Completed"
+      case "cancelled":
+      case "canceled":
+        return "Cancelled"
+      case "pending":
+        return "Pending"
+      default:
+        return String(status || "Unknown")
+    }
+  }
+
+  const appointmentStatus = normalizeStatus(appointment.status)
+  const patientName = appointment.patient_name || appointment.patientName || "Patient"
+  const appointmentId = appointment.appointment_id || appointment.id
+  const isVirtual = appointment.isVirtual ?? appointment.is_virtual ?? false
+
+  const handleStatusChange = async (newStatus: 'completed' | 'cancelled') => {
     setLoading(true)
     try {
-      let endpoint = `/appointments/${appointment.appointment_id}`;
-      if (newStatus === 'completed') endpoint += '/complete';
-      else if (newStatus === 'cancelled') endpoint += '/cancel';
-      
-      await apiClient.patch(endpoint)
+      const token = await getToken()
+      if (newStatus === 'completed') {
+        await booking.completeAppointment(appointmentId, token || undefined)
+      } else {
+        await booking.cancelAppointment(appointmentId, token || undefined)
+      }
       
       toast({
         title: "Status Synchronized",
-        description: `Appointment with ${appointment.patient_name} is now ${newStatus}.`,
+        description: `Appointment with ${patientName} is now ${newStatus}.`,
       })
       onOpenChange(false)
-      // Refresh page to show updated status
+      // Refresh to show updated status
       window.location.reload();
     } catch (error) {
       console.error('Failed to update appointment status', error);
@@ -57,13 +84,21 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Scheduled": return "bg-blue-500/10 text-blue-600 border-blue-500/20"
-      case "In Progress": return "bg-primary/10 text-primary border-primary/20"
-      case "Completed": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-      case "Cancelled": return "bg-destructive/10 text-destructive border-destructive/20"
-      case "Pending": return "bg-amber-500/10 text-amber-600 border-amber-500/20"
-      default: return "bg-muted text-muted-foreground"
+    const raw = String(status || "").toLowerCase()
+    switch (raw) {
+      case "scheduled":
+        return "bg-blue-500/10 text-blue-600 border-blue-500/20"
+      case "in progress":
+        return "bg-primary/10 text-primary border-primary/20"
+      case "completed":
+        return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+      case "cancelled":
+      case "canceled":
+        return "bg-destructive/10 text-destructive border-destructive/20"
+      case "pending":
+        return "bg-amber-500/10 text-amber-600 border-amber-500/20"
+      default:
+        return "bg-muted text-muted-foreground"
     }
   }
 
@@ -82,8 +117,8 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
         <DialogHeader>
           <div className="flex items-center justify-between pr-6">
             <h2 className="text-lg font-semibold leading-none tracking-tight">Appointment Details</h2>
-            <Badge className={getStatusColor(appointment.status)} variant="outline">
-              {appointment.status}
+            <Badge className={getStatusColor(appointmentStatus)} variant="outline">
+              {appointmentStatus}
             </Badge>
           </div>
         </DialogHeader>
@@ -91,12 +126,12 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
         <div className="space-y-6 py-6 border-y my-4">
           <div className="flex items-center gap-4">
             <Avatar className="h-14 w-14">
-              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${appointment.patientName}`} />
-              <AvatarFallback>{getInitials(appointment.patientName)}</AvatarFallback>
+              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${patientName}`} />
+              <AvatarFallback>{getInitials(patientName)}</AvatarFallback>
             </Avatar>
             <div>
-              <h4 className="font-bold text-lg">{appointment.patientName}</h4>
-              <p className="text-sm text-muted-foreground">{appointment.type}</p>
+              <h4 className="font-bold text-lg">{patientName}</h4>
+              <p className="text-sm text-muted-foreground">{appointment.appointment_type || appointment.type}</p>
             </div>
           </div>
 
@@ -127,7 +162,7 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
             </div>
             <div>
               <p className="text-[10px] uppercase font-bold text-muted-foreground">Location</p>
-              <p className="text-sm font-medium">{appointment.isVirtual ? "Virtual - Secure Video Room" : "Main Hospital • Block C, Room 402"}</p>
+              <p className="text-sm font-medium">{isVirtual ? "Virtual - Secure Video Room" : "Main Hospital • Block C, Room 402"}</p>
             </div>
           </div>
 
@@ -140,7 +175,7 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
         </div>
 
         <div className="flex flex-col gap-2">
-          {appointment.status === "Scheduled" && (
+          {appointmentStatus === "Scheduled" && (
             <Button 
               className="w-full gap-2" 
               onClick={() => toast({ title: "Connecting...", description: "Initializing secure clinical video session..." })} 
@@ -154,7 +189,7 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
               variant="outline" 
               className="gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200" 
               onClick={() => handleStatusChange("completed")}
-              disabled={loading || appointment.status === 'Completed'}
+              disabled={loading || appointmentStatus === 'Completed'}
             >
               <CheckCircle2 className="h-4 w-4" /> Complete
             </Button>
@@ -162,7 +197,7 @@ export function AppointmentDetailDialog({ open, onOpenChange, appointment }: App
               variant="outline" 
               className="gap-2 text-destructive hover:bg-destructive/5 border-destructive/20" 
               onClick={() => handleStatusChange("cancelled")}
-              disabled={loading || appointment.status === 'Cancelled'}
+              disabled={loading || appointmentStatus === 'Cancelled'}
             >
               <XCircle className="h-4 w-4" /> Cancel
             </Button>

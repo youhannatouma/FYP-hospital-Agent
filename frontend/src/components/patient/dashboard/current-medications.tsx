@@ -8,12 +8,11 @@ import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 import { useState, useEffect } from "react"
-import { apiClient } from "@/lib/api-client"
-import { useAuth } from "@clerk/nextjs"
-import { Loader2 } from "lucide-react"
+import { useHospital } from "@/hooks/use-hospital"
 
 export function CurrentMedications() {
   const { getToken } = useAuth()
+  const { pharmacy } = useHospital()
   const [medications, setMedications] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -21,10 +20,8 @@ export function CurrentMedications() {
     const fetchPrescriptions = async () => {
       try {
         const token = await getToken()
-        const response = await apiClient.get("/prescriptions/my", {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        setMedications(response.data)
+        const data = await pharmacy.getMyPrescriptions(token || undefined)
+        setMedications(data)
       } catch (error) {
         console.error("Failed to fetch prescriptions:", error)
       } finally {
@@ -32,7 +29,7 @@ export function CurrentMedications() {
       }
     }
     fetchPrescriptions()
-  }, [getToken])
+  }, [getToken, pharmacy])
 
   return (
     <div className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden h-full flex flex-col">

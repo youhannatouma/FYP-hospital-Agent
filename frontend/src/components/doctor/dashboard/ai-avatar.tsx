@@ -1,19 +1,57 @@
+import * as React from "react"
 import { Bot, Brain, MessageCircle, Mic, Sparkles, Activity } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
 import ThreeAvatar from "../../ThreeAvatar"
 import { m } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-const suggestedTasks = [
-  "Analyze population health trends",
-  "Check drug interaction safety",
-  "Retrieve evidence-based protocols",
-]
+interface DoctorAIAvatarProps {
+  selectedPatient?: any;
+}
 
-export function DoctorAIAvatar() {
+export function DoctorAIAvatar({ selectedPatient }: DoctorAIAvatarProps) {
   const { toast } = useToast()
+  const { stats } = useHospital()
+  const { getToken } = useAuth()
+  const [data, setData] = React.useState<any>(null)
+
+  const suggestedTasks = selectedPatient 
+    ? [
+        `Analyze ${selectedPatient.name}'s trends`,
+        `Check interactions for ${selectedPatient.name}`,
+        "Evidence-based protocols",
+      ]
+    : [
+        "Analyze population health trends",
+        "Check drug interaction safety",
+        "Retrieve clinical protocols",
+      ]
+
+  React.useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = await getToken()
+        const res = await stats.getDoctorStats(token || undefined)
+        setData(res)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    fetchStats()
+  }, [stats, getToken])
+
+  const pendingCount = data?.pending_reviews || 0
+  
+  const speakText = selectedPatient
+    ? `Doctor, I've loaded the clinical profile for ${selectedPatient.name}. Analyzing latest vitals and medical history.`
+    : pendingCount > 0 
+      ? `Doctor, I've identified ${pendingCount} high-priority clinical reviews pending. Ready for analysis.`
+      : "Doctor, your clinical queue is currently clear. I'm monitoring for new diagnostic updates."
+
   return (
     <m.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -41,7 +79,7 @@ export function DoctorAIAvatar() {
         </div>
 
         <div className="relative aspect-square max-w-[180px] mx-auto group-hover:scale-105 transition-transform duration-700">
-           <ThreeAvatar size={180} textToSpeak="Doctor, I've identified 3 high-priority clinical reviews pending. Ready for analysis." />
+           <ThreeAvatar size={180} textToSpeak={speakText} />
            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 glass-dark rounded-full border border-white/10 text-[10px] font-black uppercase tracking-widest whitespace-nowrap shadow-xl">
              Neural Link Active
            </div>
@@ -50,21 +88,27 @@ export function DoctorAIAvatar() {
         <div className="rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 p-5 mt-2 inner-glow">
           <div className="flex items-center gap-2 mb-3">
             <Brain className="h-4 w-4 text-blue-200 animate-pulse" />
-            <span className="text-xs font-black uppercase tracking-widest text-indigo-100">Clinic Analytics</span>
+            <span className="text-xs font-black uppercase tracking-widest text-indigo-100">
+              {selectedPatient ? "Patient Insight" : "Clinic Analytics"}
+            </span>
           </div>
           <p className="text-xs text-indigo-50/70 leading-relaxed font-bold">
-            Clinic throughput is <span className="text-emerald-300">up 5%</span> today. Identified 3 high-risk hypertension reviews pending.
+            {selectedPatient 
+              ? `Synchronizing clinical markers for ${selectedPatient.name}. Diagnostic reasoning is active.`
+              : pendingCount > 0 
+                ? `Identified ${pendingCount} high-risk clinical reviews pending. Clinical throughput is stable.`
+                : "All clinical reviews are up to date. Throughput is optimal today."}
           </p>
           <div className="mt-4 flex items-center gap-3">
             <div className="flex-1 h-3 rounded-full bg-white/10 overflow-hidden relative border border-white/5">
                 <m.div 
                 initial={{ width: 0 }}
-                animate={{ width: "85%" }}
+                animate={{ width: selectedPatient ? "85%" : (pendingCount > 0 ? "40%" : "100%") }}
                 transition={{ duration: 1.5, delay: 0.5, ease: "circOut" }}
                 className="h-full bg-gradient-to-r from-blue-400 to-indigo-300 rounded-full shadow-glow" 
                 />
             </div>
-            <span className="text-[10px] font-black text-white">85% Sync</span>
+            <span className="text-[10px] font-black text-white">{selectedPatient ? "Synced" : (pendingCount > 0 ? "Queue" : "Optimal")}</span>
           </div>
         </div>
 
@@ -91,7 +135,7 @@ export function DoctorAIAvatar() {
           <Link href="/doctor/ai-assistant">
             <Button className="w-full bg-slate-900 text-white hover:bg-slate-800 border-0 h-11 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl transition-all active:scale-95">
               <MessageCircle className="mr-2 h-4 w-4" />
-              Chat Admin
+              Chat AI
             </Button>
           </Link>
           <Button
@@ -100,7 +144,9 @@ export function DoctorAIAvatar() {
             onClick={() => {
               toast({
                 title: "Voice Transcription",
-                description: "Clinical-note agent is listening...",
+                description: selectedPatient 
+                  ? `Listening to dictate for ${selectedPatient.name}...` 
+                  : "Clinical-note agent is listening...",
               })
             }}
           >

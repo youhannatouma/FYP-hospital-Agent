@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
-import { apiClient } from "@/lib/api-client";
+import { useAuth, useUser } from "@clerk/nextjs";
 import {
   User,
   MapPin,
@@ -50,6 +49,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { m, AnimatePresence } from "framer-motion";
+import { useHospital } from "@/hooks/use-hospital";
 
 // Steps:
 // 1. Account (Completed via Clerk)
@@ -60,6 +60,8 @@ import { m, AnimatePresence } from "framer-motion";
 export default function PatientOnboarding() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
+  const { admin } = useHospital();
   const { toast } = useToast();
   const [step, setStep] = React.useState(3);
   const [progress, setProgress] = React.useState(25);
@@ -699,7 +701,8 @@ export default function PatientOnboarding() {
                         ],
                       };
 
-                      await apiClient.patch("/users/me", profileUpdate);
+                      const token = await getToken();
+                      await admin.updateMe(profileUpdate, token || undefined);
 
                       // 2. Set role in Clerk metadata
                       const roleRes = await fetch("/api/v1/set-role", {

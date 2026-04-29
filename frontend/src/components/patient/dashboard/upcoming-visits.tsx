@@ -29,8 +29,12 @@ export function UpcomingVisits() {
           specialty: a.doctor_specialty || "General Medicine",
           date: a.date || (a.created_at ? new Date(a.created_at).toDateString() : ""),
           time: a.time || "",
-          type: a.status || "",
-          typeColor: a.status === "scheduled" ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground",
+          type: a.status || "Pending",
+          typeColor: a.status === "Verified" || a.status === "Confirmed" 
+            ? "bg-emerald-500/10 text-emerald-600" 
+            : a.status === "Pending" 
+              ? "bg-amber-500/10 text-amber-600" 
+              : "bg-muted/50 text-muted-foreground",
           isVirtual: a.appointment_type?.toLowerCase().includes("virtual"),
         }))
         setVisits(ui)
