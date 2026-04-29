@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { getServiceContainer } from "@/lib/services/service-container";
 import {
   User,
   MapPin,
@@ -703,14 +702,25 @@ export default function PatientOnboarding() {
                 <Button
                   onClick={async () => {
                     try {
+                      const addressParts = [
+                        formData.address.street,
+                        formData.address.city,
+                        formData.address.state,
+                        formData.address.zip,
+                      ].map((part) => part.trim()).filter(Boolean);
+                      const emergencyParts = [
+                        formData.emergencyContact.name,
+                        formData.emergencyContact.phone,
+                      ].map((part) => part.trim()).filter(Boolean);
+
                       // 1. Save profile data to backend (Match UserProfileUpdate schema)
                       const profileUpdate = {
                         date_of_birth: formData.dob || null,
                         gender: formData.gender || null,
                         blood_type: formData.bloodType || null,
                         phone_number: formData.phone || null,
-                        address: `${formData.address.street}, ${formData.address.city}, ${formData.address.state} ${formData.address.zip}`.trim() || null,
-                        emergency_contact: `${formData.emergencyContact.name} - ${formData.emergencyContact.phone}`.trim() || null,
+                        address: addressParts.length ? addressParts.join(", ") : null,
+                        emergency_contact: emergencyParts.length ? emergencyParts.join(" - ") : null,
                         chronic_conditions: formData.chronicDiseases || [],
                         allergies: [
                           ...(formData.allergies?.drug || []),
@@ -719,8 +729,16 @@ export default function PatientOnboarding() {
                         ],
                       };
 
-                      const container = getServiceContainer();
-                      await container.user.updateProfile(profileUpdate);
+                      const profileRes = await fetch("/api/v1/users", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(profileUpdate),
+                      });
+
+                      if (!profileRes.ok) {
+                        const profileErr = await profileRes.json().catch(() => ({}));
+                        throw new Error(profileErr?.error || profileErr?.detail || "Failed to save profile");
+                      }
 
                       // 2. Set role in Clerk metadata
                       const roleRes = await fetch("/api/v1/set-role", {

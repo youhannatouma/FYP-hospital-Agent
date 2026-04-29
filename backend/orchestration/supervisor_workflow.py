@@ -17,7 +17,7 @@ import logging
 from datetime import date, time
 from typing import Any, AsyncIterator, Callable, Literal, TypedDict
 
-from langgraph.checkpoint.memory import MemorySaver
+from .checkpoint_store import get_checkpoint_saver
 from langgraph.graph import END, START, StateGraph
 
 from ..app.schemas.doctor_matching_agent import BookingSelectionInput
@@ -875,7 +875,7 @@ def _build_doctor_matching_graph():
     graph.add_node("synthesize_node", synthesize_node)
     graph.add_edge("conditional_book_node", "synthesize_node")
     graph.add_edge("synthesize_node", END)
-    return graph.compile(checkpointer=MemorySaver())
+    return graph.compile(checkpointer=get_checkpoint_saver())
 
 
 _WORKFLOW = _build_generic_graph()

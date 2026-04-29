@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
-from app.models import user, appointment, time_slot, message
-from app.routes import auth, users, appointments, doctors, payments, admin, medical_records, prescriptions, notifications, messages
+from app.models import user, appointment, time_slot, message, chat
+from app.routes import auth, users, appointments, doctors, payments, admin, medical_records, prescriptions, notifications, messages, assistant
 
 log = logging.getLogger("hospital")
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 async def lifespan(app: FastAPI):
     """Startup / shutdown hooks."""
     # ── Create tables ──────────────────────────────────────────────────────
-    from app.models import user, appointment, time_slot, medical_record, prescription, notification, message
+    from app.models import user, appointment, time_slot, medical_record, prescription, notification, message, chat
     Base.metadata.create_all(bind=engine)
     log.info("Database tables ensured.")
 
@@ -52,8 +52,16 @@ async def security_headers_middleware(request, call_next):
 
     return response
 
-# CORS: allow only known origins and required headers.
-_cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+# CORS: allow known local dev origins by default.
+_cors_origins_env = os.getenv(
+    "CORS_ORIGINS",
+    ",".join(
+        [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
+    ),
+)
 cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
 
 app.add_middleware(
@@ -76,6 +84,7 @@ api_router.include_router(medical_records.router)
 api_router.include_router(prescriptions.router)
 api_router.include_router(notifications.router)
 api_router.include_router(messages.router)
+api_router.include_router(assistant.router)
 
 app.include_router(api_router)
 app.mount("/ws", sio_app)

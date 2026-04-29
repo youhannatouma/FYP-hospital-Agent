@@ -184,7 +184,7 @@ export default function DoctorDashboardPage() {
       </div>
 
       {/* Messages & Communication */}
-      <MessagesSection onNewMessage={() => setIsNewMessageOpen(true)} />
+      <MessagesSection onNewMessage={() => setIsNewMessageOpen(true)} aiAssistantPath="/doctor/ai-assistant" />
     </m.div>
   )
 }
