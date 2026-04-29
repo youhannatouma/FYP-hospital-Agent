@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,8 @@ import {
 // motion import removed as unused
 import { cn } from "@/lib/utils"
 import { LogVitalsDialog } from "./dialogs/log-vitals-dialog"
+import { useUserProfile } from "@/hooks/use-user-profile"
+import { calculateAgeFromDob, getHeartRateBaselineByAge, midpoint } from "@/lib/health/heart-rate"
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -42,16 +44,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function VitalsTracking() {
   const [period, setPeriod] = useState("7d")
-  const [vitalsData] = useState([
-    { date: "Jan 8", systolic: 135, diastolic: 82, heartRate: 72 },
-    { date: "Jan 9", systolic: 138, diastolic: 85, heartRate: 75 },
-    { date: "Jan 10", systolic: 132, diastolic: 80, heartRate: 70 },
-    { date: "Jan 11", systolic: 140, diastolic: 88, heartRate: 78 },
-    { date: "Jan 12", systolic: 136, diastolic: 84, heartRate: 73 },
-    { date: "Jan 13", systolic: 137, diastolic: 85, heartRate: 72 },
-    { date: "Jan 14", systolic: 134, diastolic: 82, heartRate: 71 },
-    { date: "Jan 15", systolic: 137, diastolic: 85, heartRate: 72 },
-  ])
+  const { profile } = useUserProfile()
+  const age = calculateAgeFromDob(profile?.date_of_birth)
+  const hrBaseline = getHeartRateBaselineByAge(age)
+  const hrMid = midpoint(hrBaseline.min, hrBaseline.max)
+  const vitalsData = useMemo(() => ([
+    { date: "Jan 8", systolic: 135, diastolic: 82, heartRate: hrMid - 1 },
+    { date: "Jan 9", systolic: 138, diastolic: 85, heartRate: hrMid + 1 },
+    { date: "Jan 10", systolic: 132, diastolic: 80, heartRate: hrMid - 2 },
+    { date: "Jan 11", systolic: 140, diastolic: 88, heartRate: hrMid + 2 },
+    { date: "Jan 12", systolic: 136, diastolic: 84, heartRate: hrMid },
+    { date: "Jan 13", systolic: 137, diastolic: 85, heartRate: hrMid - 1 },
+    { date: "Jan 14", systolic: 134, diastolic: 82, heartRate: hrMid - 1 },
+    { date: "Jan 15", systolic: 137, diastolic: 85, heartRate: hrMid },
+  ]), [hrMid])
 
   return (
     <Card className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden">
@@ -101,9 +107,9 @@ export function VitalsTracking() {
            <div className="premium-card p-4 rounded-2xl bg-muted/30 border border-border/50">
               <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Heart Rate</span>
               <div className="flex items-end gap-2 mt-1">
-                <span className="text-2xl font-black text-foreground">72<span className="text-sm font-medium ml-1">bpm</span></span>
+                <span className="text-2xl font-black text-foreground">{hrMid}<span className="text-sm font-medium ml-1">bpm</span></span>
                 <span className="text-[10px] font-bold text-emerald-500 mb-1 flex items-center gap-0.5">
-                   <TrendingDown className="h-3 w-3" /> -3%
+                   <TrendingDown className="h-3 w-3" /> {hrBaseline.min}-{hrBaseline.max}
                 </span>
               </div>
            </div>

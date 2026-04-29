@@ -12,9 +12,9 @@ function DoctorRoleInitializer() {
   useEffect(() => {
     if (!isLoaded || !user) return;
 
-    // If doctor doesn't have role set, automatically set it
+    // Only fill missing role once for doctor users; avoid mutating existing roles.
     const role = user.publicMetadata?.role as string | undefined;
-    if (role !== "doctor") {
+    if (!role) {
       fetch("/api/v1/set-role", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

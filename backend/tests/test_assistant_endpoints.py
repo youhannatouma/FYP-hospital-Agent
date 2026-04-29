@@ -10,6 +10,8 @@ from fastapi import APIRouter, FastAPI
 from app.database import Base
 from app.models.chat import ChatThread, ChatMessage
 from app.routes import assistant as assistant_routes
+from backend.shared.gemini import AssistantConfigError
+from backend.shared.gemini import AssistantRuntimeError
 
 from sqlalchemy import Column, MetaData, Table, create_engine
 from sqlalchemy import Uuid as SqlUuid
@@ -338,3 +340,83 @@ def test_cancel_no_active_stream(client, db_session):
     res = client.post(f"/api/assistant/threads/{t.thread_id}/cancel", headers=_auth_headers())
     assert res.status_code == 200
     assert "No active stream" in res.json()["message"]
+
+
+def test_stream_reply_surfaces_structured_config_error(client, db_session, monkeypatch):
+    async def fake_stream(*args, **kwargs):
+        raise AssistantConfigError("missing key")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr("app.routes.assistant.stream_assistant_response", fake_stream)
+
+    t = ChatThread(owner_user_id=_FakeUser.user_id, title="Config Error")
+    db_session.add(t)
+    db_session.commit()
+    db_session.refresh(t)
+
+    with client.stream(
+        "POST",
+        f"/api/assistant/threads/{t.thread_id}/stream",
+        json={"message": "hello"},
+        headers=_auth_headers(),
+    ) as res:
+        chunks = [chunk for chunk in res.iter_text()]
+
+    events = _decode_sse_events(chunks)
+    error_event = next(e for e in events if e["type"] == "error")
+    assert error_event["code"] == "assistant_config_error"
+    assert "configuration" in error_event["message"].lower()
+
+
+def test_stream_reply_surfaces_structured_runtime_error(client, db_session, monkeypatch):
+    async def fake_stream(*args, **kwargs):
+        raise AssistantRuntimeError("runtime outage")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr("app.routes.assistant.stream_assistant_response", fake_stream)
+
+    t = ChatThread(owner_user_id=_FakeUser.user_id, title="Runtime Error")
+    db_session.add(t)
+    db_session.commit()
+    db_session.refresh(t)
+
+    with client.stream(
+        "POST",
+        f"/api/assistant/threads/{t.thread_id}/stream",
+        json={"message": "hello"},
+        headers=_auth_headers(),
+    ) as res:
+        chunks = [chunk for chunk in res.iter_text()]
+
+    events = _decode_sse_events(chunks)
+    error_event = next(e for e in events if e["type"] == "error")
+    assert error_event["code"] == "assistant_runtime_error"
+    assert "temporarily unavailable" in error_event["message"].lower()
+
+
+def test_assistant_telemetry_summary_counts(client, db_session, monkeypatch):
+    async def fake_stream(*args, **kwargs):
+        yield {"type": "delta", "content": "ok"}
+        yield {"type": "complete", "response": {"status": "complete"}}
+
+    monkeypatch.setattr("app.routes.assistant.stream_assistant_response", fake_stream)
+
+    t = ChatThread(owner_user_id=_FakeUser.user_id, title="Telemetry Chat")
+    db_session.add(t)
+    db_session.commit()
+    db_session.refresh(t)
+
+    with client.stream(
+        "POST",
+        f"/api/assistant/threads/{t.thread_id}/stream",
+        json={"message": "hello", "metadata": {"ui_source": "test_ui"}},
+        headers=_auth_headers(),
+    ) as res:
+        chunks = [chunk for chunk in res.iter_text()]
+        assert res.status_code == 200
+
+    summary = client.get("/api/assistant/telemetry/summary", headers=_auth_headers())
+    assert summary.status_code == 200
+    body = summary.json()
+    assert body["counts_by_event"].get("assistant_request_started", 0) >= 1
+    assert body["counts_by_event"].get("assistant_request_completed", 0) >= 1

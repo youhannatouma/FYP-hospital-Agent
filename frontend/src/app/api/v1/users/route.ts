@@ -1,12 +1,58 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
+function normalizeBackendBase(url: string): string {
+  const trimmed = url.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+}
+
+function getBackendCandidates(): string[] {
+  const configured = process.env.BACKEND_URL;
+  if (configured && configured.trim()) {
+    return [normalizeBackendBase(configured)];
+  }
+  return [
+    "http://127.0.0.1:8000/api",
+    "http://localhost:8000/api",
+    "http://backend:8000/api",
+    "http://host.docker.internal:8000/api",
+  ];
+}
+
+async function fetchBackend(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const candidates = getBackendCandidates();
+  let lastError: unknown = null;
+
+  for (const base of candidates) {
+    try {
+      return await fetch(`${base}${path}`, init);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Backend connection failed");
+}
+
+async function resolveBearerToken(request: Request): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+  try {
+    const { getToken } = await auth();
+    return await getToken();
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(request: Request) {
   try {
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await resolveBearerToken(request);
     const { searchParams } = new URL(request.url);
 
     if (!token) {
@@ -14,27 +60,34 @@ export async function GET(request: Request) {
     }
 
     // Proxy to FastAPI backend
-    const res = await fetch(`${BACKEND}/users/?${searchParams}`, {
+    const res = await fetchBackend(`/users/?${searchParams}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    const data = await res.json();
+    const raw = await res.text();
+    let data: unknown = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { detail: raw };
+      }
+    }
     return NextResponse.json(data, { status: res.status });
   } catch (error) {
     console.error("[users GET] Error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch users" },
-      { status: 500 },
+      { error: "Backend unavailable. Please try again in a moment." },
+      { status: 502 },
     );
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await resolveBearerToken(request);
     const body = await request.json();
 
     if (!token) {
@@ -42,7 +95,7 @@ export async function PATCH(request: Request) {
     }
 
     // Proxy to FastAPI backend - update current user
-    const res = await fetch(`${BACKEND}/users/me`, {
+    const res = await fetchBackend("/users/me", {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -51,13 +104,21 @@ export async function PATCH(request: Request) {
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
+    const raw = await res.text();
+    let data: unknown = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { detail: raw };
+      }
+    }
     return NextResponse.json(data, { status: res.status });
   } catch (error) {
     console.error("[users PATCH] Error:", error);
     return NextResponse.json(
-      { error: "Failed to update user" },
-      { status: 500 },
+      { error: "Backend unavailable. Please try again in a moment." },
+      { status: 502 },
     );
   }
 }

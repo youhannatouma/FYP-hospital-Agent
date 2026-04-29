@@ -5,8 +5,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
-from app.models import user, appointment, time_slot, message, chat
+from app.models import user, appointment, time_slot, message, chat, pharmacy
 from app.routes import auth, users, appointments, doctors, payments, admin, medical_records, prescriptions, notifications, messages, assistant
+from shared.gemini import log_assistant_llm_status_once
 
 log = logging.getLogger("hospital")
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 async def lifespan(app: FastAPI):
     """Startup / shutdown hooks."""
     # ── Create tables ──────────────────────────────────────────────────────
-    from app.models import user, appointment, time_slot, medical_record, prescription, notification, message, chat
+    from app.models import user, appointment, time_slot, medical_record, prescription, notification, message, chat, pharmacy
     Base.metadata.create_all(bind=engine)
     log.info("Database tables ensured.")
 
@@ -26,6 +27,8 @@ async def lifespan(app: FastAPI):
         seed_database()
     except Exception as e:
         log.warning("Auto-seed skipped or failed: %s", e)
+
+    log_assistant_llm_status_once()
 
     yield  # app is running
     log.info("Shutting down.")
