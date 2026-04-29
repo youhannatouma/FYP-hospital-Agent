@@ -101,6 +101,44 @@ class BookingSkill:
             return True
 
     @staticmethod
+    def accept_appointment(db: Session, user: User, appointment_id: UUID):
+        appointment = db.query(Appointment).filter(Appointment.appointment_id == appointment_id).first()
+        ValidationSkill.ensure_exists(appointment, "Appointment")
+        
+        # Authorize: The assigned doctor or an admin
+        AuthorizationSkill.authorize_role(user, ["doctor", "admin"])
+        if str(user.role) == "doctor":
+            AuthorizationSkill.authorize_ownership(user, appointment.doctor_id)
+
+        with TransactionSkill.run_transaction(db):
+            ValidationSkill.validate_business_rule(
+                appointment.status == AppointmentStatus.scheduled, 
+                f"Cannot accept appointment in {appointment.status} state"
+            )
+            appointment.status = AppointmentStatus.accepted
+            log.info(f"BookingSkill: Accepted appointment {appointment_id}")
+            return True
+
+    @staticmethod
+    def start_appointment(db: Session, user: User, appointment_id: UUID):
+        appointment = db.query(Appointment).filter(Appointment.appointment_id == appointment_id).first()
+        ValidationSkill.ensure_exists(appointment, "Appointment")
+        
+        # Authorize: The assigned doctor or an admin
+        AuthorizationSkill.authorize_role(user, ["doctor", "admin"])
+        if str(user.role) == "doctor":
+            AuthorizationSkill.authorize_ownership(user, appointment.doctor_id)
+
+        with TransactionSkill.run_transaction(db):
+            ValidationSkill.validate_business_rule(
+                appointment.status == AppointmentStatus.accepted, 
+                "Appointment must be accepted before it can be started"
+            )
+            appointment.status = AppointmentStatus.in_progress
+            log.info(f"BookingSkill: Started appointment {appointment_id}")
+            return True
+
+    @staticmethod
     def complete_appointment(db: Session, user: User, appointment_id: UUID):
         appointment = db.query(Appointment).filter(Appointment.appointment_id == appointment_id).first()
         ValidationSkill.ensure_exists(appointment, "Appointment")
@@ -111,7 +149,29 @@ class BookingSkill:
             AuthorizationSkill.authorize_ownership(user, appointment.doctor_id)
 
         with TransactionSkill.run_transaction(db):
+            ValidationSkill.validate_business_rule(
+                appointment.status == AppointmentStatus.in_progress, 
+                "Appointment must be in progress to mark as completed"
+            )
             appointment.status = AppointmentStatus.completed
-            log.info(f"BookingSkill: Completed appointment {appointment_id}")
+            
+            # 3. Generate Invoice
+            from app.skills.payment_skill import PaymentSkill
+            from datetime import datetime, timedelta
+            
+            doctor = db.query(User).filter(User.user_id == appointment.doctor_id).first()
+            
+            PaymentSkill.create_invoice(
+                db=db,
+                patient_id=str(appointment.patient_id),
+                appointment_id=str(appointment.appointment_id),
+                description=f"Consultation with Dr. {doctor.last_name} ({doctor.specialty or 'General'})",
+                total_amount=appointment.fee or 150.0,
+                patient_due=(appointment.fee or 150.0) * 0.2, # Default 20% patient co-pay
+                provider=f"Hospital Clinic - {doctor.specialty or 'General'}",
+                due_date=datetime.now() + timedelta(days=30)
+            )
+            
+            log.info(f"BookingSkill: Completed appointment {appointment_id} and generated invoice")
             return True
 

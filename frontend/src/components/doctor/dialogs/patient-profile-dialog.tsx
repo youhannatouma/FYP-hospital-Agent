@@ -57,10 +57,10 @@ export function PatientProfileDialog({ open, onOpenChange, patient }: PatientPro
                   </Button>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><Phone className="h-3.3 w-3" /> +1 (555) 123-4567</span>
-                <span className="flex items-center gap-1"><Mail className="h-3.3 w-3" /> {patient.email || "patient@example.com"}</span>
-                <span className="flex items-center gap-1"><MapPin className="h-3.3 w-3" /> New York, NY</span>
+              <div className="mt-3 flex flex-wrap gap-4 text-[10px] uppercase font-black tracking-widest text-muted-foreground">
+                <span className="flex items-center gap-1.5"><Phone className="h-3 w-3 text-primary/50" /> {patient.phone || "No Phone"}</span>
+                <span className="flex items-center gap-1.5"><Mail className="h-3 w-3 text-primary/50" /> {patient.email || "No Email"}</span>
+                <span className="flex items-center gap-1.5"><MapPin className="h-3 w-3 text-primary/50" /> {patient.address || "No Address"}</span>
               </div>
             </div>
           </div>
@@ -68,25 +68,44 @@ export function PatientProfileDialog({ open, onOpenChange, patient }: PatientPro
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
           <div className="px-6 border-b">
-            <TabsList className="bg-transparent border-0 gap-6 w-full justify-start h-12">
-              <TabsTrigger value="overview" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-12">Overview</TabsTrigger>
-              <TabsTrigger value="history" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-12">Medical History</TabsTrigger>
-              <TabsTrigger value="medications" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-12">Medications</TabsTrigger>
-              <TabsTrigger value="labs" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-12">Lab Results</TabsTrigger>
+            <TabsList className="bg-transparent border-0 gap-8 w-full justify-start h-12">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-12 text-[10px] uppercase font-black tracking-widest">Overview</TabsTrigger>
+              <TabsTrigger value="history" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-12 text-[10px] uppercase font-black tracking-widest">Medical History</TabsTrigger>
+              <TabsTrigger value="medications" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-12 text-[10px] uppercase font-black tracking-widest">Medications</TabsTrigger>
+              <TabsTrigger value="labs" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-12 text-[10px] uppercase font-black tracking-widest">Lab Results</TabsTrigger>
             </TabsList>
           </div>
 
           <ScrollArea className="flex-1 p-6">
             <TabsContent value="overview" className="mt-0 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
-                  <h4 className="text-xs font-bold uppercase text-primary mb-2">Primary Condition</h4>
-                  <p className="text-lg font-semibold">{patient.condition || "Hypertension"}</p>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 rounded-3xl bg-primary/5 border border-primary/10">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">Insurance Provider</h4>
+                  <p className="text-sm font-bold text-foreground">{patient.insurance_provider || "Self-Pay / None"}</p>
                 </div>
-                <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10">
-                  <h4 className="text-xs font-bold uppercase text-orange-600 mb-2">Active Risks</h4>
-                  <Badge variant="outline" className="text-orange-600 border-orange-200">Smoker</Badge>
-                  <Badge variant="outline" className="text-orange-600 border-orange-200 ml-2">High BMI</Badge>
+                <div className="p-4 rounded-3xl bg-indigo-500/5 border border-indigo-500/10">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-2">Policy Number</h4>
+                  <p className="text-sm font-bold text-foreground">{patient.insurance_id || "N/A"}</p>
+                </div>
+                <div className="p-4 rounded-3xl bg-emerald-500/5 border border-emerald-500/10">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">Coverage Class</h4>
+                  <p className="text-sm font-bold text-foreground">{patient.coverage_type || "Standard"}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-3xl bg-slate-900/5 border border-slate-900/10">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2">Clinical Conditions</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="text-[10px] font-bold bg-white">{patient.condition || "No Chronic Conditions Listed"}</Badge>
+                  </div>
+                </div>
+                <div className="p-4 rounded-3xl bg-orange-500/5 border border-orange-500/10">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-600 mb-2">Clinical Risk Factors</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="text-orange-600 border-orange-200 bg-white font-bold text-[10px]">High BMI</Badge>
+                    <Badge variant="outline" className="text-orange-600 border-orange-200 bg-white font-bold text-[10px]">Smoker</Badge>
+                  </div>
                 </div>
               </div>
 
