@@ -43,8 +43,43 @@ export interface IHttpClient {
 
 import axios, { AxiosInstance } from "axios";
 import { getAuthService, IAuthService } from "./auth-service";
-import { classifyHttpError } from "@/lib/network/http-error";
+import { attachHttpErrorDiagnostics } from "@/lib/network/http-error";
 import { resolveApiBaseUrl, warnIfSuspiciousApiBaseUrl } from "@/lib/network/runtime-config";
+
+type HeaderAccessor = {
+  get?: (name: string) => unknown;
+  has?: (name: string) => boolean;
+  set?: (name: string, value: string) => void;
+  Authorization?: unknown;
+  authorization?: unknown;
+};
+
+function hasAuthorizationHeader(headers: unknown): boolean {
+  if (!headers || typeof headers !== "object") return false;
+
+  const headerAccessor = headers as HeaderAccessor;
+  if (typeof headerAccessor.has === "function" && headerAccessor.has("Authorization")) {
+    return true;
+  }
+  if (typeof headerAccessor.get === "function" && headerAccessor.get("Authorization")) {
+    return true;
+  }
+
+  return Boolean(headerAccessor.Authorization || headerAccessor.authorization);
+}
+
+function setAuthorizationHeader(headers: unknown, token: string): void {
+  if (!headers || typeof headers !== "object") return;
+
+  const headerAccessor = headers as HeaderAccessor;
+  const authorization = `Bearer ${token}`;
+  if (typeof headerAccessor.set === "function") {
+    headerAccessor.set("Authorization", authorization);
+    return;
+  }
+
+  headerAccessor.Authorization = authorization;
+}
 
 export class AxiosHttpClient implements IHttpClient {
   private client: AxiosInstance;
@@ -63,9 +98,11 @@ export class AxiosHttpClient implements IHttpClient {
     this.client.interceptors.request.use(
       async (config) => {
         try {
-          const token = await this.authService.getToken({ waitForSession: true });
-          if (token && config.headers) {
-            config.headers.Authorization = `Bearer ${token}`;
+          if (!hasAuthorizationHeader(config.headers)) {
+            const token = await this.authService.getToken({ waitForSession: true });
+            if (token) {
+              setAuthorizationHeader(config.headers, token);
+            }
           }
         } catch {
           // Continue without token
@@ -79,14 +116,7 @@ export class AxiosHttpClient implements IHttpClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        const details = classifyHttpError(error);
-        if (details.kind === "network_unreachable") {
-          console.error("[HTTP Client Error] Network issue detected", details);
-        } else if (details.kind === "auth_unavailable" && details.status === 401) {
-          console.debug("[HTTP Client Auth] Token unavailable/expired during request", details);
-        } else {
-          console.error("[HTTP Client Error]", details);
-        }
+        attachHttpErrorDiagnostics(error);
         return Promise.reject(error);
       },
     );

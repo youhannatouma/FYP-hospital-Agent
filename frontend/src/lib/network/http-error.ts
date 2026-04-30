@@ -20,7 +20,16 @@ export type HttpErrorDiagnostics = {
   corsHint?: string;
 };
 
+export type HttpErrorWithDiagnostics = {
+  httpDiagnostics?: HttpErrorDiagnostics;
+};
+
 export function classifyHttpError(error: unknown): HttpErrorDiagnostics {
+  if (typeof error === "object" && error !== null) {
+    const existing = (error as HttpErrorWithDiagnostics).httpDiagnostics;
+    if (existing) return existing;
+  }
+
   if (!axios.isAxiosError(error)) {
     return { kind: "unknown", message: "An unexpected error occurred" };
   }
@@ -59,4 +68,23 @@ export function classifyHttpError(error: unknown): HttpErrorDiagnostics {
       typeof globalThis.window !== "undefined" ? globalThis.window.location.origin : undefined,
     corsHint,
   };
+}
+
+export function attachHttpErrorDiagnostics(error: unknown): HttpErrorDiagnostics {
+  const details = classifyHttpError(error);
+
+  if (typeof error === "object" && error !== null) {
+    try {
+      Object.defineProperty(error, "httpDiagnostics", {
+        value: details,
+        configurable: true,
+        enumerable: false,
+        writable: true,
+      });
+    } catch {
+      // Keep the original request failure intact even if the error object is sealed.
+    }
+  }
+
+  return details;
 }
