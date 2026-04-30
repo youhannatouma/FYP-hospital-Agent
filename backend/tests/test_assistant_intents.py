@@ -5,3 +5,26 @@ def test_detect_intents_marks_cholesterol_question_as_general_health():
     intents = _detect_intents("What should I know about my cholesterol levels?")
     assert intents["general_health"] is True
     assert intents["appointment"] is False
+    assert intents["route"] == "general_health"
+
+
+def test_detect_intents_medication_only_route():
+    intents = _detect_intents("What medication can I take for a headache?")
+    assert intents["medication"] is True
+    assert intents["appointment"] is False
+    assert intents["route"] == "medication_only"
+
+
+def test_detect_intents_appointment_only_route():
+    intents = _detect_intents("Please book an appointment with a cardiology doctor.")
+    assert intents["appointment"] is True
+    assert intents["medication"] is False
+    assert intents["route"] == "appointment_only"
+
+
+def test_detect_intents_combined_route():
+    intents = _detect_intents("I need to book a doctor visit and recommend medication for my fever.")
+    assert intents["appointment"] is True
+    assert intents["medication"] is True
+    assert intents["combined"] is True
+    assert intents["route"] == "combined"

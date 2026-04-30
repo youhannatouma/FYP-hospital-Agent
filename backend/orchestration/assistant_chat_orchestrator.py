@@ -64,11 +64,26 @@ def _detect_intents(message: str) -> dict[str, bool]:
     has_symptom_keyword = any(k in lowered for k in symptom_keywords)
     has_health_guidance_keyword = any(k in lowered for k in health_guidance_keywords)
     asks_for_help = bool(re.search(r"\b(what|which|can|should|help|need|recommend)\b", lowered))
+    has_appointment = any(k in lowered for k in appointment_keywords)
+    has_medication = has_medication_keyword or (has_symptom_keyword and asks_for_help)
     has_general_health = has_health_guidance_keyword and asks_for_help
+    combined = has_appointment and has_medication
+
+    if combined:
+        route = "combined"
+    elif has_appointment:
+        route = "appointment_only"
+    elif has_medication:
+        route = "medication_only"
+    else:
+        route = "general_health"
+
     return {
-        "medication": has_medication_keyword or (has_symptom_keyword and asks_for_help),
-        "appointment": any(k in lowered for k in appointment_keywords),
+        "medication": has_medication,
+        "appointment": has_appointment,
         "general_health": has_general_health,
+        "combined": combined,
+        "route": route,
     }
 
 
@@ -122,19 +137,8 @@ async def stream_assistant_response(
     if context_parts:
         contextual_message = f"{message}\n\n" + "\n\n".join(context_parts)
 
-    if intents["medication"]:
-        try:
-            med_result = await asyncio.to_thread(
-                medication_pipeline,
-                message,
-                str(user.user_id),
-                user_profile=patient_profile,
-            )
-        except Exception as exc:
-            log.warning("Medication pipeline failed: %s", exc)
-            errors.append({"code": "MedicationPipelineFailed", "message": str(exc)})
-
-    if intents["appointment"]:
+    route = str(intents.get("route") or "")
+    if route in {"appointment_only", "combined"}:
         try:
             doctor_result = await execute_doctor_match_workflow(
                 {
@@ -148,6 +152,18 @@ async def stream_assistant_response(
         except Exception as exc:
             log.warning("Doctor workflow failed: %s", exc)
             errors.append({"code": "DoctorWorkflowFailed", "message": str(exc)})
+
+    if route in {"medication_only", "combined"}:
+        try:
+            med_result = await asyncio.to_thread(
+                medication_pipeline,
+                message,
+                str(user.user_id),
+                user_profile=patient_profile,
+            )
+        except Exception as exc:
+            log.warning("Medication pipeline failed: %s", exc)
+            errors.append({"code": "MedicationPipelineFailed", "message": str(exc)})
 
     # Health education prompts should not fall into the generic error-only path.
     if intents.get("general_health") and med_result is None and doctor_result is None and not errors:

@@ -277,7 +277,8 @@ def test_synthesize_combined(monkeypatch, sample_patient, sample_medication_resu
     assert result.message_type == "combined"
     assert result.medication_result is not None
     assert result.appointment_result is not None
-    assert "Medication Guidance" in captured_prompt["text"] or "Appointment Scheduling" in captured_prompt["text"]
+    assert "Start with appointment scheduling guidance first." in captured_prompt["text"]
+    assert "Then transition naturally into medication guidance." in captured_prompt["text"]
 
 
 def test_synthesize_error_no_tools_with_structured_errors(monkeypatch, sample_patient):
