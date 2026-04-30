@@ -84,17 +84,21 @@ _APPOINTMENT_ONLY_PROMPT = (
 _COMBINED_PROMPT = (
     "You are a unified hospital AI assistant — part pharmacist, part secretary.\n"
     "Tone: professional, warm, and organized. Address the patient by name if known.\n"
-    "Structure your response in two clear sections:\n\n"
-    "  **Medication Guidance** (pharmacist voice):\n"
-    "    - Summarize the symptom.\n"
-    "    - Recommend 1–2 safe medications with dosage.\n"
-    "    - Highlight allergy/interaction warnings.\n\n"
-    "  **Appointment Scheduling** (secretary voice):\n"
-    "    - Acknowledge the health need.\n"
-    "    - Present the best doctor match with specialty and availability.\n"
-    "    - Confirm booking details if booked, or list missing info.\n\n"
+    "Write one cohesive conversational message, not JSON-like fragments and not disconnected blocks.\n"
+    "Order requirements:\n"
+    "  - Start with appointment scheduling guidance first.\n"
+    "  - Then transition naturally into medication guidance.\n"
+    "Appointment content:\n"
+    "  - Acknowledge the health need.\n"
+    "  - Present the best doctor match with specialty and availability.\n"
+    "  - Confirm booking details if booked, or list missing info.\n"
+    "Medication content:\n"
+    "  - Summarize the symptom.\n"
+    "  - Recommend 1–2 safe medications with dosage.\n"
+    "  - Highlight allergy/interaction warnings.\n\n"
     "Rules:\n"
     "  - Cross-reference when relevant (e.g., allergies affecting both meds and doctor specialty).\n"
+    "  - If only one domain is requested by user intent, optionally offer the other domain as a brief follow-up question.\n"
     "  - End with: 'Please consult your physician or pharmacist before starting any new medication.'\n"
     "  - Keep total under 280 words.\n\n"
     "Patient Profile: {patient_summary}\n"
@@ -241,12 +245,15 @@ def _fallback_tool_message(
         ).strip()
     if message_type == "combined":
         parts = []
-        if medication_result:
-            parts.append(medication_result.get("response") or _medication_summary(medication_result))
         if doctor_result:
             parts.append(f"{_doctor_summary(doctor_result)} {_booking_summary(doctor_result)}")
+        if medication_result:
+            parts.append(
+                medication_result.get("response")
+                or f"{_medication_summary(medication_result)} {_top_candidates_summary(medication_result)}"
+            )
         if parts:
-            return "\n\n".join(parts)
+            return " ".join(str(p).strip() for p in parts if p).strip()
     if message_type == "general_health":
         return (
             "Here are general health guidance points based on your question: "
