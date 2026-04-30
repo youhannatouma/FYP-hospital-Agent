@@ -4,7 +4,7 @@ import asyncio
 import logging
 import re
 from datetime import date
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal, TypedDict
 
 try:
     from app.models.user import User
@@ -24,6 +24,22 @@ except ImportError:  # Fallback for backend package context
 log = logging.getLogger(__name__)
 
 
+AssistantRoute = Literal[
+    "appointment_only",
+    "combined",
+    "general_health",
+    "medication_only",
+]
+
+
+class DetectedIntents(TypedDict):
+    medication: bool
+    appointment: bool
+    general_health: bool
+    combined: bool
+    route: AssistantRoute
+
+
 def _build_user_profile(user: User) -> dict[str, Any]:
     age = None
     if user.date_of_birth:
@@ -41,7 +57,7 @@ def _build_user_profile(user: User) -> dict[str, Any]:
     }
 
 
-def _detect_intents(message: str) -> dict[str, bool]:
+def _detect_intents(message: str) -> DetectedIntents:
     lowered = (message or "").lower()
     medication_keywords = {
         "medication", "medicine", "drug", "prescription", "dose", "dosage",
@@ -69,6 +85,7 @@ def _detect_intents(message: str) -> dict[str, bool]:
     has_general_health = has_health_guidance_keyword and asks_for_help
     combined = has_appointment and has_medication
 
+    route: AssistantRoute
     if combined:
         route = "combined"
     elif has_appointment:

@@ -2,7 +2,6 @@
 
 import { Pill, AlertCircle} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -44,13 +43,12 @@ export function CurrentMedications() {
         ) : (
           <AnimatePresence mode="popLayout">
             {medications.map((presc, idx) => {
-              // Map medications array to string for display
-              const medName = presc.medications[0] || "Medication"
-              const subText = presc.medications.length > 1 ? `+ ${presc.medications.length - 1} more` : ""
+              const medName = presc.medication_name || "Medication"
+              const subText = [presc.dosage, presc.frequency].filter(Boolean).join(" - ")
               
               return (
                 <m.div
-                  key={presc.prescription_id}
+                  key={presc.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.1 }}
@@ -65,11 +63,11 @@ export function CurrentMedications() {
                         {medName} {subText}
                       </h3>
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                        Ref: {presc.doctor_name}
+                        Ref: {presc.doctor_id}
                       </p>
                     </div>
                     <Badge className={cn("border-none text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg", 
-                      presc.status === "Active" ? "bg-emerald-500/10 text-emerald-500" : "bg-muted/30 text-muted-foreground"
+                      presc.status === "active" ? "bg-emerald-500/10 text-emerald-500" : "bg-muted/30 text-muted-foreground"
                     )}>
                        {presc.status}
                     </Badge>
@@ -82,7 +80,7 @@ export function CurrentMedications() {
                     </div>
                     <div className="space-y-1 text-right">
                       <span className="text-[9px] font-black text-muted-foreground uppercase opacity-50 tracking-wider">Expiry</span>
-                      <p className="text-xs font-black text-foreground">{presc.expiry_date || "N/A"}</p>
+                      <p className="text-xs font-black text-foreground">{presc.expires_at || "N/A"}</p>
                     </div>
                   </div>
 

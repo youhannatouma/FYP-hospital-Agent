@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { getServiceContainer } from "@/lib/services/service-container"
-import { Pill, AlertTriangle, Info } from "lucide-react"
+import { Pill, AlertTriangle } from "lucide-react"
 
 interface PrescriptionDialogProps {
   open: boolean
@@ -41,14 +41,14 @@ export function PrescriptionDialog({ open, onOpenChange, patient }: Prescription
     setLoading(true)
     
     try {
-      const fullMedication = `${medication} ${dosage} - ${frequency} for ${duration}`.trim()
-      
       const container = getServiceContainer()
       await container.prescription.createPrescription({
         patient_id: patient?.id || "",
-        medications: [fullMedication],
+        medication_name: medication,
+        dosage,
+        frequency,
+        duration,
         instructions: instructions || "Take as directed",
-        days_valid: 30
       })
 
       toast({

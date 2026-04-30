@@ -13,7 +13,12 @@ import { Loader2, ClipboardList, Pill, Save } from "lucide-react"
 interface CompleteSessionDialogProps {
   isOpen: boolean
   onClose: () => void
-  appointment: any
+  appointment: {
+    appointment_id?: string
+    id?: string
+    patient_id: string
+    patient_name?: string
+  }
   onSuccess: () => void
 }
 
@@ -48,17 +53,26 @@ export function CompleteSessionDialog({ isOpen, onClose, appointment, onSuccess 
       // 2. Create Prescription if medications entered
       if (medications.trim() && record) {
         const medsList = medications.split(",").map(m => m.trim())
-        await container.prescription.createPrescription({
-          patient_id: appointment.patient_id,
-          record_id: record.record_id,
-          medications: medsList,
-          instructions: "As discussed during the consultation.",
-          days_valid: 30
-        })
+        await Promise.all(
+          medsList.map((medicationName) =>
+            container.prescription.createPrescription({
+              patient_id: appointment.patient_id,
+              medication_name: medicationName,
+              dosage: "As directed",
+              frequency: "As directed",
+              duration: "30 days",
+              instructions: "As discussed during the consultation.",
+            })
+          )
+        )
       }
 
       // 3. Update Appointment Status to Completed
-      await container.appointment.updateStatus(appointment.appointment_id || appointment.id, "Completed")
+      const appointmentId = appointment.appointment_id || appointment.id
+      if (!appointmentId) {
+        throw new Error("Missing appointment id")
+      }
+      await container.appointment.completeAppointment(appointmentId)
 
       toast({ title: "Session Completed", description: "Medical record has been saved and patient notified." })
       onSuccess()

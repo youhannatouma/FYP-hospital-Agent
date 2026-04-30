@@ -42,11 +42,11 @@ export function MedicalHistoryTimeline() {
       const isSurgery = r.record_type?.toLowerCase().includes("surgery")
       
       return {
-        id: r.record_id,
+        id: r.id,
         type: r.record_type,
-        title: r.diagnosis || "Medical Consultation",
-        date: r.created_at ? new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD",
-        description: r.treatment || r.clinical_notes,
+        title: r.title || "Medical Consultation",
+        date: (r.date || r.created_at) ? new Date(r.date || r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD",
+        description: r.description || "No description available.",
         status: "Verified",
         statusColor: "bg-emerald-500/10 text-emerald-500",
         dotColor: isLab ? "bg-amber-500" : isSurgery ? "bg-red-500" : "bg-primary",

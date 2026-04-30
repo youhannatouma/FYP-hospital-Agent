@@ -16,7 +16,7 @@ import {
   Clock,
   CheckCircle2
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -25,10 +25,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { MedicalRecord } from "@/lib/services/repositories/medical-record-repository"
+
+type ClinicalRecord = MedicalRecord & {
+  status?: "Active" | "Follow-up" | "Archived";
+  doctor_name?: string;
+  notes?: string;
+};
 
 export default function ClinicalHistoryPage() {
   const { user } = useUser()
@@ -37,15 +42,15 @@ export default function ClinicalHistoryPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Follow-up" | "Archived">("All")
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
-  const [patientRecords, setPatientRecords] = useState<any[]>([])
+  const [patientRecords, setPatientRecords] = useState<ClinicalRecord[]>([])
 
   useEffect(() => {
     const loadRecords = async () => {
       try {
         const container = getServiceContainer()
-        const response = await container.medicalRecord.getMyMedicalRecords()
+        const response = await container.medicalRecord.getMyRecords()
         if (Array.isArray(response)) {
-          setPatientRecords(response)
+          setPatientRecords(response as ClinicalRecord[])
         }
       } catch (error) {
         console.error("Failed to load clinical history:", error)
@@ -61,11 +66,16 @@ export default function ClinicalHistoryPage() {
     }
   }, [user, toast])
 
-  const filteredRecords = patientRecords.filter((r: any) => {
+  const filteredRecords = patientRecords.filter((r) => {
+    const searchableText = [
+      r.title,
+      r.description,
+      r.id,
+      r.doctor_name,
+      r.record_type,
+    ].join(" ").toLowerCase()
     const matchesSearch = (
-      r.diagnosis?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.record_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.doctor_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      searchableText.includes(searchQuery.toLowerCase())
     )
     const recordStatus = r.status || "Active"
     const matchesStatus = statusFilter === "All" || recordStatus === statusFilter
@@ -81,19 +91,19 @@ export default function ClinicalHistoryPage() {
     }
   }
 
-  const handleDownload = (record: any) => {
-    setDownloadingId(record.record_id)
+  const handleDownload = (record: ClinicalRecord) => {
+    setDownloadingId(record.id)
     setTimeout(() => {
       // Simulate CSV generation
-      const headers = ["Record ID", "Doctor", "Date", "Diagnosis", "Notes", "Status"]
-      const row = [record.record_id, record.doctor_name, record.created_at, record.diagnosis, record.notes || "N/A", record.status || "Active"]
+      const headers = ["Record ID", "Doctor", "Date", "Title", "Notes", "Status"]
+      const row = [record.id, record.doctor_name || record.doctor_id || "Staff Physician", record.date || record.created_at, record.title, record.notes || record.description || "N/A", record.status || "Active"]
       const csvContent = [headers, row].map(e => e.join(",")).join("\n")
       
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const link = document.createElement("a")
       const url = URL.createObjectURL(blob)
       link.setAttribute("href", url)
-      link.setAttribute("download", `medical_record_${record.record_id}.csv`)
+      link.setAttribute("download", `medical_record_${record.id}.csv`)
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -151,7 +161,7 @@ export default function ClinicalHistoryPage() {
               </div>
               <div>
                 <p className="text-xs font-bold uppercase text-muted-foreground">Active Diagnoses</p>
-                <h3 className="text-2xl font-bold">{patientRecords.filter((r: any) => (r.status || 'Active') === 'Active').length}</h3>
+                <h3 className="text-2xl font-bold">{patientRecords.filter((r) => (r.status || 'Active') === 'Active').length}</h3>
               </div>
             </div>
           </CardContent>
@@ -207,11 +217,11 @@ export default function ClinicalHistoryPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredRecords.map((record: any) => {
+            {filteredRecords.map((record) => {
               const statusInfo = getStatusInfo(record.status || 'Active')
               return (
                 <div 
-                  key={record.record_id} 
+                  key={record.id} 
                   className="flex flex-col gap-4 p-4 rounded-xl border border-border bg-card/50 hover:bg-card hover:shadow-md transition-all group"
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -221,15 +231,15 @@ export default function ClinicalHistoryPage() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-base truncate">{record.diagnosis}</h3>
+                          <h3 className="font-bold text-base truncate">{record.title}</h3>
                           <Badge className={`${statusInfo.color} border-0 text-[10px]`}>
-                            {record.status}
+                            {record.status || "Active"}
                           </Badge>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="h-3.5 w-3.5" />
-                            {new Date(record.created_at).toLocaleDateString()}
+                            {new Date(record.date || record.created_at).toLocaleDateString()}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Stethoscope className="h-3.5 w-3.5" />
@@ -237,7 +247,7 @@ export default function ClinicalHistoryPage() {
                           </div>
                           <div className="hidden sm:flex items-center gap-1.5 grayscale opacity-70">
                             <Clock className="h-3.5 w-3.5" />
-                            ID: {record.record_id?.split('-')[0]}
+                            ID: {record.id.split('-')[0]}
                           </div>
                         </div>
                       </div>
@@ -250,10 +260,10 @@ export default function ClinicalHistoryPage() {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-primary"
-                        disabled={downloadingId === record.record_id}
+                        disabled={downloadingId === record.id}
                         onClick={() => handleDownload(record)}
                       >
-                        {downloadingId === record.record_id ? (
+                        {downloadingId === record.id ? (
                           <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <Download className="h-4 w-4" />
@@ -262,10 +272,10 @@ export default function ClinicalHistoryPage() {
                     </div>
                   </div>
                   
-                  {record.notes && (
+                  {(record.notes || record.description) && (
                     <div className="relative pl-4 border-l-2 border-primary/20">
                       <p className="text-sm text-muted-foreground italic leading-relaxed line-clamp-2">
-                        "{record.notes}"
+                        &quot;{record.notes || record.description}&quot;
                       </p>
                     </div>
                   )}
@@ -286,7 +296,7 @@ export default function ClinicalHistoryPage() {
                 </div>
                 <h3 className="text-lg font-bold text-foreground">No Records Found</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  We couldn't find any medical records matching your criteria.
+                  We couldn&apos;t find any medical records matching your criteria.
                 </p>
               </div>
             )}

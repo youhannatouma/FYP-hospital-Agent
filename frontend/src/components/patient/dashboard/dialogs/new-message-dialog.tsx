@@ -28,6 +28,15 @@ import { useAuth } from "@clerk/nextjs"
 import React from "react"
 import { getServiceContainer } from "@/lib/services/service-container"
 
+type DoctorOption = {
+  id?: string
+  user_id?: string
+  name?: string
+  first_name?: string
+  last_name?: string
+  specialty?: string
+}
+
 export function NewMessageDialog() {
   const { toast } = useToast()
   const { getToken } = useAuth()
@@ -37,7 +46,7 @@ export function NewMessageDialog() {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("")
   const [subject, setSubject] = useState("")
   const [content, setContent] = useState("")
-  const [doctors, setDoctors] = useState<any[]>([])
+  const [doctors, setDoctors] = useState<DoctorOption[]>([])
 
   React.useEffect(() => {
     if (open) {
@@ -45,7 +54,7 @@ export function NewMessageDialog() {
         try {
           const token = await getToken()
           const docs = await booking.getAvailableDoctors(undefined, token || undefined)
-          setDoctors(docs || [])
+          setDoctors(Array.isArray(docs) ? docs : [])
         } catch (e) {
           console.error("Failed to fetch doctors", e)
         }
@@ -64,7 +73,7 @@ export function NewMessageDialog() {
       return
     }
 
-    const doctor = doctors.find((d: any) => (d.id || d.user_id) === selectedDoctorId)
+    const doctor = doctors.find((d) => (d.id || d.user_id) === selectedDoctorId)
     if (!doctor) return
 
     setSending(true)
@@ -87,7 +96,7 @@ export function NewMessageDialog() {
         title: "Message Sent",
         description: `Your secure message has been delivered to ${doctor.name || doctor.first_name}.`,
       })
-    } catch (error) {
+    } catch {
       setSending(false)
       toast({
         title: "Delivery Failed",
@@ -121,11 +130,15 @@ export function NewMessageDialog() {
                 <SelectValue placeholder="Select recipient" />
               </SelectTrigger>
               <SelectContent>
-                {doctors.map((doc: any) => (
-                  <SelectItem key={doc.id || doc.user_id} value={doc.id || doc.user_id}>
-                    {doc.name || `${doc.first_name} ${doc.last_name}`} - {doc.specialty || 'General'}
-                  </SelectItem>
-                ))}
+                {doctors.map((doc) => {
+                  const doctorId = doc.id || doc.user_id
+                  if (!doctorId) return null
+                  return (
+                    <SelectItem key={doctorId} value={doctorId}>
+                      {doc.name || `${doc.first_name} ${doc.last_name}`} - {doc.specialty || 'General'}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>
