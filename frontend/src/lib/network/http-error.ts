@@ -74,6 +74,10 @@ export function attachHttpErrorDiagnostics(error: unknown): HttpErrorDiagnostics
   const details = classifyHttpError(error);
 
   if (typeof error === "object" && error !== null) {
+    if ((error as HttpErrorWithDiagnostics).httpDiagnostics) {
+      return details;
+    }
+
     try {
       Object.defineProperty(error, "httpDiagnostics", {
         value: details,

@@ -41,7 +41,7 @@ export interface IHttpClient {
   ): Promise<HttpResponse<T>>;
 }
 
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosHeaders, AxiosInstance } from "axios";
 import { getAuthService, IAuthService } from "./auth-service";
 import { attachHttpErrorDiagnostics } from "@/lib/network/http-error";
 import { resolveApiBaseUrl, warnIfSuspiciousApiBaseUrl } from "@/lib/network/runtime-config";
@@ -81,6 +81,12 @@ function setAuthorizationHeader(headers: unknown, token: string): void {
   headerAccessor.Authorization = authorization;
 }
 
+function ensureHeaders(headers: unknown): AxiosHeaders {
+  if (headers instanceof AxiosHeaders) return headers;
+  if (!headers || typeof headers !== "object") return new AxiosHeaders();
+  return AxiosHeaders.from(headers as Record<string, string>);
+}
+
 export class AxiosHttpClient implements IHttpClient {
   private client: AxiosInstance;
 
@@ -98,10 +104,13 @@ export class AxiosHttpClient implements IHttpClient {
     this.client.interceptors.request.use(
       async (config) => {
         try {
-          if (!hasAuthorizationHeader(config.headers)) {
+          const headers = ensureHeaders(config.headers);
+          config.headers = headers;
+
+          if (!hasAuthorizationHeader(headers)) {
             const token = await this.authService.getToken({ waitForSession: true });
             if (token) {
-              setAuthorizationHeader(config.headers, token);
+              setAuthorizationHeader(headers, token);
             }
           }
         } catch {

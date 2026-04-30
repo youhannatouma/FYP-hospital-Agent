@@ -84,7 +84,7 @@ export function UpcomingVisits() {
             time: a.time || "",
             type: a.status || "",
             typeColor: a.status === "scheduled" ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground",
-            isVirtual: a.appointment_type?.toLowerCase().includes("virtual"),
+            isVirtual: Boolean(a.appointment_type?.toLowerCase().includes("virtual")),
           }))
           setVisits(ui)
         } else {

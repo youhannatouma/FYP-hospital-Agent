@@ -253,7 +253,7 @@ def _fallback_tool_message(
                 or f"{_medication_summary(medication_result)} {_top_candidates_summary(medication_result)}"
             )
         if parts:
-            return " ".join(str(p).strip() for p in parts if p).strip()
+            return "\n\n".join(str(p).strip() for p in parts if p).strip()
     if message_type == "general_health":
         return (
             "Here are general health guidance points based on your question: "
