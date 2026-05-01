@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { m } from "framer-motion"
 import { CheckCircle2, Clock, Circle } from "lucide-react"

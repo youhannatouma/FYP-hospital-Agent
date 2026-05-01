@@ -6,31 +6,14 @@
 
 "use client";
 
-import { useMemo } from "react";
 import Link from "next/link";
 import {
   SignedIn,
   SignedOut,
   SignInButton,
   UserButton,
-  useUser,
 } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-
-/**
- * Helper to determine dashboard route based on user role
- * Follows: Single Responsibility Principle (SRP)
- */
-function useDashboardRoute(): string {
-  const { user } = useUser();
-
-  return useMemo(() => {
-    const role = user?.publicMetadata?.role as string | undefined;
-    if (role === "doctor") return "/doctor";
-    if (role === "patient") return "/patient";
-    return "/onboarding";
-  }, [user?.publicMetadata?.role]);
-}
 
 interface NavbarAuthSectionProps {
   showOnDesktop?: boolean;
@@ -41,7 +24,9 @@ export function NavbarAuthSection({
   showOnDesktop = true,
   className = "",
 }: NavbarAuthSectionProps) {
-  const dashboardRoute = useDashboardRoute();
+  // Keep href stable across SSR/client hydration. Role routing is handled
+  // by middleware and onboarding checks after navigation.
+  const dashboardRoute = "/onboarding";
 
   return (
     <div

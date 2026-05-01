@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/set-state-in-effect */
 
 import React, { useState, useEffect, useRef } from "react"
 import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, 

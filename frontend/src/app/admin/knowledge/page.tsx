@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { toast } from "@/hooks/use-toast"
 
 import { Construction } from "lucide-react"

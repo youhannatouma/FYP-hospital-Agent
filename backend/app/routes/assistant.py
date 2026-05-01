@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 from datetime import date
 from datetime import datetime, timezone
+from pathlib import Path
 from time import perf_counter
 from typing import Any, AsyncIterator
 from uuid import UUID
@@ -37,13 +39,27 @@ try:
     from middleware import stream_manager
     from shared.gemini import AssistantConfigError, AssistantRuntimeError
 except ImportError:  # Fallback for backend package context
-    from backend.orchestration.assistant_chat_orchestrator import stream_assistant_response
-    from backend.middleware import stream_manager
-    from backend.shared.gemini import AssistantConfigError, AssistantRuntimeError
+    try:
+        from backend.orchestration.assistant_chat_orchestrator import stream_assistant_response
+        from backend.middleware import stream_manager
+        from backend.shared.gemini import AssistantConfigError, AssistantRuntimeError
+    except ImportError:
+        backend_root = str(Path(__file__).resolve().parents[2])
+        if backend_root not in sys.path:
+            sys.path.append(backend_root)
+        from orchestration.assistant_chat_orchestrator import stream_assistant_response
+        from middleware import stream_manager
+        from shared.gemini import AssistantConfigError, AssistantRuntimeError
 try:
     from telemetry import emit_telemetry_event
 except ImportError:
-    from backend.telemetry import emit_telemetry_event
+    try:
+        from backend.telemetry import emit_telemetry_event
+    except ImportError:
+        backend_root = str(Path(__file__).resolve().parents[2])
+        if backend_root not in sys.path:
+            sys.path.append(backend_root)
+        from telemetry import emit_telemetry_event
 
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
 

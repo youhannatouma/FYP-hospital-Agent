@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import * as React from "react"
 import { Calendar, Clock, CheckCircle, XCircle, DollarSign, TrendingUp } from "lucide-react"

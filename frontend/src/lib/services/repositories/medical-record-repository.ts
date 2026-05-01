@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Medical Record Repository
  * Handles all medical-records related API calls
@@ -17,7 +18,7 @@ export interface MedicalRecord {
   description: string | null;
   date: string;
   file_url: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
 

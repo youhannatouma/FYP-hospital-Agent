@@ -15,7 +15,7 @@ export function useHospital() {
     /**
      * Helper to wrap any action with logging or agent hooks.
      */
-    runAction: async (actionType: string, payload: any) => {
+    runAction: async (actionType: string, payload: unknown) => {
       // In the future, this could trigger an AI notification or global state change
       return await managers.booking.handleAction(actionType, payload);
     }

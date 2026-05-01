@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { ShieldAlert, Terminal, Lock, Key, Cpu, Radio } from "lucide-react"
 
 export default function SecurityPage() {

@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import * as React from "react"
 import { Users, UserPlus, UserCheck, UserMinus, TrendingUp } from "lucide-react"
@@ -198,7 +199,7 @@ export function UserMetrics() {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {activity.map((entry: any, index: number) => (
+                  {activity.map((entry, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>

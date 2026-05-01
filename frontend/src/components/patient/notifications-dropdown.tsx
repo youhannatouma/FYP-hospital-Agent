@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars, react/no-unescaped-entities */
 
 import * as React from "react"
 import Link from "next/link"

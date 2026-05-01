@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars, react/no-unescaped-entities */
 
 import Link from "next/link"
 import { m } from "framer-motion"

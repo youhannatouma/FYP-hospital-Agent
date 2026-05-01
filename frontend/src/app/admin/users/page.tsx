@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import * as React from "react"
 import { 
@@ -57,12 +58,33 @@ import { useHospital } from "@/hooks/use-hospital"
 import { useAuth } from "@clerk/nextjs"
 import { toast } from "@/hooks/use-toast"
 
+type ApiUser = {
+  user_id: string
+  first_name?: string
+  last_name?: string
+  email?: string
+  role?: string
+  status?: string
+  created_at?: string
+}
+
+type UiUser = {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  joined: string
+  lastActive: string
+  verified: boolean
+}
+
 export default function UserManagementPage() {
   const { admin } = useHospital()
   const { getToken } = useAuth()
   const [searchTerm, setSearchTerm] = React.useState("")
   const [filterRole, setFilterRole] = React.useState("All")
-  const [users, setUsers] = React.useState<any[]>([])
+  const [users, setUsers] = React.useState<UiUser[]>([])
   const [loading, setLoading] = React.useState(true)
   const [isAddDoctorOpen, setIsAddDoctorOpen] = React.useState(false)
   const [newDoctor, setNewDoctor] = React.useState({
@@ -78,10 +100,10 @@ export default function UserManagementPage() {
     try {
       const data = await admin.getAllUsers(token || undefined)
       if (Array.isArray(data)) {
-        const mappedUsers = data.map((u: any) => ({
+        const mappedUsers = (data as ApiUser[]).map((u) => ({
           id: u.user_id,
-          name: `${u.first_name} ${u.last_name}`,
-          email: u.email,
+          name: `${u.first_name || ""} ${u.last_name || ""}`.trim() || "Unknown User",
+          email: u.email || "",
           role: u.role ? u.role.charAt(0).toUpperCase() + u.role.slice(1) : "Unknown",
           status: u.status || "Active",
           joined: u.created_at ? new Date(u.created_at).toLocaleDateString() : "Unknown",

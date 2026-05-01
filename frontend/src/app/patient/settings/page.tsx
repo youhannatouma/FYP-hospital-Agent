@@ -26,7 +26,17 @@ type ProfileForm = {
   allergies: string[];
 };
 
-function toForm(user: any): ProfileForm {
+type ProfilePayload = Partial<ProfileForm>
+
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === "object") {
+    const errObj = error as { message?: string; response?: { data?: { detail?: string } } }
+    return errObj.response?.data?.detail || errObj.message || "Please try again."
+  }
+  return "Please try again."
+}
+
+function toForm(user: ProfilePayload): ProfileForm {
   return {
     first_name: user?.first_name || "",
     last_name: user?.last_name || "",
@@ -57,11 +67,11 @@ export default function SettingsPage() {
       setLoading(true);
       try {
         const user = await container.user.getCurrentUser();
-        setForm(toForm(user));
-      } catch (error: any) {
+        setForm(toForm(user as ProfilePayload));
+      } catch (error: unknown) {
         toast({
           title: "Could not load profile",
-          description: error?.message || "Please try again.",
+          description: getErrorMessage(error),
           variant: "destructive",
         });
       } finally {
@@ -89,10 +99,10 @@ export default function SettingsPage() {
       });
       clearUserProfileCache();
       toast({ title: "Profile saved", description: "Your profile data was updated in the database." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Save failed",
-        description: error?.response?.data?.detail || error?.message || "Please try again.",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {

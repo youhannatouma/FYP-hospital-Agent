@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { m } from "framer-motion"

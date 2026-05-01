@@ -17,7 +17,10 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import QueuePool
 
-from ..middleware import approval_manager
+try:
+    from middleware import approval_manager
+except ImportError:  # Fallback for backend package context
+    from ..middleware import approval_manager
 
 load_dotenv()
 log = logging.getLogger(__name__)

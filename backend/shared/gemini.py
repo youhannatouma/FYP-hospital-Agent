@@ -24,6 +24,8 @@ class AssistantRuntimeError(RuntimeError):
 _LLM_CACHE: dict[tuple[str, float], ChatGoogleGenerativeAI] = {}
 _LLM_LOCK = Lock()
 _STATUS_LOGGED = False
+_DEFAULT_MODEL = "gemini-2.5-flash"
+_DEFAULT_FALLBACK_MODELS = ("gemini-2.0-flash", "gemini-2.0-flash-lite")
 
 
 def _resolve_api_key() -> str | None:
@@ -38,6 +40,36 @@ def assistant_llm_is_configured() -> bool:
     return _resolve_api_key() is not None
 
 
+def _model_candidates(preferred_model: str = _DEFAULT_MODEL) -> list[str]:
+    env_value = (os.getenv("GEMINI_FALLBACK_MODELS") or "").strip()
+    configured = [item.strip() for item in env_value.split(",") if item.strip()]
+    ordered = [preferred_model, *configured, *_DEFAULT_FALLBACK_MODELS]
+
+    deduped: list[str] = []
+    for model in ordered:
+        if model not in deduped:
+            deduped.append(model)
+    return deduped
+
+
+def _is_retryable_runtime_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    signals = (
+        "503",
+        "500",
+        "429",
+        "unavailable",
+        "overloaded",
+        "deadline",
+        "timed out",
+        "timeout",
+        "rate limit",
+        "high demand",
+        "try again later",
+    )
+    return any(signal in message for signal in signals)
+
+
 def log_assistant_llm_status_once() -> None:
     global _STATUS_LOGGED
     with _LLM_LOCK:
@@ -47,7 +79,7 @@ def log_assistant_llm_status_once() -> None:
     log.info("Assistant LLM config status: configured=%s", assistant_llm_is_configured())
 
 
-def get_gemini_llm(*, temperature: float, model: str = "gemini-2.5-flash") -> ChatGoogleGenerativeAI:
+def get_gemini_llm(*, temperature: float, model: str = _DEFAULT_MODEL) -> ChatGoogleGenerativeAI:
     key = _resolve_api_key()
     if not key:
         raise AssistantConfigError(
@@ -93,3 +125,39 @@ def classify_llm_error(exc: Exception) -> AssistantConfigError | AssistantRuntim
     if any(signal in message for signal in config_signals):
         return AssistantConfigError("Assistant AI configuration is invalid or unauthorized.")
     return AssistantRuntimeError("Assistant AI generation failed at runtime.")
+
+
+def invoke_with_model_fallback(
+    prompt: str,
+    *,
+    temperature: float,
+    preferred_model: str = _DEFAULT_MODEL,
+):
+    last_exc: Exception | None = None
+    candidates = _model_candidates(preferred_model)
+
+    for index, model in enumerate(candidates):
+        llm = get_gemini_llm(temperature=temperature, model=model)
+        try:
+            return llm.invoke(prompt)
+        except Exception as exc:
+            classified = classify_llm_error(exc)
+            if isinstance(classified, AssistantConfigError):
+                raise classified from exc
+
+            last_exc = exc
+            if index == len(candidates) - 1 or not _is_retryable_runtime_error(exc):
+                raise classified from exc
+
+            log.warning(
+                "Gemini model %s failed with retryable error; trying next model (%s/%s): %s",
+                model,
+                index + 2,
+                len(candidates),
+                exc,
+            )
+
+    if last_exc is not None:
+        raise classify_llm_error(last_exc) from last_exc
+
+    raise AssistantRuntimeError("Assistant AI generation failed at runtime.")

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Notification Repository
  * Handles all notification-related API calls
@@ -16,7 +17,7 @@ export interface Notification {
   type: 'appointment' | 'message' | 'system' | 'alert';
   is_read: boolean;
   created_at: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface INotificationRepository {

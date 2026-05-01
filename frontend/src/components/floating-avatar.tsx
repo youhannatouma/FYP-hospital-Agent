@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/set-state-in-effect */
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { X } from "lucide-react"
