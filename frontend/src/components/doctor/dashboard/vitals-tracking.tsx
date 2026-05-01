@@ -16,10 +16,29 @@ import {
   Legend,
 } from "recharts"
 
+type Vitals = {
+  systolic?: number
+  diastolic?: number
+  heart_rate?: number
+  heartRate?: number
+}
+
+type ApiRecord = {
+  created_at?: string
+  vitals?: Vitals
+}
+
+type ChartPoint = {
+  date: string
+  systolic: number
+  diastolic: number
+  heartRate: number
+}
+
 export function VitalsTracking() {
   const { medicalRecords } = useHospital();
   const { getToken } = useAuth();
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [period] = useState("7d")
 
@@ -29,13 +48,13 @@ export function VitalsTracking() {
         const token = await getToken();
         const records = await medicalRecords.getMyRecords(token || undefined);
         
-        const extracted = records
-          .filter((r: any) => r.vitals && typeof r.vitals === 'object')
-          .map((r: any) => ({
-            date: new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-            systolic: r.vitals.systolic,
-            diastolic: r.vitals.diastolic,
-            heartRate: r.vitals.heart_rate || r.vitals.heartRate,
+        const extracted = (records as ApiRecord[])
+          .filter((r) => r.vitals && typeof r.vitals === 'object')
+          .map((r): ChartPoint => ({
+            date: r.created_at ? new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "--",
+            systolic: r.vitals?.systolic ?? 0,
+            diastolic: r.vitals?.diastolic ?? 0,
+            heartRate: r.vitals?.heart_rate ?? r.vitals?.heartRate ?? 0,
           }))
           .reverse();
         

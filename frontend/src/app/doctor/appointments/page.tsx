@@ -29,6 +29,27 @@ import { CompleteSessionDialog } from "@/components/doctor/dialogs/complete-sess
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
+type DoctorAppointmentUi = {
+  id: string
+  patient_id: string
+  patientName: string
+  avatar: string
+  type: string
+  specialty: string
+  date: string
+  time: string
+  duration: string
+  status: "Upcoming" | "Completed" | "Cancelled"
+  notes: string
+  isVideo: boolean
+  roomId?: string
+}
+
+type UserSummary = {
+  user_id: string
+  email?: string
+  phone_number?: string
+}
 
 // Helper to get status styles for the badge
 const getStatusStyles = (status: string) => {
@@ -53,39 +74,48 @@ export default function DoctorAppointmentsPage() {
 
   // ── Selected-item state ──────────────────────────────────────────────────────
   const [selectedPatientRecord, setSelectedPatientRecord] = React.useState<MedicalRecord | null>(null)
-  const [selectedAppointment, setSelectedAppointment] = React.useState<any>(null)
+  const [selectedAppointment, setSelectedAppointment] = React.useState<DoctorAppointmentUi | null>(null)
   const [activePatientName, setActivePatientName] = React.useState("")
 
   // ── Appointment list ─────────────────────────────────────────────────────────
-  const [appointmentList, setAppointmentList] = React.useState<any[]>([])
+  const [appointmentList, setAppointmentList] = React.useState<DoctorAppointmentUi[]>([])
 
   const load = React.useCallback(async () => {
     const container = getServiceContainer()
     const data = await container.appointment.getDoctorAppointments()
     if (Array.isArray(data)) {
-      const ui = data.map((a: any) => {
+      const ui = data.map((a) => {
+        const item = a as unknown as Record<string, unknown>
+        const appointmentId = (item.appointment_id as string) || (item.id as string) || ""
+        const patientId = (item.patient_id as string) || ""
+        const patientName = (item.patient_name as string) || patientId
+        const appointmentType = (item.appointment_type as string) || ""
+        const date = (item.date as string) || ((item.created_at as string) ? new Date(item.created_at as string).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "")
+        const time = (item.time as string) || ""
+        const status = ((item.status as string) || "").toLowerCase()
+        const roomId = item.room_id as string | undefined
+
         // Normalize status: backend returns 'scheduled'/'completed'/'cancelled'
         // UI expects 'Upcoming'/'Completed'/'Cancelled'
-        let uiStatus = "Upcoming"
-        const raw = (a.status || "").toLowerCase()
-        if (raw === "completed") uiStatus = "Completed"
-        else if (raw === "cancelled") uiStatus = "Cancelled"
-        else if (raw === "scheduled") uiStatus = "Upcoming"
+        let uiStatus: DoctorAppointmentUi["status"] = "Upcoming"
+        if (status === "completed") uiStatus = "Completed"
+        else if (status === "cancelled") uiStatus = "Cancelled"
+        else if (status === "scheduled") uiStatus = "Upcoming"
 
         return {
-          id: a.appointment_id,
-          patient_id: a.patient_id,
-          patientName: a.patient_name || a.patient_id,
-          avatar: a.patient_name ? a.patient_name.slice(0, 2).toUpperCase() : "",
-          type: a.appointment_type || "",
+          id: appointmentId,
+          patient_id: patientId,
+          patientName,
+          avatar: patientName ? patientName.slice(0, 2).toUpperCase() : "",
+          type: appointmentType,
           specialty: "",
-          date: a.date || (a.created_at ? new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""),
-          time: a.time || "",
+          date,
+          time,
           duration: "30 min",
           status: uiStatus,
           notes: "",
-          isVideo: a.appointment_type?.toLowerCase().includes("virtual") || a.appointment_type?.toLowerCase().includes("video"),
-          roomId: a.room_id,
+          isVideo: appointmentType.toLowerCase().includes("virtual") || appointmentType.toLowerCase().includes("video"),
+          roomId,
         }
       })
       setAppointmentList(ui)
@@ -105,15 +135,31 @@ export default function DoctorAppointmentsPage() {
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
   // Called by ScheduleAppointmentDialog on success
-  const handleScheduleSuccess = (newAppt: any) => {
-    setAppointmentList((prev) => [newAppt, ...prev])
+  const handleScheduleSuccess = (newAppt: unknown) => {
+    const item = newAppt as Partial<DoctorAppointmentUi>
+    const normalized: DoctorAppointmentUi = {
+      id: item.id || `appt-${Date.now()}`,
+      patient_id: item.patient_id || "",
+      patientName: item.patientName || "Patient",
+      avatar: item.avatar || "PA",
+      type: item.type || "Consultation",
+      specialty: item.specialty || "",
+      date: item.date || new Date().toLocaleDateString(),
+      time: item.time || "",
+      duration: item.duration || "30 min",
+      status: item.status || "Upcoming",
+      notes: item.notes || "",
+      isVideo: Boolean(item.isVideo),
+      roomId: item.roomId,
+    }
+    setAppointmentList((prev) => [normalized, ...prev])
   }
 
   const handleViewPatient = async (patientId: string, patientName: string) => {
     try {
       const container = getServiceContainer()
       const users = await container.user.getAllUsers()
-      const patientData = users.find((u: any) => u.user_id === patientId)
+      const patientData = (users as UserSummary[]).find((u) => u.user_id === patientId)
       
       const record = {
         id: patientId || Math.random().toString(),
@@ -125,7 +171,7 @@ export default function DoctorAppointmentsPage() {
         email: patientData?.email || "",
         phone: patientData?.phone_number || "",
       }
-      setSelectedPatientRecord(record as any)
+      setSelectedPatientRecord(record as MedicalRecord)
       setIsDetailOpen(true)
     } catch (error) {
       console.error(error);
@@ -137,19 +183,19 @@ export default function DoctorAppointmentsPage() {
         diagnosis: "New Patient",
         status: "Active",
       }
-      setSelectedPatientRecord(fallbackRecord as any)
+      setSelectedPatientRecord(fallbackRecord as MedicalRecord)
       setIsDetailOpen(true)
     }
   }
 
   // FIX: accepts the full appointment object so we have the id for the room
-  const handleJoinCall = (appt: any) => {
+  const handleJoinCall = (appt: DoctorAppointmentUi) => {
     setActivePatientName(appt.patientName)
     setSelectedAppointment(appt)   // ← FIX: save the whole appointment
     setIsVideoCallOpen(true)
   }
 
-  const handleCompleteSession = (appt: any) => {
+  const handleCompleteSession = (appt: DoctorAppointmentUi) => {
     setSelectedAppointment(appt)
     setIsCompleteOpen(true)
   }
@@ -460,12 +506,14 @@ export default function DoctorAppointmentsPage() {
         }}
       />
 
-      <CompleteSessionDialog
-        isOpen={isCompleteOpen}
-        onClose={() => setIsCompleteOpen(false)}
-        appointment={selectedAppointment}
-        onSuccess={load}
-      />
+      {selectedAppointment && (
+        <CompleteSessionDialog
+          isOpen={isCompleteOpen}
+          onClose={() => setIsCompleteOpen(false)}
+          appointment={selectedAppointment}
+          onSuccess={load}
+        />
+      )}
 
       {/* FIX: selectedAppointment is now properly declared and set */}
       <VideoCallDialog

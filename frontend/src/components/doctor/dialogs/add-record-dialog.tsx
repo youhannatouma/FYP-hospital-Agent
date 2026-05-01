@@ -28,9 +28,17 @@ interface AddRecordDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+type ApiUser = {
+  user_id: string
+  role?: string
+  first_name?: string
+  last_name?: string
+  email?: string
+}
+
 export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
   const { toast } = useToast()
-  const [patients, setPatients] = React.useState<any[]>([])
+  const [patients, setPatients] = React.useState<ApiUser[]>([])
   const [loading, setLoading] = React.useState(false)
   const [selectedPatientId, setSelectedPatientId] = React.useState("")
   const [diagnosis, setDiagnosis] = React.useState("")
@@ -43,7 +51,7 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
         try {
           const container = getServiceContainer()
           const allUsers = await container.user.getAllUsers()
-          setPatients(allUsers.filter((u) => u.role === 'patient'))
+          setPatients((allUsers as ApiUser[]).filter((u) => u.role === 'patient'))
         } catch (err) {
           console.error("[AddRecordDialog] Failed to fetch patients:", err)
         }
@@ -60,7 +68,7 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
     }
 
     setLoading(true)
-    const patient = patients.find((p: any) => p.user_id === selectedPatientId)
+    const patient = patients.find((p) => p.user_id === selectedPatientId)
     try {
       const container = getServiceContainer()
       await container.medicalRecord.createRecord({
@@ -104,7 +112,7 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
                 <SelectValue placeholder="Select a patient..." />
               </SelectTrigger>
               <SelectContent>
-                {patients.map((p: any) => (
+                {patients.map((p) => (
                   <SelectItem key={p.user_id} value={p.user_id}>
                     {p.first_name} {p.last_name} ({p.email})
                   </SelectItem>

@@ -37,30 +37,40 @@ export default function MedicalRecordsPage() {
         const container = getServiceContainer()
         const data = await container.medicalRecord.getMyRecords()
         if (Array.isArray(data)) {
-          const mappedRecords = data.map((r: any) => ({
-            id: r.record_id,
-            patientId: r.patient_id || "Unknown",
-            name: r.patient_name || "Unknown Patient",
-            lastVisit: r.created_at ? new Date(r.created_at).toLocaleDateString() : 'Unknown',
-            diagnosis: r.diagnosis || "Medical Record",
-            status: "Active",
-            age: 0,
-            gender: "Unknown",
-            bloodType: "Unknown",
-            phone: "Unknown",
-            email: "Unknown",
-            address: "Unknown",
-            height: 0,
-            weight: 0,
-            bloodPressure: "Unknown",
-            heartRate: 0,
-            temperature: 0,
-            medications: [],
-            allergies: [],
-            treatmentPlan: r.treatment || "",
-            notes: r.clinical_notes || "",
-            nextAppointment: ""
-          })) as MedicalRecord[]
+          const mappedRecords = data.map((r) => {
+            const item = r as unknown as Record<string, unknown>
+            const id = (item.record_id as string) || (item.id as string) || ""
+            const patientId = (item.patient_id as string) || (item.patientId as string) || "Unknown"
+            const patientName = (item.patient_name as string) || (item.name as string) || "Unknown Patient"
+            const createdAt = (item.created_at as string) || (item.lastVisit as string)
+            const diagnosis = (item.diagnosis as string) || "Medical Record"
+            const treatment = (item.treatment as string) || (item.treatmentPlan as string) || ""
+            const notes = (item.clinical_notes as string) || (item.notes as string) || ""
+            return {
+              id,
+              patientId,
+              name: patientName,
+              lastVisit: createdAt ? new Date(createdAt).toLocaleDateString() : 'Unknown',
+              diagnosis,
+              status: "Active",
+              age: 0,
+              gender: "Unknown",
+              bloodType: "Unknown",
+              phone: "Unknown",
+              email: "Unknown",
+              address: "Unknown",
+              height: 0,
+              weight: 0,
+              bloodPressure: "Unknown",
+              heartRate: 0,
+              temperature: 0,
+              medications: [],
+              allergies: [],
+              treatmentPlan: treatment,
+              notes,
+              nextAppointment: ""
+            }
+          }) as MedicalRecord[]
           setRecords(mappedRecords)
         }
       } catch (error) {

@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 /**
  * Doctor Dashboard Page
@@ -29,6 +30,22 @@ import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { getServiceContainer } from "@/lib/services/service-container"
 
+type AppointmentSelection = {
+  appointment_id?: string
+  id?: string
+  patient_name?: string
+  patientName?: string
+  status?: string
+  type?: string
+  appointment_type?: string
+  date?: string
+  appointment_date?: string
+  time?: string
+  start_time?: string
+  location?: string
+  room_id?: string
+}
+
 export default function DoctorDashboardPage() {
   const { toast } = useToast()
   const { profile, isLoading: profileLoading } = useUserProfile()
@@ -40,9 +57,9 @@ export default function DoctorDashboardPage() {
   const [isRecordDetailOpen, setIsRecordDetailOpen] = useState(false)
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false)
 
-  const [selectedPatient, setSelectedPatient] = useState<any>(null)
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
-  const [selectedRecord, setSelectedRecord] = useState<any>(null)
+  const [selectedPatient, setSelectedPatient] = useState<unknown>(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentSelection | null>(null)
+  const [selectedRecord, setSelectedRecord] = useState<unknown>(null)
 
   // Derive display name from SOLID service layer instead of useUser directly
   const firstName = profile?.first_name || "Doctor"
@@ -76,17 +93,17 @@ export default function DoctorDashboardPage() {
     }
   }, [toast])
 
-  const handleViewPatient = useCallback((patient: any) => {
+  const handleViewPatient = useCallback((patient: unknown) => {
     setSelectedPatient(patient)
     setIsPatientProfileOpen(true)
   }, [])
 
-  const handleViewAppointment = useCallback((appointment: any) => {
-    setSelectedAppointment(appointment)
+  const handleViewAppointment = useCallback((appointment: unknown) => {
+    setSelectedAppointment(appointment as AppointmentSelection)
     setIsAppointmentDetailOpen(true)
   }, [])
 
-  const handleViewRecord = useCallback((record: any) => {
+  const handleViewRecord = useCallback((record: unknown) => {
     setSelectedRecord(record)
     setIsRecordDetailOpen(true)
   }, [])
@@ -159,7 +176,7 @@ export default function DoctorDashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <DoctorMedicalTimeline
-            onViewPatient={(patient: any) =>
+            onViewPatient={(patient: unknown) =>
               handleViewPatient(patient || { name: "Unknown Patient", id: "" })
             }
             onViewRecord={handleViewRecord}

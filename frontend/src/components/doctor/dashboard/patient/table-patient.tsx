@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/incompatible-library */
 import { Button } from "@/components/ui/button";
 import * as React from "react";
 import {

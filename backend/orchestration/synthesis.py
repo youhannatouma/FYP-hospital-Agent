@@ -13,9 +13,19 @@ from typing import Any, AsyncIterator, Literal
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 try:
-    from shared.gemini import AssistantConfigError, classify_llm_error, get_gemini_llm
+    from shared.gemini import (
+        AssistantConfigError,
+        classify_llm_error,
+        get_gemini_llm,
+        invoke_with_model_fallback,
+    )
 except ImportError:  # Fallback for backend package context
-    from backend.shared.gemini import AssistantConfigError, classify_llm_error, get_gemini_llm
+    from backend.shared.gemini import (
+        AssistantConfigError,
+        classify_llm_error,
+        get_gemini_llm,
+        invoke_with_model_fallback,
+    )
 
 try:
     from app.schemas.unified_agent_response import (
@@ -388,8 +398,10 @@ def synthesize_response(
             has_med,
             has_appt,
         )
-        llm = _get_llm()
-        resp = llm.invoke(prompt)
+        if _llm is not None:
+            resp = _llm.invoke(prompt)
+        else:
+            resp = invoke_with_model_fallback(prompt, temperature=0.7)
         message = str(resp.content).strip()
     except Exception as exc:
         log.error("Synthesis LLM call failed: %s", exc)

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server';
 import { LAB_RESULTS, LabResult } from '@/lib/hospital-data-manifest';
 

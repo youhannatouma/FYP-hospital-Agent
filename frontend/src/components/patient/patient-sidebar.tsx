@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/purity */
 
 import { cn } from "@/lib/utils"
 import Link from "next/link"

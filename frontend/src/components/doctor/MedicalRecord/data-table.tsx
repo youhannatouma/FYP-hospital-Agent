@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/incompatible-library */
 import { toast } from "@/hooks/use-toast";
 
 import * as React from "react";

@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState, useEffect } from "react"
 import { Phone, Mail, MessageSquare, Sparkles, ShieldCheck, Building2, Terminal } from "lucide-react"

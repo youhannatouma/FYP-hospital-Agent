@@ -51,7 +51,6 @@ export default clerkMiddleware(async (auth, req) => {
   const claimRole = metadata?.role;
   let role = claimRole;
   const { pathname } = req.nextUrl;
-  const onboardingCookie = req.cookies.get("patient_onboarding_complete")?.value === "1";
 
   // Fallback role resolution when Clerk session claims are stale.
   if (!role && userId) {
@@ -74,7 +73,8 @@ export default clerkMiddleware(async (auth, req) => {
       if (role === "doctor") return NextResponse.redirect(new URL("/doctor", req.url));
       if (role === "admin")  return NextResponse.redirect(new URL("/admin", req.url));
       if (role === "patient") return NextResponse.redirect(new URL("/patient", req.url));
-      // No role yet → onboarding
+      // Signed-in users should keep moving through onboarding instead of
+      // lingering on an auth page while role resolution catches up.
       return NextResponse.redirect(new URL("/onboarding", req.url));
     }
   }
@@ -99,10 +99,9 @@ export default clerkMiddleware(async (auth, req) => {
       if (role !== "patient") {
         if (role === "doctor") return NextResponse.redirect(new URL("/doctor", req.url));
         if (role === "admin")  return NextResponse.redirect(new URL("/admin", req.url));
-        // Missing claim role: allow if onboarding already completed cookie exists.
-        if (userId && !role && !onboardingCookie) {
-          return NextResponse.redirect(new URL("/onboarding/patient", req.url));
-        }
+        // Missing role can happen briefly right after sign-in/session refresh.
+        // Allow rendering instead of forcing a redirect loop/blank transition.
+        if (userId && !role) return NextResponse.next();
       }
     }
 

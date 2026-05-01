@@ -17,23 +17,40 @@ import logging
 from datetime import date, time
 from typing import Any, AsyncIterator, Callable, Literal, TypedDict
 
-from .checkpoint_store import get_checkpoint_saver
 from langgraph.graph import END, START, StateGraph
 
-from ..app.schemas.doctor_matching_agent import BookingSelectionInput
-from ..memory import memory_tools
-from ..middleware.lock_manager import lock_manager
-from ..telemetry import emit_telemetry_event
-from ..tools.doctor_matching_tools import (
-    BookingDomainError,
-    book_appointment,
-    profile_user,
-    search_user,
-    search_doctors_for_need,
-)
-from .supervisor_routing import ToolTask, build_parallel_stages, execute_parallel_plan
-from ..middleware import stream_manager
-from .synthesis import synthesize_node
+try:
+    from app.schemas.doctor_matching_agent import BookingSelectionInput
+    from memory import memory_tools
+    from middleware import stream_manager
+    from middleware.lock_manager import lock_manager
+    from orchestration.checkpoint_store import get_checkpoint_saver
+    from orchestration.supervisor_routing import ToolTask, build_parallel_stages, execute_parallel_plan
+    from orchestration.synthesis import synthesize_node
+    from telemetry import emit_telemetry_event
+    from tools.doctor_matching_tools import (
+        BookingDomainError,
+        book_appointment,
+        profile_user,
+        search_user,
+        search_doctors_for_need,
+    )
+except ImportError:  # Fallback for backend package context
+    from .checkpoint_store import get_checkpoint_saver
+    from .supervisor_routing import ToolTask, build_parallel_stages, execute_parallel_plan
+    from .synthesis import synthesize_node
+    from ..app.schemas.doctor_matching_agent import BookingSelectionInput
+    from ..memory import memory_tools
+    from ..middleware import stream_manager
+    from ..middleware.lock_manager import lock_manager
+    from ..telemetry import emit_telemetry_event
+    from ..tools.doctor_matching_tools import (
+        BookingDomainError,
+        book_appointment,
+        profile_user,
+        search_user,
+        search_doctors_for_need,
+    )
 
 log = logging.getLogger(__name__)
 

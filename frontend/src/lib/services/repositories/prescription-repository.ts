@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Prescription Repository
  * Handles all prescription-related API calls

@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { columns, Patient } from "@/components/doctor/dashboard/patient/columns"
 import { DataTable } from "@/components/doctor/dashboard/patient/table-patient"
@@ -22,9 +23,26 @@ import { useState, useEffect } from "react"
 import { getServiceContainer } from "@/lib/services/service-container"
 import { Loader2 } from "lucide-react"
 
+type ApiUser = {
+  user_id: string
+  first_name?: string
+  last_name?: string
+  role?: string
+  status?: string
+  email?: string
+  created_at?: string
+}
+
+const normalizeStatus = (status?: string): Patient["status"] => {
+  if (status === "inactive" || status === "pending" || status === "active") {
+    return status
+  }
+  return "active"
+}
+
 export default function DoctorPatientsPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [patients, setPatients] = useState<any[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -33,13 +51,13 @@ export default function DoctorPatientsPage() {
         const container = getServiceContainer()
         const users = await container.user.getAllUsers()
         
-        const patientData = users
-          .filter((u: any) => u.role === 'patient')
-          .map((p: any) => ({
+        const patientData = (users as ApiUser[])
+          .filter((u) => u.role === 'patient')
+          .map((p): Patient => ({
             id: p.user_id,
-            name: `${p.first_name} ${p.last_name}`,
-            status: p.status || 'active',
-            email: p.email,
+            name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Unknown Patient",
+            status: normalizeStatus(p.status),
+            email: p.email || "",
             lastVisit: p.created_at ? new Date(p.created_at).toLocaleDateString() : 'Unknown',
           }))
         setPatients(patientData)

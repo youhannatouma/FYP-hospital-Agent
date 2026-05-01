@@ -32,7 +32,7 @@ export class BaseHospitalComponent {
    * Unified Button Handler (The "Functional Buttons" logic)
    * Ensures every button in the app routes through this central registration.
    */
-  async handleAction(actionType: string, payload: any): Promise<any> {
+  async handleAction(actionType: string, payload: unknown): Promise<unknown> {
     console.log(`AI-Triggered Action: ${actionType}`, payload);
     
     const endpoints: Record<string, string> = {

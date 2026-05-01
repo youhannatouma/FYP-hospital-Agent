@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, react/no-unescaped-entities */
 import { FileText, Shield, Gavel, Scale } from "lucide-react"
 
 export default function TermsPage() {

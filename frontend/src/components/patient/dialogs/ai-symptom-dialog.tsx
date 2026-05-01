@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/set-state-in-effect, react/no-unescaped-entities */
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"

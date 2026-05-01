@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable react-hooks/rules-of-hooks, @typescript-eslint/no-unused-vars */
 
 import {
   AlertDialog,

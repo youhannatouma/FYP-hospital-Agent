@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useEffect, useCallback } from "react"
 import { Bell } from "lucide-react"

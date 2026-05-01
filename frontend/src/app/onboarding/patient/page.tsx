@@ -4,26 +4,19 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
 import {
-  User,
   MapPin,
   Phone,
   Droplet,
-  Stethoscope,
   AlertCircle,
   Pill,
-  History,
   CheckCircle2,
   ArrowRight,
   ArrowLeft,
-  ChevronRight,
   Plus,
   Trash2,
-  ShieldCheck,
-  Languages,
-  Bell,
-  Sparkles,
   Calendar,
   Activity,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -46,8 +39,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import { m, AnimatePresence } from "framer-motion";
 
 // Steps:
@@ -146,7 +137,19 @@ export default function PatientOnboarding() {
   const nextStep = () => setStep((prev) => Math.min(prev + 1, 4));
   const prevStep = () => setStep((prev) => Math.max(prev - 1, 3));
 
-  if (!isLoaded) return null;
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <div className="space-y-2">
+          <h1 className="text-xl font-bold tracking-tight">Loading your onboarding</h1>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Restoring your secure session and preparing the patient setup flow.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-6 md:p-12">

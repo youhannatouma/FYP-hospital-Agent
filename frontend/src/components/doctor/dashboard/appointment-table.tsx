@@ -16,11 +16,21 @@ import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
 export interface AppointmentsTableProps {
-  onSelectAppointment?: (appointment: any) => void
+  onSelectAppointment?: (appointment: unknown) => void
+}
+
+type DoctorAppointment = {
+  appointment_id: string
+  patient_name?: string
+  appointment_type?: string
+  status?: string
+  time?: string
+  created_at?: string
+  avatar?: string
 }
 
 export function AppointmentsTable({ onSelectAppointment }: AppointmentsTableProps) {
-  const [appointments, setAppointments] = React.useState<any[]>([]);
+  const [appointments, setAppointments] = React.useState<DoctorAppointment[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -29,7 +39,7 @@ export function AppointmentsTable({ onSelectAppointment }: AppointmentsTableProp
         setIsLoading(true);
         const container = getServiceContainer();
         const data = await container.appointment.getDoctorAppointments();
-        setAppointments(data);
+        setAppointments((Array.isArray(data) ? data : []) as unknown as DoctorAppointment[]);
       } catch (error) {
         console.error('[AppointmentsTable] Failed to fetch doctor appointments:', error);
       } finally {
@@ -120,7 +130,7 @@ export function AppointmentsTable({ onSelectAppointment }: AppointmentsTableProp
                   <TableCell>
                     <Badge
                       variant="outline"
-                      className={`text-[11px] font-medium capitalize ${getStatusVariant(apt.status)}`}
+                      className={`text-[11px] font-medium capitalize ${getStatusVariant(apt.status || "")}`}
                     >
                       {apt.status}
                     </Badge>

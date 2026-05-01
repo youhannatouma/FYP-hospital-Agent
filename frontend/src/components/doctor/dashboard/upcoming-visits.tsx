@@ -32,7 +32,7 @@ const visits = [
 ]
 
 export interface UpcomingVisitsProps {
-  onViewAppointment?: (visit: any) => void
+  onViewAppointment?: (visit: unknown) => void
 }
 
 export function UpcomingVisits({ onViewAppointment }: Readonly<UpcomingVisitsProps>) {
