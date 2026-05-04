@@ -6,9 +6,6 @@ import dynamic from "next/dynamic"
 import { X } from "lucide-react" 
 
 const ThreeAvatar = dynamic(() => import("./ThreeAvatar"), { ssr: false })
-import { useState, useRef, useCallback, useEffect } from "react"
-import { X } from "lucide-react"
-import ThreeAvatar from "./ThreeAvatar"
 
 export function FloatingAvatar() {
   const [expanded, setExpanded] = useState(false)
