@@ -1,0 +1,77 @@
+name: DB Preflight
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  db-preflight:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: FYP
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: 1234567890
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d FYP"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://postgres:1234567890@localhost:5432/FYP
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: FYP
+      DB_USER: postgres
+      DB_PASSWORD: 1234567890
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Wait for postgres service
+        run: |
+          for i in {1..30}; do
+            if pg_isready -h localhost -p 5432 -U postgres -d FYP; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres did not become ready in time"
+          exit 1
+
+      - name: Bootstrap base schema tables
+        run: |
+          python backend/scripts/db_bootstrap_schema.py
+
+      - name: Apply DB phase migrations
+        run: |
+          python backend/scripts/db_apply_migrations.py
+
+      - name: Run DB preflight check
+        run: |
+          python backend/scripts/db_preflight_check.py
+
+      - name: Assert required DB safeguard indexes
+        run: |
+          python backend/scripts/db_apply_migrations.py --check-indexes-only

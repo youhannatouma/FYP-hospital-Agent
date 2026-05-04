@@ -1,35 +1,31 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
-import {
-  Activity,
-  Bell,
-  Globe,
-  Moon,
-  Sun,
-} from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useClerk } from "@clerk/nextjs"
+import { useUserProfile } from "@/hooks/use-user-profile"
+import { Activity, Moon, Sun, Settings, LogOut } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { NotificationCenter } from "@/components/shared/notification-center"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-
 export function DoctorTopNav() {
-  const pathname = usePathname()
   const { theme, setTheme } = useTheme()
+  const { signOut } = useClerk()
+  const { profile, isLoading, fullName, initials, displayRole } = useUserProfile()
 
-  const isActiveTab = (href: string) => {
-    if (href === "/") return pathname === "/"
-    return pathname.startsWith(href)
-  }
+  const handleSignOut = () => signOut({ redirectUrl: "/sign-in" })
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 px-6 glass border-b border-border/50">
@@ -50,24 +46,7 @@ export function DoctorTopNav() {
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
-              aria-label="Language"
-            >
-              <Globe className="h-4.5 w-4.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40 glass shadow-premium">
-            <DropdownMenuItem className="text-xs font-semibold">English</DropdownMenuItem>
-            <DropdownMenuItem className="text-xs font-semibold">Arabic</DropdownMenuItem>
-            <DropdownMenuItem className="text-xs font-semibold">French</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
+        {/* Theme Toggle */}
         <Button
           variant="ghost"
           size="icon"
@@ -76,24 +55,17 @@ export function DoctorTopNav() {
           aria-label="Toggle theme"
         >
           {theme === "dark" ? (
-            <Sun className="h-4.5 w-4.5" />
+            <Sun className="h-4 w-4" />
           ) : (
-            <Moon className="h-4.5 w-4.5" />
+            <Moon className="h-4 w-4" />
           )}
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
-          aria-label="Notifications"
-        >
-          <Bell className="h-4.5 w-4.5" />
-          <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-destructive border-2 border-background shadow-glow" />
-        </Button>
+        <NotificationCenter />
 
         <div className="h-6 w-px bg-border/50 mx-1" />
 
+        {/* Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -101,30 +73,53 @@ export function DoctorTopNav() {
               className="group gap-3 pl-1 pr-3 h-10 rounded-xl hover:bg-muted/50 transition-all"
             >
               <Avatar className="h-8 w-8 rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
-                <AvatarImage src="/placeholder-user.jpg" alt="Sarah Johnson" />
-                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-black">
-                  SJ
+                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-black rounded-lg">
+                  {isLoading ? "…" : initials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden flex-col items-start md:flex text-left">
-                <span className="text-xs font-bold text-foreground leading-none">
-                  Sarah Johnson
-                </span>
-                <span className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                  General Practice
-                </span>
+                {isLoading ? (
+                  <div className="space-y-1">
+                    <Skeleton className="h-3 w-20 rounded" />
+                    <Skeleton className="h-2.5 w-16 rounded" />
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-xs font-bold text-foreground leading-none">
+                      {profile?.role === "doctor" ? `Dr. ${fullName}` : fullName}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                      {profile?.specialty || "Physician"}
+                    </span>
+                  </>
+                )}
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 glass shadow-premium animate-scale-in">
-             <div className="px-2 py-1.5 mb-1">
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-2">Role: Senior Physician</p>
-            </div>
-            <DropdownMenuItem asChild className="text-xs font-bold rounded-lg m-1">
-              <Link href="/doctor/settings">Profile Settings</Link>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-xs font-bold leading-none">
+                  {profile?.role === "doctor" ? `Dr. ${fullName}` : fullName}
+                </p>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  {profile?.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="text-xs font-bold rounded-lg m-1 cursor-pointer">
+              <Link href="/doctor/settings">
+                <Settings className="mr-2 h-3.5 w-3.5" />
+                Profile Settings
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border/50" />
-            <DropdownMenuItem className="text-xs font-bold text-destructive rounded-lg m-1">
+            <DropdownMenuItem
+              onClick={handleSignOut}
+              className="text-xs font-bold text-destructive rounded-lg m-1 cursor-pointer focus:text-destructive focus:bg-destructive/10"
+            >
+              <LogOut className="mr-2 h-3.5 w-3.5" />
               Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>

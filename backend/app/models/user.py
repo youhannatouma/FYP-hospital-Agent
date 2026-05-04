@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Text, Date, DateTime, Integer, ARRAY
+from sqlalchemy import Column, Text, Date, DateTime, Integer, ARRAY, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -21,7 +21,6 @@ class User(Base):
     first_name = Column(Text)
     last_name = Column(Text)
     phone_number = Column(Text)
-    preferred_language = Column(Text)
 
     role = Column(Text, nullable=False)  # 'admin' | 'doctor' | 'patient'
 
@@ -32,10 +31,14 @@ class User(Base):
     years_of_experience = Column(Integer)       # for doctors
     qualifications = Column(ARRAY(Text))        # for doctors
     clinic_address = Column(Text)               # for doctors
+    clinic_latitude = Column(Float)             # optional geodata for distance ranking
+    clinic_longitude = Column(Float)            # optional geodata for distance ranking
 
     date_of_birth = Column(Date)                # for patients
     gender = Column(Text)                       # for patients
     address = Column(Text)                       # for patients
+    patient_latitude = Column(Float)             # optional geodata for distance ranking
+    patient_longitude = Column(Float)            # optional geodata for distance ranking
     blood_type = Column(Text)                    # for patients
     allergies = Column(ARRAY(Text))              # for patients
     chronic_conditions = Column(ARRAY(Text))     # for patients

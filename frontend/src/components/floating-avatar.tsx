@@ -1,10 +1,14 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/set-state-in-effect */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { X } from "lucide-react" 
 
 const ThreeAvatar = dynamic(() => import("./ThreeAvatar"), { ssr: false })
+import { useState, useRef, useCallback, useEffect } from "react"
+import { X } from "lucide-react"
+import ThreeAvatar from "./ThreeAvatar"
 
 export function FloatingAvatar() {
   const [expanded, setExpanded] = useState(false)
@@ -41,13 +45,21 @@ export function FloatingAvatar() {
     })
   }, [])
 
-  const startDrag = useCallback((x: number, y: number) => {
-    if (!dragRef.current) return
-    hasDragged.current = false
-    const rect = dragRef.current.getBoundingClientRect()
-    offsetRef.current = { x: x - rect.left, y: y - rect.top }
-    longPressTimer.current = setTimeout(() => setIsDragging(true), 300)
-  }, [])
+  const startDrag = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!dragRef.current) return
+      hasDragged.current = false
+      const rect = dragRef.current.getBoundingClientRect()
+      offsetRef.current = {
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+      }
+      longPressTimer.current = setTimeout(() => {
+        setIsDragging(true)
+      }, 35)
+    },
+    [],
+  )
 
   const onDrag = useCallback(
     (x: number, y: number) => {

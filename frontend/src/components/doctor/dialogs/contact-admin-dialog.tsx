@@ -1,6 +1,7 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Phone, Mail, MessageSquare, Sparkles, ShieldCheck, Building2, Terminal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { m, AnimatePresence } from "framer-motion"
+import { getServiceContainer } from "@/lib/services/service-container"
 
 interface ContactAdminDialogProps {
   open: boolean
@@ -33,8 +35,25 @@ export function ContactAdminDialog({ open, onOpenChange }: ContactAdminDialogPro
   const [department, setDepartment] = useState("")
   const [message, setMessage] = useState("")
   const [isSending, setIsSending] = useState(false)
+  const [adminId, setAdminId] = useState<string | null>(null)
 
-  const handleContact = () => {
+  useEffect(() => {
+    if (open) {
+      const fetchAdmin = async () => {
+        try {
+          const container = getServiceContainer()
+          const users = await container.user.getAllUsers()
+          const admin = users.find(u => u.role === 'admin')
+          if (admin) setAdminId(admin.user_id)
+        } catch (err) {
+          console.error("[ContactAdminDialog] Failed to fetch admin:", err)
+        }
+      }
+      fetchAdmin()
+    }
+  }, [open])
+
+  const handleContact = async () => {
     if (!department) {
       toast({
         title: "Protocol Violation",
@@ -55,8 +74,17 @@ export function ContactAdminDialog({ open, onOpenChange }: ContactAdminDialogPro
 
     setIsSending(true)
 
-    // Mock API
-    setTimeout(() => {
+    try {
+      if (method === "message" || method === "email") {
+        if (!adminId) throw new Error("No admin user found in system.")
+        const container = getServiceContainer()
+        await container.message.sendMessage({
+          receiver_id: adminId,
+          subject: `${method === "email" ? "Formal" : "Secure"} request to ${department}`,
+          body: message || `Urgent request for ${department}`
+        })
+      }
+      
       setIsSending(false)
       onOpenChange(false)
       toast({
@@ -66,7 +94,14 @@ export function ContactAdminDialog({ open, onOpenChange }: ContactAdminDialogPro
       setDepartment("")
       setMessage("")
       setMethod("message")
-    }, 1000)
+    } catch (error) {
+      setIsSending(false)
+      toast({
+        title: "Error",
+        description: "Failed to dispatch communication.",
+        variant: "destructive"
+      })
+    }
   }
 
   const contactMethods = [

@@ -28,8 +28,8 @@ class Appointment(Base):
 
     slot_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("time_slot.slot_id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("time_slot.slot_id", ondelete="SET NULL"),
+        nullable=True
     )
 
     status = Column(
@@ -40,6 +40,7 @@ class Appointment(Base):
 
     appointment_type = Column(Text, nullable=True)
     fee = Column(Numeric, nullable=True)
+    room_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=True) # persistent Room ID
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())

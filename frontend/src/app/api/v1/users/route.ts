@@ -1,47 +1,124 @@
-import { NextResponse } from 'next/server';
-import { USERS, User } from '@/lib/hospital-data-manifest';
+import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const role = searchParams.get('role');
-  
-  let filteredUsers = USERS;
-  
-  if (role) {
-    filteredUsers = USERS.filter(user => user.role.toLowerCase() === role.toLowerCase());
-  }
-  
-  return NextResponse.json(filteredUsers);
+function normalizeBackendBase(url: string): string {
+  const trimmed = url.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 }
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    
-    // Validate required fields
-    if (!body.email || !body.name || !body.role) {
-      return NextResponse.json(
-        { error: 'Missing required fields: email, name, role' },
-        { status: 400 }
-      );
+function getBackendCandidates(): string[] {
+  const configured = process.env.BACKEND_URL;
+  if (configured && configured.trim()) {
+    return [normalizeBackendBase(configured)];
+  }
+  return [
+    "http://127.0.0.1:8000/api",
+    "http://localhost:8000/api",
+    "http://backend:8000/api",
+    "http://host.docker.internal:8000/api",
+  ];
+}
+
+async function fetchBackend(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const candidates = getBackendCandidates();
+  let lastError: unknown = null;
+
+  for (const base of candidates) {
+    try {
+      return await fetch(`${base}${path}`, init);
+    } catch (error) {
+      lastError = error;
     }
-    
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      joined: new Date().toISOString(),
-      status: 'Pending',
-      lastActive: 'Just now',
-      ...body
-    };
-    
-    // In a real app, we would save to DB here
-    // For mock, we just return the new user as if it was created
-    
-    return NextResponse.json(newUser, { status: 201 });
+  }
+
+  throw lastError || new Error("Backend connection failed");
+}
+
+async function resolveBearerToken(request: Request): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+  try {
+    const { getToken } = await auth();
+    return await getToken();
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const token = await resolveBearerToken(request);
+    const { searchParams } = new URL(request.url);
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Proxy to FastAPI backend
+    const res = await fetchBackend(`/users/?${searchParams}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const raw = await res.text();
+    let data: unknown = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { detail: raw };
+      }
+    }
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
+    console.error("[users GET] Error:", error);
     return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
+      { error: "Backend unavailable. Please try again in a moment." },
+      { status: 502 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const token = await resolveBearerToken(request);
+    const body = await request.json();
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Proxy to FastAPI backend - update current user
+    const res = await fetchBackend("/users/me", {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const raw = await res.text();
+    let data: unknown = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { detail: raw };
+      }
+    }
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error("[users PATCH] Error:", error);
+    return NextResponse.json(
+      { error: "Backend unavailable. Please try again in a moment." },
+      { status: 502 },
     );
   }
 }

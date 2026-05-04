@@ -66,12 +66,15 @@ _approval_policies: dict[str, ApprovalPolicy] = {
     "search_medication": ApprovalPolicy.NEVER,  # Read-only
     "check_drug_safety": ApprovalPolicy.RISKY,  # Critical safety check
     "recommend_medication": ApprovalPolicy.ALWAYS,  # Medical decision
+
+    # Appointment operations
+    "book_appointment_cross_patient": ApprovalPolicy.RISKY,
 }
 
 # Risky operation patterns that trigger approval
 _risky_patterns = {
     "delete", "clear", "remove", "drop", "truncate",
-    "medication", "prescription", "dosage", "drug"
+    "medication", "prescription", "dosage", "drug", "cross_patient", "appointment"
 }
 
 

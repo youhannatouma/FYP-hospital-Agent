@@ -1,6 +1,7 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { CalendarIcon, Clock, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -23,12 +24,19 @@ import { useToast } from "@/hooks/use-toast"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { getServiceContainer } from "@/lib/services/service-container"
 
 interface ScheduleAppointmentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess?: (appointment: any) => void
+  onSuccess?: (appointment: unknown) => void
+}
+
+type ApiUser = {
+  user_id: string
+  role?: string
+  first_name?: string
+  last_name?: string
 }
 
 export function ScheduleAppointmentDialog({ open, onOpenChange, onSuccess }: ScheduleAppointmentDialogProps) {
@@ -38,8 +46,20 @@ export function ScheduleAppointmentDialog({ open, onOpenChange, onSuccess }: Sch
   const [patient, setPatient] = useState("")
   const [type, setType] = useState("Video Consultation")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [patients, setPatients] = useState<ApiUser[]>([])
 
-  const handleSchedule = () => {
+  useEffect(() => {
+    if (open) {
+      const container = getServiceContainer()
+      container.user.getAllUsers().then(users => {
+        if (Array.isArray(users)) {
+          setPatients((users as ApiUser[]).filter((u) => u.role === 'patient'))
+        }
+      }).catch(err => console.error("Failed to fetch patients:", err))
+    }
+  }, [open])
+
+  const handleSchedule = async () => {
     if (!date || !time || !patient) {
       toast({
         title: "Missing Information",
@@ -51,15 +71,25 @@ export function ScheduleAppointmentDialog({ open, onOpenChange, onSuccess }: Sch
 
     setIsSubmitting(true)
 
-    // Mock API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      const selectedPatient = patients.find(p => p.user_id === patient)
+      if (!selectedPatient) throw new Error("Patient not found")
+
+      const container = getServiceContainer()
+      await container.appointment.bookAppointment({
+        patient_id: patient,
+        appointment_type: type,
+        date: format(date, 'yyyy-MM-dd'),
+        time: time
+      })
+
       const newAppt = {
-        id: Math.random(),
-        patientName: patient,
-        avatar: patient.split(" ").map(n => n[0]).join(""),
+        id: Math.random().toString(),
+        patient_id: patient,
+        patientName: `${selectedPatient.first_name} ${selectedPatient.last_name}`,
+        avatar: selectedPatient.first_name?.[0] || "P",
         type: type,
-        specialty: "Cardiology", // Default for this doctor
+        specialty: "General",
         date: format(date, "MMM d, yyyy"),
         time: time,
         duration: "30 min",
@@ -71,13 +101,22 @@ export function ScheduleAppointmentDialog({ open, onOpenChange, onSuccess }: Sch
       onOpenChange(false)
       toast({
         title: "Appointment Scheduled!",
-        description: `Appointment with ${patient} is scheduled for ${format(date, "MMM d, yyyy")} at ${time}.`,
+        description: `Appointment with ${selectedPatient.first_name} ${selectedPatient.last_name} is scheduled for ${format(date, "MMM d, yyyy")} at ${time}.`,
       })
       // Reset form
       setDate(undefined)
       setTime(undefined)
       setPatient("")
-    }, 1000)
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: "Error",
+        description: "Failed to schedule appointment.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -99,11 +138,11 @@ export function ScheduleAppointmentDialog({ open, onOpenChange, onSuccess }: Sch
                 <SelectValue placeholder="Select a patient" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Sarah Johnson">Sarah Johnson</SelectItem>
-                <SelectItem value="Michael Chen">Michael Chen</SelectItem>
-                <SelectItem value="Emily Davis">Emily Davis</SelectItem>
-                <SelectItem value="John Doe">John Doe</SelectItem>
-                <SelectItem value="Jane Smith">Jane Smith</SelectItem>
+                {patients.map(p => (
+                  <SelectItem key={p.user_id} value={p.user_id}>
+                    {p.first_name} {p.last_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

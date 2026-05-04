@@ -1,36 +1,46 @@
 "use client";
 
-import { useState, ReactNode } from "react";
+import { useSyncExternalStore } from "react";
 import { IntroOverlay } from "./IntroOverlay";
 
 const INTRO_STORAGE_KEY = "intro_seen";
+const INTRO_STORAGE_EVENT = "landing_intro_seen_changed";
 
-export function LandingIntro({ children }: { children: ReactNode }) {
-  // states: "checking" (initial), "playing" (show intro), "idle" (show content)
-  // states: "playing" (show intro) | "idle" (show content)
-  const [state, setState] = useState<"playing" | "idle">(() => {
-    // Read sessionStorage during client render; if server, default to idle.
-    try {
-      if (typeof window === "undefined") return "idle";
-      const seen = sessionStorage.getItem(INTRO_STORAGE_KEY);
-      return seen ? "idle" : "playing";
-    } catch {
-      return "idle";
-    }
-  });
+function subscribe(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(INTRO_STORAGE_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(INTRO_STORAGE_EVENT, onStoreChange);
+  };
+}
+
+function getSnapshot() {
+  try {
+    return !sessionStorage.getItem(INTRO_STORAGE_KEY);
+  } catch {
+    return false;
+  }
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
+export function LandingIntro() {
+  const isPlaying = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
   const handleFinish = () => {
     try {
       sessionStorage.setItem(INTRO_STORAGE_KEY, "1");
+      window.dispatchEvent(new Event(INTRO_STORAGE_EVENT));
     } catch {}
-    setState("idle");
   };
 
-  // While playing, do not render the page content to avoid flashes.
-  if (state === "playing") {
-    return <IntroOverlay onFinish={handleFinish} />;
-  }
-
-  // state === 'idle' -> render page content
-  return children;
+  return isPlaying ? <IntroOverlay onFinish={handleFinish} /> : null;
 }

@@ -2,10 +2,9 @@
 
 import { Bot, Heart, MessageCircle, Mic } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import ThreeAvatar from "../../ThreeAvatar"
-import { m, AnimatePresence } from "framer-motion"
-import { cn } from "@/lib/utils"
+import { m } from "framer-motion"
+import { useRouter } from "next/navigation"
 
 const suggestedQuestions = [
   "What should I know about my cholesterol levels?",
@@ -14,6 +13,16 @@ const suggestedQuestions = [
 ]
 
 export function AIHealthAvatar() {
+  const router = useRouter()
+
+  const openAssistant = (prompt?: string) => {
+    if (prompt) {
+      router.push(`/patient/ai-assistant?prompt=${encodeURIComponent(prompt)}`)
+      return
+    }
+    router.push("/patient/ai-assistant")
+  }
+
   return (
     <m.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -79,6 +88,7 @@ export function AIHealthAvatar() {
                 key={i}
                 whileHover={{ x: 4, backgroundColor: "rgba(255,255,255,0.1)" }}
                 className="rounded-xl bg-white/5 border border-white/5 px-4 py-2.5 text-left text-[11px] font-bold text-white/90 transition-all hover:text-white group-hover:border-white/10"
+                onClick={() => openAssistant(q)}
               >
                 {q}
               </m.button>
@@ -87,7 +97,10 @@ export function AIHealthAvatar() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-2">
-          <Button className="w-full bg-amber-400 text-slate-950 hover:bg-amber-500 border-0 h-11 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl transition-all active:scale-95">
+          <Button
+            className="w-full bg-amber-400 text-slate-950 hover:bg-amber-500 border-0 h-11 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl transition-all active:scale-95"
+            onClick={() => openAssistant()}
+          >
             <MessageCircle className="mr-2 h-4 w-4" />
             Start Chat
           </Button>

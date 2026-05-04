@@ -1,10 +1,8 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { toast } from "@/hooks/use-toast";
-
-import React from "react";
-
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,12 +31,15 @@ import {
   ChevronUp,
   Send,
   X,
+  Loader2,
 } from "lucide-react";
+import { useHospital } from "@/hooks/use-hospital";
+import { useAuth } from "@clerk/nextjs";
 
 const filterTabs = ["All", "Visits", "Labs", "Medications", "Flagged"];
 
 type TimelineItem = {
-  id: number;
+  id: string;
   type: string;
   title: string;
   date: string;
@@ -57,140 +58,6 @@ type TimelineItem = {
   flagged?: boolean;
   annotations?: { author: string; text: string; time: string }[];
 };
-
-const initialTimelineItems: TimelineItem[] = [
-  {
-    id: 1,
-    type: "visit",
-    title: "Follow-up Cardiology Visit",
-    date: "Jan 10, 2024",
-    description:
-      "Routine checkup and medication review. Patient reports improved energy levels. BP: 128/82.",
-    status: "Completed",
-    statusColor: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-    dotColor: "bg-emerald-500",
-    icon: Stethoscope,
-    needsReview: false,
-    flagged: false,
-    annotations: [
-      {
-        author: "Dr. Chen",
-        text: "Patient responding well to current regimen. Continue monitoring.",
-        time: "Jan 10, 2024 3:45 PM",
-      },
-    ],
-    extra: [
-      { label: "Completed", type: "success" },
-      { label: "Notes Available", type: "info" },
-    ],
-  },
-  {
-    id: 2,
-    type: "lab",
-    title: "Lab Results - Lipid Panel",
-    date: "Jan 8, 2024",
-    description: null,
-    status: "Needs Review",
-    statusColor: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-    dotColor: "bg-amber-500",
-    icon: FileText,
-    needsReview: true,
-    flagged: true,
-    labValues: [
-      { label: "Total Cholesterol", value: "245 mg/dL", flag: "high" },
-      { label: "LDL", value: "165 mg/dL", flag: "high" },
-      { label: "HDL", value: "48 mg/dL", flag: "low" },
-      { label: "Triglycerides", value: "160 mg/dL", flag: "normal" },
-    ],
-    annotations: [],
-    extra: [
-      { label: "Needs Review", type: "warning" },
-      { label: "Abnormal Values", type: "critical" },
-    ],
-  },
-  {
-    id: 3,
-    type: "medication",
-    title: "Medication Adjustment",
-    date: "Dec 20, 2023",
-    description:
-      "Lisinopril dosage increased from 5mg to 10mg daily. Patient tolerated previous dose well.",
-    status: "Active",
-    statusColor: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-    dotColor: "bg-blue-500",
-    icon: Pill,
-    needsReview: false,
-    flagged: false,
-    annotations: [
-      {
-        author: "Dr. Chen",
-        text: "Increased due to suboptimal BP control at 5mg. Recheck in 4 weeks.",
-        time: "Dec 20, 2023 2:10 PM",
-      },
-    ],
-    extra: [
-      { label: "Active", type: "info" },
-      { label: "Rx Change", type: "tag" },
-    ],
-  },
-  {
-    id: 4,
-    type: "visit",
-    title: "Annual Physical Exam",
-    date: "Nov 15, 2023",
-    description:
-      "Comprehensive health assessment. All vitals within normal range. BMI: 26.2. Recommended dietary changes.",
-    status: "Completed",
-    statusColor: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-    dotColor: "bg-emerald-500",
-    icon: ClipboardCheck,
-    needsReview: false,
-    flagged: false,
-    annotations: [],
-    extra: [{ label: "Completed", type: "success" }],
-  },
-  {
-    id: 5,
-    type: "visit",
-    title: "Emergency Visit - Chest Pain",
-    date: "Aug 22, 2023",
-    description:
-      "Evaluated for chest discomfort. ECG normal. Troponin negative. Diagnosed with anxiety-related symptoms. Referred to behavioral health.",
-    status: "Resolved",
-    statusColor: "bg-muted text-muted-foreground",
-    dotColor: "bg-rose-500",
-    icon: AlertTriangle,
-    needsReview: false,
-    flagged: true,
-    annotations: [
-      {
-        author: "Dr. Patel (ER)",
-        text: "Cardiac workup negative. Likely anxiety. Recommend outpatient follow-up.",
-        time: "Aug 22, 2023 9:20 PM",
-      },
-    ],
-    extra: [
-      { label: "Resolved", type: "info" },
-      { label: "ER Visit", type: "tag" },
-    ],
-  },
-  {
-    id: 6,
-    type: "visit",
-    title: "Initial Consultation",
-    date: "Jun 10, 2023",
-    description:
-      "First visit. Health history documented. Hypertension diagnosis established. Started on Lisinopril 5mg.",
-    status: "Historical",
-    statusColor: "bg-muted text-muted-foreground",
-    dotColor: "bg-muted-foreground",
-    icon: Stethoscope,
-    needsReview: false,
-    flagged: false,
-    annotations: [],
-    extra: [{ label: "Historical", type: "info" }],
-  },
-];
 
 function StatCard({
   label,
@@ -260,10 +127,10 @@ function TimelineEntry({
   onViewRecord,
 }: {
   item: TimelineItem;
-  onMarkReviewed: (id: number) => void;
-  onToggleFlag: (id: number) => void;
-  onAddAnnotation: (id: number, text: string) => void;
-  onViewRecord?: (item: any) => void;
+  onMarkReviewed: (id: string) => void;
+  onToggleFlag: (id: string) => void;
+  onAddAnnotation: (id: string, text: string) => void;
+  onViewRecord?: (item: unknown) => void;
 }) {
   const [expanded, setExpanded] = useState(item.needsReview || false);
   const [showNoteInput, setShowNoteInput] = useState(false);
@@ -518,13 +385,66 @@ function TimelineEntry({
 }
 
 export interface DoctorMedicalTimelineProps {
-  onViewPatient?: (patient: any) => void;
-  onViewRecord?: (record: any) => void;
+  onViewPatient?: (patient: unknown) => void;
+  onViewRecord?: (record: unknown) => void;
+}
+
+type TimelineApiRecord = {
+  record_id: string
+  record_type?: string
+  diagnosis?: string
+  created_at?: string
+  treatment?: string
+  clinical_notes?: string
+  is_reviewed?: boolean
 }
 
 export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMedicalTimelineProps) {
+  const { medicalRecords } = useHospital();
+  const { getToken } = useAuth();
   const [activeFilter, setActiveFilter] = useState("All");
-  const [items, setItems] = useState<TimelineItem[]>(initialTimelineItems);
+  const [items, setItems] = useState<TimelineItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setIsLoading(true);
+        const token = await getToken();
+        const data = await medicalRecords.getMyRecords(token || undefined);
+        
+        const mapped: TimelineItem[] = (data as TimelineApiRecord[]).map((r) => {
+          const type: TimelineItem["type"] =
+            r.record_type?.toLowerCase() === "lab result"
+              ? "lab"
+              : r.record_type?.toLowerCase() === "medication"
+                ? "medication"
+                : "visit"
+          return {
+          id: r.record_id,
+          type,
+          title: r.diagnosis || "Consultation",
+          date: r.created_at ? new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "--",
+          description: r.treatment || r.clinical_notes || null,
+          status: r.is_reviewed ? "Reviewed" : "Needs Review",
+          statusColor: r.is_reviewed ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700",
+          dotColor: r.is_reviewed ? "bg-emerald-500" : "bg-amber-500",
+          icon: r.record_type?.toLowerCase() === 'lab result' ? FileText : r.record_type?.toLowerCase() === 'medication' ? Pill : Stethoscope,
+          needsReview: !r.is_reviewed,
+          flagged: false, // Default
+          extra: [{ label: r.record_type || "General", type: "info" }],
+          annotations: [] // Could fetch separately
+        }});
+        
+        setItems(mapped);
+      } catch (error) {
+        console.error("Failed to fetch doctor timeline:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchItems();
+  }, [medicalRecords, getToken]);
 
   const needsReviewCount = items.filter((i) => i.needsReview).length;
   const flaggedCount = items.filter((i) => i.flagged).length;
@@ -539,7 +459,7 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
     return true;
   });
 
-  function handleMarkReviewed(id: number) {
+  function handleMarkReviewed(id: string) {
     setItems((prev) =>
       prev.map((item) =>
         item.id === id
@@ -559,7 +479,7 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
     );
   }
 
-  function handleToggleFlag(id: number) {
+  function handleToggleFlag(id: string) {
     setItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, flagged: !item.flagged } : item,
@@ -567,7 +487,7 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
     );
   }
 
-  function handleAddAnnotation(id: number, text: string) {
+  function handleAddAnnotation(id: string, text: string) {
     setItems((prev) =>
       prev.map((item) =>
         item.id === id
@@ -727,24 +647,31 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
 
       <CardContent>
         {/* Timeline */}
-        <div className="relative ml-3 border-l-2 border-border">
-          {filtered.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              No items match the current filter.
-            </div>
-          ) : (
-            filtered.map((item) => (
-              <TimelineEntry
-                key={item.id}
-                item={item}
-                onMarkReviewed={handleMarkReviewed}
-                onToggleFlag={handleToggleFlag}
-                onAddAnnotation={handleAddAnnotation}
-                onViewRecord={onViewRecord}
-              />
-            ))
-          )}
-        </div>
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Synchronizing records...</p>
+          </div>
+        ) : (
+          <div className="relative ml-3 border-l-2 border-border">
+            {filtered.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No items match the current filter.
+              </div>
+            ) : (
+              filtered.map((item) => (
+                <TimelineEntry
+                  key={item.id}
+                  item={item}
+                  onMarkReviewed={handleMarkReviewed}
+                  onToggleFlag={handleToggleFlag}
+                  onAddAnnotation={handleAddAnnotation}
+                  onViewRecord={onViewRecord}
+                />
+              ))
+            )}
+          </div>
+        )}
 
         <div className="mt-4 text-center">
           <Button

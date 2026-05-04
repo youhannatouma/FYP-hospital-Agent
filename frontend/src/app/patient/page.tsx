@@ -1,9 +1,14 @@
 "use client"
 
+/**
+ * Patient Dashboard Page
+ * Follows: Single Responsibility Principle (SRP) — page orchestration only, no data fetching
+ * Follows: Dependency Inversion Principle (DIP) — user info via useUserProfile service layer
+ */
+
 import { useState } from "react"
 import { m, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { CalendarPlus, Phone, Sparkles, ArrowRight } from "lucide-react"
 import { StatCards } from "@/components/patient/dashboard/stat-cards"
 import { MedicalHistoryTimeline } from "@/components/patient/dashboard/medical-history-timeline"
@@ -20,11 +25,20 @@ import { RecentLabResults } from "@/components/patient/dashboard/recent-lab-resu
 import { MedicalDocuments } from "@/components/patient/dashboard/medical-documents"
 import { BookAppointmentDialog } from "@/components/patient/dialogs/book-appointment-dialog"
 import { ContactDoctorDialog } from "@/components/patient/dialogs/contact-doctor-dialog"
-import { cn } from "@/lib/utils"
+import { useUserProfile } from "@/hooks/use-user-profile"
 
 export default function PatientDashboardPage() {
   const [showBookAppointment, setShowBookAppointment] = useState(false)
   const [showContactDoctor, setShowContactDoctor] = useState(false)
+
+  // Use service layer profile — not direct Clerk hook (DIP)
+  const { profile } = useUserProfile()
+  const firstName = profile?.first_name || "there"
+  const todayFormatted = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })
 
   return (
     <AnimatePresence mode="wait">
@@ -43,24 +57,28 @@ export default function PatientDashboardPage() {
             </div>
             <div>
               <h1 className="text-4xl font-black text-foreground tracking-tight leading-none lg:text-5xl">
-                Welcome back, Sarah
+                Welcome back, {firstName}
               </h1>
               <p className="text-muted-foreground mt-4 font-medium text-lg max-w-lg leading-relaxed">
-                Your health telemetry is synchronized. Summary for <span className="text-foreground font-black underline decoration-primary/30 underline-offset-4">January 15, 2024</span>.
+                Your health telemetry is synchronized. Summary for{" "}
+                <span className="text-foreground font-black underline decoration-primary/30 underline-offset-4">
+                  {todayFormatted}
+                </span>
+                .
               </p>
             </div>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="gap-3 border-border/50 text-foreground h-12 px-6 rounded-2xl hover:bg-muted/50 transition-all font-black text-xs uppercase tracking-widest shadow-subtle group"
               onClick={() => setShowBookAppointment(true)}
             >
               <CalendarPlus className="h-4 w-4 transition-transform group-hover:scale-110" />
               Book Session
             </Button>
-            <Button 
+            <Button
               className="gap-3 bg-slate-900 text-white hover:bg-slate-800 h-12 px-8 rounded-2xl transition-all font-black text-xs uppercase tracking-widest shadow-glow group"
               onClick={() => setShowContactDoctor(true)}
             >
@@ -73,7 +91,7 @@ export default function PatientDashboardPage() {
 
         {/* Core Metrics Staggered */}
         <div className="space-y-12">
-          {/* Stat Cards - Horizontal Layer */}
+          {/* Stat Cards — Horizontal Layer */}
           <section>
             <StatCards />
           </section>
@@ -86,7 +104,7 @@ export default function PatientDashboardPage() {
             <div className="flex flex-col gap-8 order-1 lg:order-2">
               <AIHealthAvatar />
               <div className="hidden lg:block">
-                 <HealthTip />
+                <HealthTip />
               </div>
             </div>
           </div>
@@ -103,9 +121,9 @@ export default function PatientDashboardPage() {
 
           {/* Secondary Intelligence: Medications + Labs + Goals */}
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-             <CurrentMedications />
-             <RecentLabResults />
-             <HealthGoals />
+            <CurrentMedications />
+            <RecentLabResults />
+            <HealthGoals />
           </div>
 
           {/* Deep Insights Full Width */}
@@ -115,20 +133,26 @@ export default function PatientDashboardPage() {
 
           {/* Utility Sections Staggered */}
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-             <MessagesSection />
-             <div className="flex flex-col gap-8">
-                <MedicalDocuments />
-                <HealthEducation />
-             </div>
+            <MessagesSection />
+            <div className="flex flex-col gap-8">
+              <MedicalDocuments />
+              <HealthEducation />
+            </div>
           </div>
         </div>
 
         <div className="mt-12 lg:hidden">
-           <HealthTip />
+          <HealthTip />
         </div>
 
-        <BookAppointmentDialog open={showBookAppointment} onOpenChange={setShowBookAppointment} />
-        <ContactDoctorDialog open={showContactDoctor} onOpenChange={setShowContactDoctor} />
+        <BookAppointmentDialog
+          open={showBookAppointment}
+          onOpenChange={setShowBookAppointment}
+        />
+        <ContactDoctorDialog
+          open={showContactDoctor}
+          onOpenChange={setShowContactDoctor}
+        />
       </m.div>
     </AnimatePresence>
   )

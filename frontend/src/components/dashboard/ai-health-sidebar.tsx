@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars, react/no-unescaped-entities */
 
 import { MessageCircle, Mic, Activity, User, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"

@@ -21,50 +21,50 @@ _active_streams: dict[str, asyncio.Event] = {}
 _stream_lock = RLock()
 
 
-def create_stream_token(user_id: str) -> asyncio.Event:
-    """Create a new cancellation token for a user stream.
-    
-    Automatically cancels any existing stream for this user (reprompt handling).
+def create_stream_token(stream_key: str) -> asyncio.Event:
+    """Create a new cancellation token for a stream key.
+
+    Automatically cancels any existing stream for this key (reprompt handling).
     Returns an Event that will be set when stream should be cancelled.
     """
     with _stream_lock:
         # Cancel previous stream if exists (reprompt behavior)
-        if user_id in _active_streams:
-            log.info(f"Cancelling previous stream for user {user_id} (reprompt)")
-            _active_streams[user_id].set()
+        if stream_key in _active_streams:
+            log.info(f"Cancelling previous stream for key {stream_key} (reprompt)")
+            _active_streams[stream_key].set()
         
         # Create new cancellation token
         cancel_token = asyncio.Event()
-        _active_streams[user_id] = cancel_token
-        log.info(f"Created new stream token for user {user_id}")
+        _active_streams[stream_key] = cancel_token
+        log.info(f"Created new stream token for key {stream_key}")
         return cancel_token
 
 
-def cancel_stream(user_id: str) -> bool:
-    """Cancel active stream for a user (interrupt behavior).
-    
+def cancel_stream(stream_key: str) -> bool:
+    """Cancel active stream for a key (interrupt behavior).
+
     Returns True if a stream was cancelled, False if no active stream.
     """
     with _stream_lock:
-        if user_id in _active_streams:
-            log.info(f"User {user_id} cancelled stream")
-            _active_streams[user_id].set()
+        if stream_key in _active_streams:
+            log.info(f"Stream key {stream_key} cancelled stream")
+            _active_streams[stream_key].set()
             return True
         return False
 
 
-def remove_stream_token(user_id: str):
+def remove_stream_token(stream_key: str):
     """Remove stream token after completion/cancellation."""
     with _stream_lock:
-        if user_id in _active_streams:
-            del _active_streams[user_id]
-            log.info(f"Removed stream token for user {user_id}")
+        if stream_key in _active_streams:
+            del _active_streams[stream_key]
+            log.info(f"Removed stream token for key {stream_key}")
 
 
-def is_cancelled(user_id: str) -> bool:
-    """Check if stream for user has been cancelled."""
+def is_cancelled(stream_key: str) -> bool:
+    """Check if stream for key has been cancelled."""
     with _stream_lock:
-        token = _active_streams.get(user_id)
+        token = _active_streams.get(stream_key)
         return token.is_set() if token else False
 
 

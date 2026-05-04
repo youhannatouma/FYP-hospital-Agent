@@ -1,8 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useUser } from "@clerk/nextjs"
-import { useDataStore } from "@/hooks/use-data-store"
+import { getServiceContainer } from "@/lib/services/service-container"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -29,18 +28,37 @@ interface AddRecordDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+type ApiUser = {
+  user_id: string
+  role?: string
+  first_name?: string
+  last_name?: string
+  email?: string
+}
+
 export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
   const { toast } = useToast()
-  const { user } = useUser()
-  const { users, addRecord } = useDataStore()
-  
+  const [patients, setPatients] = React.useState<ApiUser[]>([])
   const [loading, setLoading] = React.useState(false)
   const [selectedPatientId, setSelectedPatientId] = React.useState("")
   const [diagnosis, setDiagnosis] = React.useState("")
   const [details, setDetails] = React.useState("")
   const [date, setDate] = React.useState(new Date().toISOString().split('T')[0])
 
-  const patients = users.filter((u: any) => u.role === 'Patient')
+  React.useEffect(() => {
+    if (open) {
+      const fetchPatients = async () => {
+        try {
+          const container = getServiceContainer()
+          const allUsers = await container.user.getAllUsers()
+          setPatients((allUsers as ApiUser[]).filter((u) => u.role === 'patient'))
+        } catch (err) {
+          console.error("[AddRecordDialog] Failed to fetch patients:", err)
+        }
+      }
+      fetchPatients()
+    }
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,31 +68,28 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
     }
 
     setLoading(true)
-    
-    const patient = patients.find((p: any) => p.id === selectedPatientId)
-    
+    const patient = patients.find((p) => p.user_id === selectedPatientId)
     try {
-      addRecord({
-        patientId: selectedPatientId,
-        patientName: patient?.name || "Unknown Patient",
-        doctorId: user?.id || "doc-1",
-        doctorName: user?.fullName || "Dr. Current User",
+      const container = getServiceContainer()
+      await container.medicalRecord.createRecord({
+        patient_id: selectedPatientId,
+        record_type: "General Entry",
+        title: diagnosis,
+        description: details,
         date,
-        diagnosis,
-        status: 'Active',
-        notes: details,
       })
 
       toast({
         title: "Record Added",
-        description: `Medical record for ${patient?.name} has been successfully saved.`,
+        description: `Medical record for ${patient?.first_name} ${patient?.last_name} has been successfully saved.`,
       })
-      
-      // Reset form
       setSelectedPatientId("")
       setDiagnosis("")
       setDetails("")
       onOpenChange(false)
+    } catch (err) {
+      console.error("[AddRecordDialog] Failed to add record:", err)
+      toast({ title: "Error", description: "Failed to save record. Please try again.", variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -97,8 +112,10 @@ export function AddRecordDialog({ open, onOpenChange }: AddRecordDialogProps) {
                 <SelectValue placeholder="Select a patient..." />
               </SelectTrigger>
               <SelectContent>
-                {patients.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                {patients.map((p) => (
+                  <SelectItem key={p.user_id} value={p.user_id}>
+                    {p.first_name} {p.last_name} ({p.email})
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

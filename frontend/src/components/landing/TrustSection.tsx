@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { m } from "framer-motion"
 import { Shield, Lock, Eye, Award, Heart, CheckCircle2 } from "lucide-react"

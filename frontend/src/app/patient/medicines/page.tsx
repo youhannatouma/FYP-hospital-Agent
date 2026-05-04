@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -37,10 +38,10 @@ export default function MedicinesPage() {
   
   const [searchQuery, setSearchQuery] = useState("")
   
-  const [selectedPrescription, setSelectedPrescription] = useState<any | null>(null)
+  const [selectedPrescription, setSelectedPrescription] = useState<unknown | null>(null)
   const [showRefill, setShowRefill] = useState(false)
   
-  const [selectedPharmacy, setSelectedPharmacy] = useState<any | null>(null)
+  const [selectedPharmacy, setSelectedPharmacy] = useState<unknown | null>(null)
   const [showOrder, setShowOrder] = useState(false)
 
   const [activePrescriptions] = useState([
@@ -128,12 +129,12 @@ export default function MedicinesPage() {
     },
   ])
 
-  const handleRefill = (rx: any) => {
+  const handleRefill = (rx: unknown) => {
     setSelectedPrescription(rx)
     setShowRefill(true)
   }
 
-  const handleOrder = (pharmacy: any) => {
+  const handleOrder = (pharmacy: unknown) => {
     setSelectedPharmacy(pharmacy)
     setShowOrder(true)
   }

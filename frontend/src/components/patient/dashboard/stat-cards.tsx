@@ -1,59 +1,103 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { Heart, Droplets, Weight, Moon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { m } from "framer-motion"
+import { useState, useEffect } from "react"
+import { useHospital } from "@/hooks/use-hospital"
+import { useAuth } from "@clerk/nextjs"
+import { useUserProfile } from "@/hooks/use-user-profile"
+import { calculateAgeFromDob, getHeartRateBaselineByAge, midpoint } from "@/lib/health/heart-rate"
+import { classifyHttpError } from "@/lib/network/http-error"
+
+type PatientStats = {
+  upcoming_appointments?: number;
+  medical_records?: number;
+  active_prescriptions?: number;
+};
 
 export function StatCards() {
-  const stats = [
+  const { stats } = useHospital();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
+  const { profile } = useUserProfile();
+  const [data, setData] = useState<PatientStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    const fetchStats = async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await stats.getPatientStats(token);
+        setData(res);
+      } catch (e: unknown) {
+        const details = classifyHttpError(e);
+        if (details.kind !== "auth_unavailable") {
+          console.error("[PatientStats] Failed to fetch stats", details);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStats();
+  }, [stats, getToken, isLoaded, isSignedIn]);
+
+  const age = calculateAgeFromDob(profile?.date_of_birth);
+  const hrBaseline = getHeartRateBaselineByAge(age);
+  const hrValue = midpoint(hrBaseline.min, hrBaseline.max);
+
+  const statsItems = [
     {
       icon: Heart,
-      value: "72 bpm",
+      value: `${hrValue} bpm`,
       label: "Heart Rate",
-      status: "Optimal",
+      status: hrBaseline.label,
       statusColor: "text-emerald-500",
       iconBg: "bg-rose-500/10",
       iconColor: "text-rose-500",
-      updated: "2h ago",
+      updated: `${hrBaseline.min}-${hrBaseline.max} bpm`,
       primary: true,
-      description: "Consistent resting rhythm detected over the last 24 hours.",
+      description: "Estimated resting baseline from your age band.",
     },
     {
       icon: Droplets,
-      value: "137/85",
-      label: "Blood Pressure",
-      status: "Stable",
+      value: `${data?.upcoming_appointments || 0}`,
+      label: "Appointments",
+      status: "Upcoming",
       statusColor: "text-emerald-500",
       iconBg: "bg-amber-500/10",
       iconColor: "text-amber-500",
-      updated: "3h ago",
+      updated: "Real-time",
     },
     {
       icon: Weight,
-      value: "158 lbs",
-      label: "Weight",
-      status: "-2 lbs",
+      value: `${data?.medical_records || 0}`,
+      label: "Medical Records",
+      status: "Stored",
       statusColor: "text-blue-500",
       iconBg: "bg-emerald-500/10",
       iconColor: "text-emerald-500",
-      updated: "Today",
+      updated: "Total",
     },
     {
       icon: Moon,
-      value: "7.5 hrs",
-      label: "Sleep Quality",
-      status: "Good",
+      value: `${data?.active_prescriptions || 0}`,
+      label: "Prescriptions",
+      status: "Active",
       statusColor: "text-indigo-500",
       iconBg: "bg-indigo-500/10",
       iconColor: "text-indigo-500",
-      updated: "Last Night",
+      updated: "Current",
     },
   ]
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 px-1">
-      {stats.map((stat, idx) => (
+      {statsItems.map((stat, idx) => (
         <m.div
           key={stat.label}
           initial={{ opacity: 0, y: 20 }}

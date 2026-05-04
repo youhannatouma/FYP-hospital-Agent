@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Pill, AlertTriangle, Info } from "lucide-react"
+import { getServiceContainer } from "@/lib/services/service-container"
+import { Pill, AlertTriangle } from "lucide-react"
 
 interface PrescriptionDialogProps {
   open: boolean
@@ -29,19 +30,49 @@ export function PrescriptionDialog({ open, onOpenChange, patient }: Prescription
   const { toast } = useToast()
   const [loading, setLoading] = React.useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [medication, setMedication] = React.useState("")
+  const [dosage, setDosage] = React.useState("")
+  const [frequency, setFrequency] = React.useState("")
+  const [duration, setDuration] = React.useState("")
+  const [instructions, setInstructions] = React.useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      const container = getServiceContainer()
+      await container.prescription.createPrescription({
+        patient_id: patient?.id || "",
+        medication_name: medication,
+        dosage,
+        frequency,
+        duration,
+        instructions: instructions || "Take as directed",
+      })
+
       toast({
         title: "Prescription Created",
-        description: `New prescription for ${patient?.name || "the patient"} has been sent to the pharmacy.`,
+        description: `New prescription for ${patient?.name || "the patient"} has been issued.`,
       })
+      
+      // Reset
+      setMedication("")
+      setDosage("")
+      setFrequency("")
+      setDuration("")
+      setInstructions("")
       onOpenChange(false)
-    }, 1500)
+    } catch (error) {
+      console.error("Prescription creation failed:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create prescription. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -60,21 +91,45 @@ export function PrescriptionDialog({ open, onOpenChange, patient }: Prescription
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="medication">Medication Name</Label>
-              <Input id="medication" placeholder="e.g. Amoxicillin" required />
+              <Input 
+                id="medication" 
+                placeholder="e.g. Amoxicillin" 
+                value={medication}
+                onChange={(e) => setMedication(e.target.value)}
+                required 
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="dosage">Dosage</Label>
-                <Input id="dosage" placeholder="e.g. 500mg" required />
+                <Input 
+                  id="dosage" 
+                  placeholder="e.g. 500mg" 
+                  value={dosage}
+                  onChange={(e) => setDosage(e.target.value)}
+                  required 
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="frequency">Frequency</Label>
-                <Input id="frequency" placeholder="e.g. Twice daily" required />
+                <Input 
+                  id="frequency" 
+                  placeholder="e.g. Twice daily" 
+                  value={frequency}
+                  onChange={(e) => setFrequency(e.target.value)}
+                  required 
+                />
               </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="duration">Duration</Label>
-              <Input id="duration" placeholder="e.g. 7 days" required />
+              <Input 
+                id="duration" 
+                placeholder="e.g. 7 days" 
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                required 
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="instructions">Special Instructions</Label>
@@ -82,6 +137,8 @@ export function PrescriptionDialog({ open, onOpenChange, patient }: Prescription
                 id="instructions" 
                 placeholder="e.g. Take with food, maintain hydration..." 
                 className="min-h-[80px]"
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
               />
             </div>
           </div>

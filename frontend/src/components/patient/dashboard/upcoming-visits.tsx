@@ -11,35 +11,101 @@ import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { useHospital } from "@/hooks/use-hospital"
 import { useAuth } from "@clerk/nextjs"
+import { classifyHttpError } from "@/lib/network/http-error"
+
+type ApiAppointment = {
+  appointment_id: string;
+  appointment_type?: string;
+  doctor_name?: string;
+  doctor_id?: string;
+  doctor_specialty?: string;
+  date?: string;
+  created_at?: string;
+  time?: string;
+  status?: string;
+};
+
+type VisitViewModel = {
+  id: string;
+  title: string;
+  doctor: string;
+  specialty: string;
+  date: string;
+  time: string;
+  type: string;
+  typeColor: string;
+  isVirtual: boolean;
+};
 
 export function UpcomingVisits() {
-  const [visits, setVisits] = React.useState<any[]>([])
+  const [visits, setVisits] = React.useState<VisitViewModel[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [loadMessage, setLoadMessage] = React.useState<string | null>(null)
   const { booking } = useHospital()
-  const { getToken } = useAuth()
+  const { getToken, isLoaded, isSignedIn } = useAuth()
 
   React.useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      setIsLoading(false)
+      return
+    }
+
     const loadVisits = async () => {
-      const token = await getToken()
-      const data = await booking.getMyAppointments(token)
-      if (Array.isArray(data)) {
-        const ui = data.map((a: any) => ({
-          id: a.appointment_id,
-          title: a.appointment_type || "Appointment",
-          doctor: a.doctor_name || a.doctor_id,
-          specialty: "", // could fetch doctor info separately
-          date: a.created_at ? new Date(a.created_at).toDateString() : "",
-          time: "",
-          type: a.status || "",
-          typeColor: a.status === "scheduled" ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground",
-          isVirtual: a.appointment_type?.toLowerCase().includes("virtual"),
-        }))
-        setVisits(ui)
-      } else {
+      setIsLoading(true)
+      setLoadMessage(null)
+      try {
+        const token = await getToken()
+        if (!token) {
+          setVisits([])
+          setIsLoading(false)
+          return
+        }
+
+        let data: unknown
+        try {
+          data = await booking.getMyAppointments(token)
+        } catch (firstError: unknown) {
+          const firstDetails = classifyHttpError(firstError)
+          if (firstDetails.kind === "network_unreachable") {
+            await new Promise((resolve) => setTimeout(resolve, 400))
+            data = await booking.getMyAppointments(token)
+          } else {
+            throw firstError
+          }
+        }
+
+        if (Array.isArray(data)) {
+          const ui = data.map((a: ApiAppointment): VisitViewModel => ({
+            id: a.appointment_id,
+            title: a.appointment_type || "Appointment",
+            doctor: a.doctor_name || a.doctor_id || "Care Team",
+            specialty: a.doctor_specialty || "General Medicine",
+            date: a.date || (a.created_at ? new Date(a.created_at).toDateString() : ""),
+            time: a.time || "",
+            type: a.status || "",
+            typeColor: a.status === "scheduled" ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground",
+            isVirtual: Boolean(a.appointment_type?.toLowerCase().includes("virtual")),
+          }))
+          setVisits(ui)
+        } else {
+          setVisits([])
+        }
+      } catch (error: unknown) {
+        const details = classifyHttpError(error)
         setVisits([])
+        if (details.kind === "network_unreachable") {
+          setLoadMessage("Appointments are temporarily unavailable. Please try again shortly.")
+        } else if (details.kind === "auth_unavailable") {
+          setLoadMessage("Please sign in again to load your upcoming visits.")
+        } else {
+          setLoadMessage("Unable to load upcoming visits right now.")
+        }
+      } finally {
+        setIsLoading(false)
       }
     }
     loadVisits()
-  }, [booking, getToken])
+  }, [booking, getToken, isLoaded, isSignedIn])
 
   const [isOpen, setIsOpen] = React.useState(false)
   const [activeDoctor, setActiveDoctor] = React.useState("")
@@ -65,6 +131,16 @@ export function UpcomingVisits() {
         </div>
       </CardHeader>
       <CardContent className="p-8 pt-4 flex flex-col gap-6">
+        {isLoading && (
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Loading upcoming visits...
+          </p>
+        )}
+        {!isLoading && loadMessage && (
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            {loadMessage}
+          </p>
+        )}
         <div className="space-y-4">
           <AnimatePresence mode="popLayout">
             {visits.map((visit, idx) => (
@@ -146,6 +222,7 @@ export function UpcomingVisits() {
         onOpenChange={setIsOpen}
         remoteName={activeDoctor}
         role="patient"
+        roomId="quick_consult"
       />
     </Card>
   )

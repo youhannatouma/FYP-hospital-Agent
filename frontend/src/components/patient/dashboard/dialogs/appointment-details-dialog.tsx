@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import {
   Dialog,
@@ -11,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CalendarDays, Clock, MapPin, User, FileText } from "lucide-react"
 
-import { Appointment } from "@/hooks/use-data-store"
+import { Appointment } from "@/lib/hospital-data-manifest"
 
 interface AppointmentDetailsDialogProps {
   children: React.ReactNode

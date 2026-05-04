@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useUser } from "@clerk/nextjs"
-import { useDataStore } from "@/hooks/use-data-store"
+import { getServiceContainer } from "@/lib/services/service-container"
 import { 
   FileText, 
   Search, 
@@ -16,7 +16,7 @@ import {
   Clock,
   CheckCircle2
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -25,31 +25,60 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { MedicalRecord } from "@/lib/services/repositories/medical-record-repository"
+
+type ClinicalRecord = MedicalRecord & {
+  status?: "Active" | "Follow-up" | "Archived";
+  doctor_name?: string;
+  notes?: string;
+};
 
 export default function ClinicalHistoryPage() {
   const { user } = useUser()
   const { toast } = useToast()
-  const { getRecordsByPatient } = useDataStore()
   
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Follow-up" | "Archived">("All")
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [patientRecords, setPatientRecords] = useState<ClinicalRecord[]>([])
 
-  // Use a mock patient ID for now or derive from Clerk if implementation allows
-  // For demonstration, we'll fetch all records and filter or use a specific ID
-  const patientRecords = getRecordsByPatient("PAT-001") || [] // Mock ID matching seed data
+  useEffect(() => {
+    const loadRecords = async () => {
+      try {
+        const container = getServiceContainer()
+        const response = await container.medicalRecord.getMyRecords()
+        if (Array.isArray(response)) {
+          setPatientRecords(response as ClinicalRecord[])
+        }
+      } catch (error) {
+        console.error("Failed to load clinical history:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load clinical history.",
+          variant: "destructive"
+        })
+      }
+    }
+    if (user) {
+      loadRecords()
+    }
+  }, [user, toast])
 
-  const filteredRecords = patientRecords.filter((r: any) => {
+  const filteredRecords = patientRecords.filter((r) => {
+    const searchableText = [
+      r.title,
+      r.description,
+      r.id,
+      r.doctor_name,
+      r.record_type,
+    ].join(" ").toLowerCase()
     const matchesSearch = (
-      r.diagnosis.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.doctorName?.toLowerCase().includes(searchQuery.toLowerCase())
+      searchableText.includes(searchQuery.toLowerCase())
     )
-    const matchesStatus = statusFilter === "All" || r.status === statusFilter
+    const recordStatus = r.status || "Active"
+    const matchesStatus = statusFilter === "All" || recordStatus === statusFilter
     return matchesSearch && matchesStatus
   })
 
@@ -62,12 +91,12 @@ export default function ClinicalHistoryPage() {
     }
   }
 
-  const handleDownload = (record: any) => {
+  const handleDownload = (record: ClinicalRecord) => {
     setDownloadingId(record.id)
     setTimeout(() => {
       // Simulate CSV generation
-      const headers = ["Record ID", "Doctor", "Date", "Diagnosis", "Notes", "Status"]
-      const row = [record.id, record.doctorName, record.date, record.diagnosis, record.notes || "N/A", record.status]
+      const headers = ["Record ID", "Doctor", "Date", "Title", "Notes", "Status"]
+      const row = [record.id, record.doctor_name || record.doctor_id || "Staff Physician", record.date || record.created_at, record.title, record.notes || record.description || "N/A", record.status || "Active"]
       const csvContent = [headers, row].map(e => e.join(",")).join("\n")
       
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -82,7 +111,7 @@ export default function ClinicalHistoryPage() {
       setDownloadingId(null)
       toast({
         title: "Record Downloaded",
-        description: `Your medical record from ${record.date} has been saved.`,
+        description: `Your medical record has been saved.`,
       })
     }, 800)
   }
@@ -132,7 +161,7 @@ export default function ClinicalHistoryPage() {
               </div>
               <div>
                 <p className="text-xs font-bold uppercase text-muted-foreground">Active Diagnoses</p>
-                <h3 className="text-2xl font-bold">{patientRecords.filter((r: any) => r.status === 'Active').length}</h3>
+                <h3 className="text-2xl font-bold">{patientRecords.filter((r) => (r.status || 'Active') === 'Active').length}</h3>
               </div>
             </div>
           </CardContent>
@@ -188,8 +217,8 @@ export default function ClinicalHistoryPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredRecords.map((record: any) => {
-              const statusInfo = getStatusInfo(record.status)
+            {filteredRecords.map((record) => {
+              const statusInfo = getStatusInfo(record.status || 'Active')
               return (
                 <div 
                   key={record.id} 
@@ -202,23 +231,23 @@ export default function ClinicalHistoryPage() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-base truncate">{record.diagnosis}</h3>
+                          <h3 className="font-bold text-base truncate">{record.title}</h3>
                           <Badge className={`${statusInfo.color} border-0 text-[10px]`}>
-                            {record.status}
+                            {record.status || "Active"}
                           </Badge>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="h-3.5 w-3.5" />
-                            {record.date}
+                            {new Date(record.date || record.created_at).toLocaleDateString()}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Stethoscope className="h-3.5 w-3.5" />
-                            {record.doctorName || "Staff Physician"}
+                            {record.doctor_name || "Staff Physician"}
                           </div>
                           <div className="hidden sm:flex items-center gap-1.5 grayscale opacity-70">
                             <Clock className="h-3.5 w-3.5" />
-                            ID: {record.id}
+                            ID: {record.id.split('-')[0]}
                           </div>
                         </div>
                       </div>
@@ -243,10 +272,10 @@ export default function ClinicalHistoryPage() {
                     </div>
                   </div>
                   
-                  {record.notes && (
+                  {(record.notes || record.description) && (
                     <div className="relative pl-4 border-l-2 border-primary/20">
                       <p className="text-sm text-muted-foreground italic leading-relaxed line-clamp-2">
-                        "{record.notes}"
+                        &quot;{record.notes || record.description}&quot;
                       </p>
                     </div>
                   )}
@@ -267,7 +296,7 @@ export default function ClinicalHistoryPage() {
                 </div>
                 <h3 className="text-lg font-bold text-foreground">No Records Found</h3>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  We couldn't find any medical records matching your criteria.
+                  We couldn&apos;t find any medical records matching your criteria.
                 </p>
               </div>
             )}

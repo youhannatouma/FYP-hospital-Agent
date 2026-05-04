@@ -19,134 +19,68 @@ import { toast } from "@/hooks/use-toast"
 import { RecordDetailDialog } from "@/components/doctor/MedicalRecord/record-detail-dialog"
 import { MedicalRecord } from "@/components/doctor/MedicalRecord/columns"
 import { CreateRecordDialog } from "@/components/doctor/MedicalRecord/create-record-dialog"
-
-const MOCK_RECORDS: MedicalRecord[] = [
-  { 
-    id: "1", 
-    patientId: "P-2024-001", 
-    name: "John Doe", 
-    lastVisit: "2024-02-05", 
-    diagnosis: "Hypertension", 
-    status: "Active",
-    age: 45,
-    gender: "Male",
-    bloodType: "A+",
-    phone: "(555) 123-4567",
-    email: "john.doe@example.com",
-    address: "123 Main St, Springfield",
-    height: 180,
-    weight: 85,
-    bloodPressure: "140/90",
-    heartRate: 72,
-    temperature: 36.6,
-    medications: ["Lisinopril 10mg"],
-    allergies: ["Pollen"],
-    treatmentPlan: "Regular monitoring and low-sodium diet.",
-    notes: "Patient is compliant with current medication.",
-    nextAppointment: "2024-03-05"
-  },
-  { 
-    id: "2", 
-    patientId: "P-2024-002", 
-    name: "Jane Smith", 
-    lastVisit: "2024-02-04", 
-    diagnosis: "Type 2 Diabetes", 
-    status: "Active",
-    age: 38,
-    gender: "Female",
-    bloodType: "O-",
-    phone: "(555) 987-6543",
-    email: "jane.smith@example.com",
-    address: "456 Oak Ave, Metropolis",
-    height: 165,
-    weight: 70,
-    bloodPressure: "120/80",
-    heartRate: 68,
-    temperature: 37.0,
-    medications: ["Metformin 500mg"],
-    allergies: ["Latex"],
-    treatmentPlan: "Blood sugar monitoring and carb-controlled diet.",
-    notes: "Requires follow-up on A1C levels.",
-    nextAppointment: "2024-02-18"
-  },
-  { 
-    id: "3", 
-    patientId: "P-2024-003", 
-    name: "Mike Johnson", 
-    lastVisit: "2024-02-03", 
-    diagnosis: "Asthma", 
-    status: "Follow-up",
-    age: 28,
-    gender: "Male",
-    bloodType: "B+",
-    phone: "(555) 456-7890",
-    email: "mike.j@example.com",
-    address: "789 Pine Rd, Smallville",
-    height: 175,
-    weight: 75,
-    bloodPressure: "115/75",
-    heartRate: 75,
-    temperature: 36.8,
-    medications: ["Albuterol Inhaler"],
-    allergies: ["Dust Mites"],
-    treatmentPlan: "Avoid triggers and use inhaler as needed.",
-    nextAppointment: "2024-02-15"
-  },
-  { 
-    id: "4", 
-    patientId: "P-2024-004", 
-    name: "Sarah Williams", 
-    lastVisit: "2024-02-02", 
-    diagnosis: "Migraine", 
-    status: "Active",
-    age: 32,
-    gender: "Female",
-    bloodType: "AB+",
-    phone: "(555) 222-3333",
-    email: "sarah.w@example.com",
-    address: "101 Maple Ln, Hill Valley",
-    height: 170,
-    weight: 60,
-    bloodPressure: "110/70",
-    heartRate: 65,
-    temperature: 36.5,
-    medications: ["Sumatriptan"],
-    treatmentPlan: "Triptans for acute attacks and trigger management."
-  },
-  { 
-    id: "5", 
-    patientId: "P-2024-005", 
-    name: "Robert Brown", 
-    lastVisit: "2024-02-01", 
-    diagnosis: "Back Pain", 
-    status: "Recovered",
-    age: 55,
-    gender: "Male",
-    bloodType: "A-",
-    phone: "(555) 555-4444",
-    email: "robert.b@example.com",
-    address: "202 Cedar St, Riverdale",
-    height: 185,
-    weight: 95,
-    bloodPressure: "135/85",
-    heartRate: 80,
-    temperature: 36.9,
-    treatmentPlan: "Physical therapy and sporadic NSAIDs."
-  },
-]
-
-const statusColors: Record<string, string> = {
-  Active: "bg-emerald-500/10 text-emerald-500",
-  "Follow-up": "bg-amber-500/10 text-amber-500",
-  Recovered: "bg-blue-500/10 text-blue-500",
-}
+import { useState, useEffect } from "react"
+import { getServiceContainer } from "@/lib/services/service-container"
+import { Loader2 } from "lucide-react"
 
 export default function MedicalRecordsPage() {
-  const [search, setSearch] = React.useState("")
-  const [selectedRecord, setSelectedRecord] = React.useState<MedicalRecord | null>(null)
-  const [isDetailOpen, setIsDetailOpen] = React.useState(false)
-  const [isCreateOpen, setIsCreateOpen] = React.useState(false)
-  const [records, setRecords] = React.useState<MedicalRecord[]>(MOCK_RECORDS)
+  const [search, setSearch] = useState("")
+  const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [records, setRecords] = useState<MedicalRecord[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchRecords = async () => {
+      try {
+        const container = getServiceContainer()
+        const data = await container.medicalRecord.getMyRecords()
+        if (Array.isArray(data)) {
+          const mappedRecords = data.map((r) => {
+            const item = r as unknown as Record<string, unknown>
+            const id = (item.record_id as string) || (item.id as string) || ""
+            const patientId = (item.patient_id as string) || (item.patientId as string) || "Unknown"
+            const patientName = (item.patient_name as string) || (item.name as string) || "Unknown Patient"
+            const createdAt = (item.created_at as string) || (item.lastVisit as string)
+            const diagnosis = (item.diagnosis as string) || "Medical Record"
+            const treatment = (item.treatment as string) || (item.treatmentPlan as string) || ""
+            const notes = (item.clinical_notes as string) || (item.notes as string) || ""
+            return {
+              id,
+              patientId,
+              name: patientName,
+              lastVisit: createdAt ? new Date(createdAt).toLocaleDateString() : 'Unknown',
+              diagnosis,
+              status: "Active",
+              age: 0,
+              gender: "Unknown",
+              bloodType: "Unknown",
+              phone: "Unknown",
+              email: "Unknown",
+              address: "Unknown",
+              height: 0,
+              weight: 0,
+              bloodPressure: "Unknown",
+              heartRate: 0,
+              temperature: 0,
+              medications: [],
+              allergies: [],
+              treatmentPlan: treatment,
+              notes,
+              nextAppointment: ""
+            }
+          }) as MedicalRecord[]
+          setRecords(mappedRecords)
+        }
+      } catch (error) {
+        console.error("Failed to fetch medical records:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchRecords()
+  }, [])
 
   const handleAddRecord = () => {
     setSelectedRecord(null)
@@ -233,8 +167,14 @@ export default function MedicalRecordsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
+        <CardContent className="min-h-[300px]">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-[300px] gap-4">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Loading Records...</p>
+            </div>
+          ) : (
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Patient</TableHead>
@@ -264,7 +204,7 @@ export default function MedicalRecordsPage() {
                   <TableCell className="text-muted-foreground">{record.lastVisit}</TableCell>
                   <TableCell className="text-foreground">{record.diagnosis}</TableCell>
                   <TableCell>
-                    <Badge className={`border-0 ${statusColors[record.status] ?? "bg-muted text-muted-foreground"}`}>
+                    <Badge className={`border-0 bg-emerald-500/10 text-emerald-500`}>
                       {record.status}
                     </Badge>
                   </TableCell>
@@ -303,6 +243,7 @@ export default function MedicalRecordsPage() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 

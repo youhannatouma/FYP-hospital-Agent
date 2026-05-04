@@ -31,7 +31,7 @@ export default function SignInPage() {
           <div className="h-10 w-10 rounded-full bg-background border border-border flex items-center justify-center">
             <Activity className="h-5 w-5 text-primary" />
           </div>
-          <span>Enterprise-grade security & HIPAA compliant</span>
+          <span>Enterprise-grade security &amp; HIPAA compliant</span>
         </div>
       </div>
 
@@ -48,6 +48,7 @@ export default function SignInPage() {
           </div>
           
           <SignIn 
+            forceRedirectUrl="/onboarding"
             appearance={{
               elements: {
                 formButtonPrimary: "bg-primary hover:bg-primary/90 text-sm font-bold h-11 rounded-xl shadow-lg shadow-primary/20",
@@ -64,13 +65,23 @@ export default function SignInPage() {
             }}
           />
 
-          <div className="text-center pt-4 border-t border-border/50">
-            <p className="text-sm text-muted-foreground font-medium">
-              Are you a medical professional?{" "}
-              <Link href="/doctor-sign-in" className="text-primary font-bold hover:underline">
-                Doctor Sign In
-              </Link>
-            </p>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground font-bold tracking-widest">Medical Professionals</span>
+            </div>
+          </div>
+
+          <div className="bg-primary/5 rounded-2xl p-6 border border-primary/10 flex flex-col items-center text-center gap-3">
+            <h3 className="font-bold text-sm">Are you a Doctor?</h3>
+            <p className="text-xs text-muted-foreground">Access your clinical dashboard and patient engagements.</p>
+            <Link href="/doctor-sign-in" className="w-full">
+              <button className="w-full h-11 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-sm rounded-xl transition-all">
+                Sign In to Clinical Workspace
+              </button>
+            </Link>
           </div>
         </div>
       </div>

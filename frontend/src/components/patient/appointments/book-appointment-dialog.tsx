@@ -21,11 +21,21 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { CalendarPlus, CheckCircle2, Clock, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useDataStore } from "@/hooks/use-data-store"
 import { useHospital } from "@/hooks/use-hospital"
-import { cn } from "@/lib/utils"
 import { useAuth } from "@clerk/nextjs"
 
+type DoctorOption = {
+  id?: string
+  user_id?: string
+  name?: string
+  first_name?: string
+  last_name?: string
+  specialty?: string
+}
+
+type SlotOption = {
+  time?: string
+}
 
 interface BookAppointmentDialogProps {
   patientId?: string
@@ -49,7 +59,6 @@ export function BookAppointmentDialog({
   const { toast } = useToast()
   const { getToken } = useAuth()
   const { booking } = useHospital()
-  const { getDoctors, addAppointment } = useDataStore()  // keep for fallback
   const [step, setStep] = useState(1)
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
@@ -64,40 +73,40 @@ export function BookAppointmentDialog({
     setInternalOpen(val)
   }
 
+  const [allDoctors, setAllDoctors] = useState<DoctorOption[]>([])
+
   // Sync selectedDoctorId when dialog opens with a specific doctor
   React.useEffect(() => {
-    if (open && initialDoctorId) {
+    if (open && initialDoctorId && allDoctors.length > 0) {
       setSelectedDoctorId(initialDoctorId)
-      const doc = getDoctors().find((d: any) => d.id === initialDoctorId)
+      const doc = allDoctors.find((d) => d.id === initialDoctorId)
       if (doc) setSelectedSpecialty(doc.specialty || null)
     }
-  }, [open, initialDoctorId, getDoctors])
-
-  const [allDoctors, setAllDoctors] = useState<any[]>([])
+  }, [open, initialDoctorId, allDoctors])
   React.useEffect(() => {
     const loadDoctors = async () => {
       const token = await getToken()
-      const docs = await booking.getAvailableDoctors(selectedSpecialty || undefined, token)
-      setAllDoctors(docs || [])
+      const docs = await booking.getAvailableDoctors(selectedSpecialty || undefined, token || undefined)
+      setAllDoctors(Array.isArray(docs) ? docs : [])
     }
     loadDoctors()
   }, [selectedSpecialty, booking, getToken])
 
-  const specialties = [...new Set(allDoctors.map((d: any) => d.specialty).filter(Boolean))] as string[]
+  const specialties = [...new Set(allDoctors.map((d) => d.specialty).filter(Boolean))] as string[]
   const filteredDoctors = selectedSpecialty
-    ? allDoctors.filter((d: any) => d.specialty === selectedSpecialty)
+    ? allDoctors.filter((d) => d.specialty === selectedSpecialty)
     : allDoctors
-  const selectedDoctor = allDoctors.find((d: any) => d.id === selectedDoctorId)
+  const selectedDoctor = allDoctors.find((d) => d.id === selectedDoctorId)
 
   const [timeSlots, setTimeSlots] = useState<string[]>([])
 
   React.useEffect(() => {
     const loadSlots = async () => {
-      if (selectedDoctor && date) {
+      if (selectedDoctor?.id && date) {
         const token = await getToken()
-        const slots = await booking.getSlots(selectedDoctor.id, date.toISOString().split('T')[0], token)
+        const slots = await booking.getSlots(selectedDoctor.id, date.toISOString().split('T')[0], token || undefined)
         if (Array.isArray(slots)) {
-          setTimeSlots(slots.map((s: any) => s.time))
+          setTimeSlots((slots as SlotOption[]).map((s) => s.time).filter((time): time is string => Boolean(time)))
         }
       }
     }
@@ -105,12 +114,12 @@ export function BookAppointmentDialog({
   }, [selectedDoctor, date, booking, getToken])
 
   const handleBook = async () => {
-    if (!selectedDoctor || !date || !selectedTime) return
+    if (!selectedDoctor?.id || !date || !selectedTime) return
 
     const formattedDate = date.toISOString().split('T')[0]
     try {
       const token = await getToken()
-      const result = await booking.submitBooking({
+      await booking.submitBooking({
         patientId,
         patientName,
         doctor_id: selectedDoctor.id,
@@ -119,26 +128,11 @@ export function BookAppointmentDialog({
         appointment_type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
         fee: 150,
         is_virtual: appointmentType === "Video",
-      }, token)
-
-      // Also update local mock store so the UI reflects the new appointment immediately
-      addAppointment({
-        patientId,
-        patientName,
-        doctorId: selectedDoctor.id,
-        doctorName: selectedDoctor.name,
-        specialty: selectedDoctor.specialty,
-        date: formattedDate,
-        time: selectedTime,
-        status: 'Scheduled',
-        type: appointmentType === "Video" ? "Virtual Consultation" : "Consultation",
-        price: 150,
-        isVirtual: appointmentType === "Video",
-      })
+      }, token || undefined)
 
       toast({
         title: "Appointment Booked!",
-        description: `Your appointment with ${selectedDoctor.name} on ${date.toDateString()} at ${selectedTime} has been confirmed.`,
+        description: `Your appointment with ${selectedDoctor.name || selectedDoctor.first_name} on ${date.toDateString()} at ${selectedTime} has been confirmed.`,
       })
       setOpen(false)
       onBooked?.()
@@ -148,7 +142,7 @@ export function BookAppointmentDialog({
         setSelectedDoctorId(null)
         setSelectedSpecialty(null)
       }, 500)
-    } catch (error) {
+    } catch {
       toast({
         title: "Unable to book appointment",
         description: "Please try again or contact support.",
@@ -200,11 +194,15 @@ export function BookAppointmentDialog({
                     <SelectValue placeholder="Select doctor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredDoctors.map((d: any) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name} {d.specialty ? `(${d.specialty})` : ""}
+                    {filteredDoctors.map((d) => {
+                      const doctorId = d.id || d.user_id
+                      if (!doctorId) return null
+                      return (
+                      <SelectItem key={doctorId} value={doctorId}>
+                        {d.name || `${d.first_name} ${d.last_name}`} {d.specialty ? `(${d.specialty})` : ""}
                       </SelectItem>
-                    ))}
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -256,7 +254,7 @@ export function BookAppointmentDialog({
               <div className="rounded-lg bg-muted p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-primary" />
-                  <span className="font-medium">{selectedDoctor?.name}</span>
+                  <span className="font-medium">{selectedDoctor?.name || `${selectedDoctor?.first_name} ${selectedDoctor?.last_name}`}</span>
                   <span className="text-xs text-muted-foreground">({selectedDoctor?.specialty})</span>
                 </div>
                 <div className="flex items-center gap-2">

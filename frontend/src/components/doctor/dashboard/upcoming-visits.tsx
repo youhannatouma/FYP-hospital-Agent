@@ -32,10 +32,10 @@ const visits = [
 ]
 
 export interface UpcomingVisitsProps {
-  onViewAppointment?: (visit: any) => void
+  onViewAppointment?: (visit: unknown) => void
 }
 
-export function UpcomingVisits({ onViewAppointment }: UpcomingVisitsProps) {
+export function UpcomingVisits({ onViewAppointment }: Readonly<UpcomingVisitsProps>) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [activePatient, setActivePatient] = React.useState("")
 
@@ -57,8 +57,15 @@ export function UpcomingVisits({ onViewAppointment }: UpcomingVisitsProps) {
         {visits.map((visit) => (
           <div
             key={visit.id}
+            role="button"
+            tabIndex={0}
             className="rounded-2xl border border-border/50 p-4 transition-all hover:bg-primary/5 cursor-pointer group/visit active:scale-98"
             onClick={() => onViewAppointment?.(visit)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                onViewAppointment?.(visit)
+              }
+            }}
           >
             <div className="flex items-start justify-between mb-2">
               <h4 className="text-sm font-semibold text-card-foreground">
@@ -106,6 +113,7 @@ export function UpcomingVisits({ onViewAppointment }: UpcomingVisitsProps) {
         onOpenChange={setIsOpen}
         remoteName={activePatient}
         role="doctor"
+        roomId={`visit_${activePatient.replaceAll(" ", "_")}`}
       />
     </Card>
   )

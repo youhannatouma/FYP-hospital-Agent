@@ -4,7 +4,6 @@ import Link from "next/link";
 import { m } from "framer-motion";
 import { ArrowRight, Mic, Users, Star, Activity, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 
 export function HeroSection() {
@@ -39,13 +38,13 @@ export function HeroSection() {
         <div className="flex flex-col items-center gap-16 lg:flex-row lg:items-center lg:gap-12">
           {/* Left Content */}
           <m.div
-            initial={{ opacity: 0, x: -50 }}
+            initial={false}
             animate={isVisible ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="flex max-w-2xl flex-1 flex-col items-center text-center lg:items-start lg:text-left"
           >
             <m.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={isVisible ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.2, duration: 0.5 }}
               className="mb-8 flex items-center gap-3 rounded-full border border-border bg-card/50 backdrop-blur-md px-5 py-2.5 shadow-sm"
@@ -76,7 +75,7 @@ export function HeroSection() {
             </m.div>
 
             <m.h1
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={isVisible ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.3, duration: 0.6 }}
               className="text-balance text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-7xl font-heading"
@@ -86,7 +85,7 @@ export function HeroSection() {
             </m.h1>
 
             <m.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={isVisible ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.4, duration: 0.6 }}
               className="mt-6 max-w-lg text-pretty text-lg leading-relaxed text-muted-foreground"
@@ -97,7 +96,7 @@ export function HeroSection() {
             </m.p>
 
             <m.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               animate={isVisible ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.5, duration: 0.6 }}
               className="mt-10 flex flex-wrap items-center gap-4"
@@ -111,24 +110,20 @@ export function HeroSection() {
                   <ArrowRight className="h-5 w-5" />
                 </Button>
               </Link>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-14 gap-2 border-primary/20 text-foreground px-8 text-lg font-semibold backdrop-blur-sm transition-all hover:bg-primary/5 hover:border-primary/40 active:scale-95"
-                onClick={() =>
-                  toast({
-                    title: "Initializing Clinical AI...",
-                    description: "Connecting to the medical knowledge base.",
-                  })
-                }
-              >
-                <Mic className="h-5 w-5 text-primary" />
-                Speak to AI
-              </Button>
+              <Link href="/sign-up">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-14 gap-2 border-primary/20 text-foreground px-8 text-lg font-semibold backdrop-blur-sm transition-all hover:bg-primary/5 hover:border-primary/40 active:scale-95"
+                >
+                  <Mic className="h-5 w-5 text-primary" />
+                  Speak to AI
+                </Button>
+              </Link>
             </m.div>
 
             <m.div
-              initial={{ opacity: 0 }}
+              initial={false}
               animate={isVisible ? { opacity: 1 } : {}}
               transition={{ delay: 0.7, duration: 1 }}
               className="mt-12 grid w-full grid-cols-3 gap-8 border-t border-border pt-8"
@@ -152,7 +147,7 @@ export function HeroSection() {
 
           {/* Right Visual Element (AI Visual) */}
           <m.div
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={false}
             animate={isVisible ? { opacity: 1, scale: 1 } : {}}
             transition={{ duration: 1, ease: "easeOut" }}
             className="relative flex flex-1 items-center justify-center"

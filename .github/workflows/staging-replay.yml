@@ -1,0 +1,43 @@
+name: Staging Replay
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Staging backend base URL"
+        required: true
+        type: string
+      scenario_file:
+        description: "Scenario file path in repo"
+        required: false
+        default: "backend/scripts/staging_replay_scenarios.json"
+        type: string
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run staging replay harness
+        run: |
+          python backend/scripts/staging_replay_doctor_workflow.py \
+            --base-url "${{ inputs.base_url }}" \
+            --scenario-file "${{ inputs.scenario_file }}" \
+            --output-file backend/scripts/staging_replay_report.json
+
+      - name: Upload replay artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-replay-report
+          path: |
+            backend/scripts/staging_replay_report.json
+            backend/scripts/staging_replay_scenarios.json

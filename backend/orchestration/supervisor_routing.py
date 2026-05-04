@@ -23,6 +23,8 @@ class ToolTask:
         task_id: unique identifier for traceability.
         tool_name: symbolic tool action (e.g., 'recall_memory').
         user_id: user scope for write/read conflict checks.
+        patient_user_id: optional patient scope for booking/matching conflict checks.
+        thread_id: optional workflow thread scope for booking/matching conflict checks.
         is_write: whether this task mutates user state.
         runner: async callable to execute the task.
     """
@@ -32,6 +34,8 @@ class ToolTask:
     user_id: str
     is_write: bool
     runner: ToolRunner
+    patient_user_id: str | None = None
+    thread_id: str | None = None
 
 
 @dataclass
@@ -67,9 +71,30 @@ def _blocked_by_data_conflict(a: ToolTask, b: ToolTask) -> bool:
     return a.is_write or b.is_write
 
 
+_MATCH_TOOL_NAMES = {"search_doctors_for_need", "match_doctors"}
+_BOOKING_TOOL_NAMES = {"book_appointment", "conditional_book"}
+
+
+def _blocked_by_patient_thread_conflict(a: ToolTask, b: ToolTask) -> bool:
+    """Block match-book parallelism when patient or thread scope overlaps."""
+    a_is_match = a.tool_name in _MATCH_TOOL_NAMES
+    b_is_match = b.tool_name in _MATCH_TOOL_NAMES
+    a_is_book = a.tool_name in _BOOKING_TOOL_NAMES
+    b_is_book = b.tool_name in _BOOKING_TOOL_NAMES
+
+    if not ((a_is_match and b_is_book) or (a_is_book and b_is_match)):
+        return False
+
+    same_patient = bool(a.patient_user_id and b.patient_user_id and a.patient_user_id == b.patient_user_id)
+    same_thread = bool(a.thread_id and b.thread_id and a.thread_id == b.thread_id)
+    return same_patient or same_thread
+
+
 def can_run_in_parallel(a: ToolTask, b: ToolTask) -> bool:
     """Decision-tree check for pairwise parallel eligibility."""
     if _blocked_by_matrix(a, b):
+        return False
+    if _blocked_by_patient_thread_conflict(a, b):
         return False
     if _blocked_by_data_conflict(a, b):
         return False

@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -42,21 +43,7 @@ export function HealthEducation() {
     },
   ])
 
-  // API Endpoints Suggestion:
-  // GET: /patient/education/resources -> Fetch health education resources
-  /*
-    React.useEffect(() => {
-      const fetchResources = async () => {
-        try {
-          // const response = await apiClient.get('/patient/education/resources');
-          // setResources(response.data);
-        } catch (error) {
-          console.error('Failed to fetch health resources', error);
-        }
-      };
-      fetchResources();
-    }, []);
-  */
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
