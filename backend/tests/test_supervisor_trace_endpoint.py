@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -181,8 +182,8 @@ def test_supervisor_trace_admin_can_view_all_and_endpoint_is_read_only(client):
         db.execute(
             text(
                 "INSERT INTO workflow_trace_event "
-                "(trace_id, workflow_family, thread_id, actor_user_id, patient_user_id, run_id, node_name, event_type, sequence, status, payload_json) "
-                "VALUES (:trace_id, :workflow_family, :thread_id, :actor_user_id, :patient_user_id, :run_id, :node_name, :event_type, :sequence, :status, :payload_json)"
+                "(trace_id, workflow_family, thread_id, actor_user_id, patient_user_id, run_id, node_name, event_type, sequence, occurred_at, status, payload_json) "
+                "VALUES (:trace_id, :workflow_family, :thread_id, :actor_user_id, :patient_user_id, :run_id, :node_name, :event_type, :sequence, :occurred_at, :status, :payload_json)"
             ),
             {
                 "trace_id": str(uuid.uuid4()),
@@ -194,6 +195,7 @@ def test_supervisor_trace_admin_can_view_all_and_endpoint_is_read_only(client):
                 "node_name": "synthesize_node",
                 "event_type": "run_completed",
                 "sequence": 1,
+                "occurred_at": datetime(2026, 1, 1),
                 "status": "ok",
                 "payload_json": '{"booking_mode":"suggest_only"}',
             },
@@ -218,3 +220,102 @@ def test_supervisor_trace_admin_can_view_all_and_endpoint_is_read_only(client):
     finally:
         db2.close()
     assert count_after == count_before
+
+
+def test_supervisor_trace_owner_filter_applied_before_limit(client):
+    owner_id = "123e4567-e89b-12d3-a456-426614174000"
+    other_id = "00000000-0000-0000-0000-000000000111"
+    thread_id = "thread-owner-limit"
+
+    db = TestingSessionLocal()
+    try:
+        # First many events belong to others, owner event appears later.
+        for seq in range(1, 8):
+            actor = other_id if seq < 7 else owner_id
+            db.execute(
+                    text(
+                        "INSERT INTO workflow_trace_event "
+                        "(trace_id, workflow_family, thread_id, actor_user_id, patient_user_id, run_id, node_name, event_type, sequence, occurred_at, status, payload_json) "
+                        "VALUES (:trace_id, :workflow_family, :thread_id, :actor_user_id, :patient_user_id, :run_id, :node_name, :event_type, :sequence, :occurred_at, :status, :payload_json)"
+                    ),
+                {
+                    "trace_id": str(uuid.uuid4()),
+                    "workflow_family": "specialized_doctor",
+                    "thread_id": thread_id,
+                    "actor_user_id": actor,
+                    "patient_user_id": actor,
+                    "run_id": "run-limit",
+                    "node_name": "profile_view_node",
+                    "event_type": "node_completed",
+                    "sequence": seq,
+                    "occurred_at": datetime(2026, 1, 2) + timedelta(seconds=seq),
+                    "status": "ok",
+                    "payload_json": '{"booking_ready": false}',
+                },
+            )
+        db.commit()
+    finally:
+        db.close()
+
+    backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: _User(owner_id, "patient")
+    res = client.get(f"/supervisor/doctor/threads/{thread_id}/workflow-traces?limit=2")
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["events"]) == 1
+    assert body["events"][0]["actor_user_id"] == owner_id
+
+
+def test_supervisor_trace_cursor_pagination_integration(client):
+    owner_id = "123e4567-e89b-12d3-a456-426614174000"
+    thread_id = "thread-cursor-int"
+
+    db = TestingSessionLocal()
+    try:
+        for seq in range(1, 7):
+            db.execute(
+                text(
+                    "INSERT INTO workflow_trace_event "
+                    "(trace_id, workflow_family, thread_id, actor_user_id, patient_user_id, run_id, node_name, event_type, sequence, occurred_at, status, payload_json) "
+                    "VALUES (:trace_id, :workflow_family, :thread_id, :actor_user_id, :patient_user_id, :run_id, :node_name, :event_type, :sequence, :occurred_at, :status, :payload_json)"
+                ),
+                {
+                    "trace_id": str(uuid.uuid4()),
+                    "workflow_family": "specialized_doctor",
+                    "thread_id": thread_id,
+                    "actor_user_id": owner_id,
+                    "patient_user_id": owner_id,
+                    "run_id": "run-cursor-int",
+                    "node_name": "match_doctors_node",
+                "event_type": "node_completed",
+                "sequence": seq,
+                "occurred_at": datetime(2026, 1, 1) + timedelta(seconds=seq),
+                "status": "ok",
+                "payload_json": '{"candidate_count": 3}',
+            },
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    backend_main.app.dependency_overrides[backend_main.get_current_user] = lambda: _User(owner_id, "patient")
+    first = client.get(
+        f"/supervisor/doctor/threads/{thread_id}/workflow-traces",
+        params={"limit": 3},
+    )
+    assert first.status_code == 200
+    body1 = first.json()
+    assert len(body1["events"]) == 3
+    assert body1["next_cursor"] is not None
+
+    second = client.get(
+        f"/supervisor/doctor/threads/{thread_id}/workflow-traces",
+        params={"limit": 3, "before_cursor": body1["next_cursor"]},
+    )
+    assert second.status_code == 200
+    body2 = second.json()
+    assert len(body2["events"]) == 3
+    ids1 = {e["trace_id"] for e in body1["events"]}
+    ids2 = {e["trace_id"] for e in body2["events"]}
+    # Endpoint integration contract: cursor is accepted and advances page results.
+    assert ids1 != ids2
+    assert len(ids1.union(ids2)) >= 4

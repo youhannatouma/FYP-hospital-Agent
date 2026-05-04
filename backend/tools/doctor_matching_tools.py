@@ -40,13 +40,14 @@ _ENGINE = None
 class BookingDomainError(Exception):
     """Domain-level booking error with stable code and safe message."""
 
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, detail: dict[str, Any] | None = None):
         super().__init__(message)
         self.code = code
         self.message = message
+        self.detail = detail or {}
 
     def to_dict(self) -> dict[str, str]:
-        return {"code": self.code, "message": self.message}
+        return {"code": self.code, "message": self.message, "detail": self.detail}
 
 
 def _is_patient_assigned_to_doctor(conn, doctor_id: uuid.UUID, patient_id: uuid.UUID) -> bool:
@@ -832,6 +833,16 @@ def book_appointment(
 
             actor_role = str(actor.get("role"))
             is_cross_patient = actor_uuid != patient_uuid
+            context = dict(policy_context or {})
+            is_high_risk = bool(context.get("high_risk", False))
+            policy_record = {
+                "actor_role": actor_role,
+                "is_cross_patient": bool(is_cross_patient),
+                "high_risk_flag": bool(is_high_risk),
+                "policy_rule_applied": "delegated_booking_policy_v1",
+                "decision": "allow",
+                "reason_code": "AllowedByPolicy",
+            }
 
             # Enforce explicit policy matrix:
             # - admin can book any patient
@@ -843,20 +854,20 @@ def book_appointment(
                     raise BookingDomainError(
                         "AuthorizationPolicyNotConfigured",
                         "Doctor-patient assignment policy is not configured",
+                        detail={"policy_decision": {**policy_record, "decision": "deny", "reason_code": "AuthorizationPolicyNotConfigured"}},
                     ) from exc
                 if not assigned:
                     raise BookingDomainError(
                         "ActorPatientScopeViolation",
                         "Doctor is not authorized to book for this patient",
+                        detail={"policy_decision": {**policy_record, "decision": "deny", "reason_code": "ActorPatientScopeViolation"}},
                     )
                 if is_cross_patient and not (booking_reason or "").strip():
                     raise BookingDomainError(
                         "MissingAuditReason",
                         "booking_reason is required for doctor on-behalf booking",
+                        detail={"policy_decision": {**policy_record, "decision": "deny", "reason_code": "MissingAuditReason"}},
                     )
-
-                context = dict(policy_context or {})
-                is_high_risk = bool(context.get("high_risk", False))
                 if is_cross_patient and is_high_risk:
                     approval = approval_manager.create_approval_request(
                         user_id=str(actor_uuid),
@@ -868,12 +879,38 @@ def book_appointment(
                             "patient_user_id": str(patient_uuid),
                             "doctor_id": str(doctor_uuid),
                             "booking_reason": booking_reason,
-                            "policy_context": context,
+                            "policy_context": {
+                                "high_risk": bool(context.get("high_risk", False)),
+                                "policy_tags": list(context.get("policy_tags", [])) if isinstance(context.get("policy_tags"), list) else [],
+                            },
+                            "slot_id": str(slot_id) if slot_id else None,
+                            "appointment_date": appointment_date.isoformat() if isinstance(appointment_date, date) else None,
+                            "appointment_time": appointment_time.isoformat() if isinstance(appointment_time, time) else None,
+                            "booking_timezone": booking_timezone,
                         },
                     )
                     raise BookingDomainError(
                         "ApprovalRequired",
-                        f"Human approval required before booking. approval_id={approval.approval_id}",
+                        "Human approval required before booking",
+                        detail={
+                            "approval_id": approval.approval_id,
+                            "requested_at": approval.created_at.isoformat(),
+                            "expires_at": approval.expires_at.isoformat(),
+                            "review_context_summary": {
+                                "actor_user_id": str(actor_uuid),
+                                "patient_user_id": str(patient_uuid),
+                                "doctor_id": str(doctor_uuid),
+                                "high_risk_flag": bool(is_high_risk),
+                                "is_cross_patient": bool(is_cross_patient),
+                                "has_booking_reason": bool((booking_reason or "").strip()),
+                                "slot_id_present": bool(slot_id),
+                            },
+                            "policy_decision": {
+                                **policy_record,
+                                "decision": "require_approval",
+                                "reason_code": "ApprovalRequired",
+                            },
+                        },
                     )
 
             patient = conn.execute(patient_sql, {"pid": patient_uuid}).mappings().first()

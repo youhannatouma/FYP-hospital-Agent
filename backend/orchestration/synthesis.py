@@ -229,6 +229,10 @@ def _booking_summary(doctor_result: dict[str, Any] | None) -> str:
         date = booking.get("appointment_date", "")
         time = booking.get("appointment_time", "")
         return f"Confirmed with {doctor_name} on {date} at {time}."
+    if mode == "booking_pending_approval":
+        approval = doctor_result.get("approval_outcome", {})
+        approval_id = approval.get("approval_id", "")
+        return f"Booking is pending human approval (approval_id={approval_id})."
     if mode == "booking_failed":
         code = doctor_result.get("booking_result", {}).get("code", "Unknown")
         return f"Booking failed — reason: {code}."
@@ -313,6 +317,12 @@ def _extract_actions(
                     "appointment_id": booking.get("appointment_id"),
                     "doctor_id": booking.get("doctor_id"),
                 },
+            ))
+        elif mode == "booking_pending_approval":
+            actions.append(ActionButton(
+                label="Check Approval",
+                action="retry",
+                payload={"approval_id": (doctor_result.get("approval_outcome") or {}).get("approval_id")},
             ))
 
     if med_result and med_result.get("top_candidates"):

@@ -8,9 +8,17 @@ from app.models.user import User
 from app.models.appointment import Appointment
 from app.auth.dependencies import require_role
 try:
-    from telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
+    from telemetry.workflow_trace import (
+        encode_trace_cursor,
+        list_workflow_trace_events,
+        serialize_trace_event,
+    )
 except ImportError:
-    from backend.telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
+    from backend.telemetry.workflow_trace import (
+        encode_trace_cursor,
+        list_workflow_trace_events,
+        serialize_trace_event,
+    )
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -58,6 +66,7 @@ def admin_workflow_traces(
     workflow_family: str | None = None,
     thread_id: str | None = None,
     run_id: str | None = None,
+    before_cursor: str | None = None,
     before_trace_id: str | None = None,
     limit: int = 50,
     db: Annotated[Session, Depends(get_db)],
@@ -69,12 +78,20 @@ def admin_workflow_traces(
         workflow_family=workflow_family,
         thread_id=thread_id,
         run_id=run_id,
-        before_trace_id=before_trace_id,
+        before_cursor=before_cursor or before_trace_id,
         limit=min(max(limit, 1), 200) + 1,
     )
     has_more = len(rows) > limit
     page = rows[:limit]
-    next_cursor = str(page[-1].trace_id) if has_more and page else None
+    next_cursor = (
+        encode_trace_cursor(
+            occurred_at=page[-1].occurred_at,
+            sequence=int(page[-1].sequence),
+            trace_id=str(page[-1].trace_id),
+        )
+        if has_more and page
+        else None
+    )
     return {
         "workflow_family": workflow_family,
         "thread_id": thread_id,

@@ -2,6 +2,7 @@ import os
 import json
 import hashlib
 import logging
+from datetime import date, time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -38,11 +39,16 @@ from .tools.medication_tools import medication_pipeline
 from .middleware import stream_manager, approval_manager
 from .scripts.db_apply_migrations import apply_phase_migrations, verify_required_indexes
 from .telemetry import emit_telemetry_event
-from .tools.doctor_matching_tools import BookingDomainError
+from .tools.doctor_matching_tools import BookingDomainError, book_appointment
 from app.auth.dependencies import get_current_user
 from app.database import get_db
 from app.models.user import User
-from .telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
+from .telemetry.workflow_trace import (
+    emit_workflow_trace_event,
+    encode_trace_cursor,
+    list_workflow_trace_events,
+    serialize_trace_event,
+)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -253,7 +259,7 @@ async def booking_domain_error_handler(_: Request, exc: BookingDomainError):
     status_code = _BOOKING_ERROR_STATUS.get(exc.code, 400)
     return JSONResponse(
         status_code=status_code,
-        content={"error": {"code": exc.code, "message": exc.message}},
+        content={"error": {"code": exc.code, "message": exc.message, "detail": exc.detail}},
     )
 
 app.add_middleware(
@@ -323,6 +329,20 @@ SupervisorRequestPayload = SupervisorRouteRequest | DoctorMatchAgentRequest
 class ApprovalActionRequest(BaseModel):
     human_user_id: str
     response_message: Optional[str] = None
+
+
+class ApprovalResumeRequest(BaseModel):
+    thread_id: str
+    actor_user_id: str
+    patient_user_id: str
+    doctor_id: str
+    slot_id: Optional[str] = None
+    appointment_date: Optional[str] = None
+    appointment_time: Optional[str] = None
+    booking_timezone: str = "UTC"
+    booking_reason: Optional[str] = None
+    policy_context: dict = Field(default_factory=dict)
+    doctor_name: Optional[str] = None
 
 
 def _is_doctor_match_request(request: SupervisorRequestPayload) -> bool:
@@ -456,6 +476,8 @@ def _coerce_doctor_response_contract(
 
     booking_result = workflow_response.get("booking_result")
     booking_result = booking_result if isinstance(booking_result, dict) else {}
+    approval_outcome = workflow_response.get("approval_outcome")
+    approval_outcome = approval_outcome if isinstance(approval_outcome, dict) else None
     booking_outcome = None
     if mode in {"booked", "booking_failed"}:
         booking_outcome = {
@@ -498,6 +520,7 @@ def _coerce_doctor_response_contract(
         },
         "booking_mode": mode,
         "booking_outcome": booking_outcome,
+        "approval_outcome": approval_outcome,
         "errors": structured_errors,
     }
 
@@ -827,6 +850,7 @@ async def cancel_supervisor_doctor_stream(actor_user_id: str):
 def get_supervisor_doctor_workflow_traces(
     thread_id: str,
     run_id: str | None = None,
+    before_cursor: str | None = None,
     before_trace_id: str | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
@@ -838,17 +862,24 @@ def get_supervisor_doctor_workflow_traces(
         workflow_family="specialized_doctor",
         thread_id=str(thread_id),
         run_id=run_id,
-        before_trace_id=before_trace_id,
+        before_cursor=before_cursor or before_trace_id,
+        visible_to_user_id=None if str(user.role) == "admin" else str(user.user_id),
         limit=safe_limit + 1,
     )
     serialized = [serialize_trace_event(r) for r in rows]
-    visible = [e for e in serialized if _trace_event_visible_to_user(e, user)]
-    if not visible and str(user.role) != "admin":
+    if not serialized and str(user.role) != "admin":
         raise HTTPException(status_code=404, detail="Trace thread not found")
-
-    page = visible[:safe_limit]
-    has_more = len(visible) > safe_limit
-    next_cursor = str(page[-1]["trace_id"]) if has_more and page else None
+    page = serialized[:safe_limit]
+    has_more = len(serialized) > safe_limit
+    next_cursor = (
+        encode_trace_cursor(
+            occurred_at=rows[safe_limit - 1].occurred_at,
+            sequence=int(rows[safe_limit - 1].sequence),
+            trace_id=str(rows[safe_limit - 1].trace_id),
+        )
+        if has_more and page
+        else None
+    )
     return {
         "thread_id": str(thread_id),
         "workflow_family": "specialized_doctor",
@@ -937,7 +968,17 @@ async def approve_approval_request(approval_id: str, request: ApprovalActionRequ
     
     if not success:
         raise HTTPException(status_code=400, detail=message)
-    
+    approval = approval_manager.get_approval_request(approval_id)
+    thread_id = ""
+    if approval and isinstance(approval.task_id, str) and ":" in approval.task_id:
+        thread_id = approval.task_id.split(":", 1)[1]
+    emit_telemetry_event(
+        "approval_approved",
+        request_path=f"/approval/{approval_id}/approve",
+        endpoint_family="specialized",
+        sample_key=f"{approval_id}:approval_approved",
+        payload={"approval_id": approval_id, "thread_id": thread_id, "human_user_id": request.human_user_id},
+    )
     return {"message": message, "approval_id": approval_id, "status": "approved"}
 
 
@@ -957,8 +998,141 @@ async def reject_approval_request(approval_id: str, request: ApprovalActionReque
     
     if not success:
         raise HTTPException(status_code=400, detail=message)
-    
+    approval = approval_manager.get_approval_request(approval_id)
+    thread_id = ""
+    if approval and isinstance(approval.task_id, str) and ":" in approval.task_id:
+        thread_id = approval.task_id.split(":", 1)[1]
+    emit_telemetry_event(
+        "approval_rejected",
+        request_path=f"/approval/{approval_id}/reject",
+        endpoint_family="specialized",
+        sample_key=f"{approval_id}:approval_rejected",
+        payload={"approval_id": approval_id, "thread_id": thread_id, "human_user_id": request.human_user_id},
+    )
     return {"message": message, "approval_id": approval_id, "status": "rejected"}
+
+
+@app.post("/supervisor/doctor/approval/{approval_id}/resume")
+async def resume_approved_booking(approval_id: str, request: ApprovalResumeRequest):
+    approval = approval_manager.get_approval_request(approval_id)
+    if not approval:
+        raise HTTPException(status_code=404, detail="Approval request not found")
+    if approval.status.value == "expired":
+        emit_telemetry_event(
+            "approval_expired",
+            request_path=f"/supervisor/doctor/approval/{approval_id}/resume",
+            endpoint_family="specialized",
+            sample_key=f"{approval_id}:approval_expired",
+            payload={"approval_id": approval_id, "thread_id": request.thread_id},
+        )
+        raise HTTPException(status_code=409, detail="Approval request expired")
+    if approval.status.value == "rejected":
+        emit_telemetry_event(
+            "approval_rejected",
+            request_path=f"/supervisor/doctor/approval/{approval_id}/resume",
+            endpoint_family="specialized",
+            sample_key=f"{approval_id}:approval_rejected",
+            payload={"approval_id": approval_id, "thread_id": request.thread_id},
+        )
+        raise HTTPException(status_code=409, detail="Approval request rejected")
+    if approval.status.value != "approved":
+        raise HTTPException(status_code=409, detail="Approval request must be approved before resume")
+
+    appointment_date = date.fromisoformat(request.appointment_date) if request.appointment_date else None
+    appointment_time = time.fromisoformat(request.appointment_time) if request.appointment_time else None
+
+    emit_telemetry_event(
+        "approval_resume_started",
+        request_path=f"/supervisor/doctor/approval/{approval_id}/resume",
+        endpoint_family="specialized",
+        sample_key=f"{approval_id}:approval_resume_started",
+        payload={"approval_id": approval_id, "thread_id": request.thread_id},
+    )
+    emit_workflow_trace_event(
+        workflow_family="specialized_doctor",
+        thread_id=request.thread_id,
+        run_id=f"resume-{approval_id}",
+        event_type="approval_resume_started",
+        node_name="approval_resume",
+        status="started",
+        actor_user_id=request.actor_user_id,
+        patient_user_id=request.patient_user_id,
+        payload={"approval_id": approval_id},
+    )
+
+    try:
+        result = book_appointment(
+            thread_id=request.thread_id,
+            actor_user_id=request.actor_user_id,
+            patient_user_id=request.patient_user_id,
+            doctor_id=request.doctor_id,
+            slot_id=request.slot_id,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+            booking_timezone=request.booking_timezone,
+            booking_reason=request.booking_reason,
+            policy_context=dict(request.policy_context or {}),
+            doctor_name=request.doctor_name,
+        )
+        approval_manager.complete_request(
+            approval_id,
+            status=approval_manager.ApprovalStatus.APPROVED,
+            response_message="approved_resumed",
+        )
+        emit_telemetry_event(
+            "approval_resume_succeeded",
+            request_path=f"/supervisor/doctor/approval/{approval_id}/resume",
+            endpoint_family="specialized",
+            sample_key=f"{approval_id}:approval_resume_succeeded",
+            payload={"approval_id": approval_id, "thread_id": request.thread_id},
+        )
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=request.thread_id,
+            run_id=f"resume-{approval_id}",
+            event_type="approval_resume_succeeded",
+            node_name="approval_resume",
+            status="ok",
+            actor_user_id=request.actor_user_id,
+            patient_user_id=request.patient_user_id,
+            payload={"approval_id": approval_id, "booking_mode": "booked"},
+        )
+        return {
+            "approval_id": approval_id,
+            "booking_mode": "booked",
+            "booking_outcome": result,
+            "approval_outcome": {"approval_id": approval_id, "status": "approved_resumed"},
+        }
+    except BookingDomainError as exc:
+        approval_manager.complete_request(
+            approval_id,
+            status=approval_manager.ApprovalStatus.APPROVED,
+            response_message="approved_resume_failed",
+        )
+        emit_telemetry_event(
+            "approval_resume_failed",
+            request_path=f"/supervisor/doctor/approval/{approval_id}/resume",
+            endpoint_family="specialized",
+            sample_key=f"{approval_id}:approval_resume_failed:{exc.code}",
+            payload={"approval_id": approval_id, "thread_id": request.thread_id, "error_code": exc.code},
+        )
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=request.thread_id,
+            run_id=f"resume-{approval_id}",
+            event_type="approval_resume_failed",
+            node_name="approval_resume",
+            status="error",
+            actor_user_id=request.actor_user_id,
+            patient_user_id=request.patient_user_id,
+            payload={"approval_id": approval_id, "error_code": exc.code},
+        )
+        return {
+            "approval_id": approval_id,
+            "booking_mode": "booking_failed",
+            "booking_outcome": exc.to_dict(),
+            "approval_outcome": {"approval_id": approval_id, "status": "approved_resume_failed"},
+        }
 
 
 @app.post("/approval/cleanup")

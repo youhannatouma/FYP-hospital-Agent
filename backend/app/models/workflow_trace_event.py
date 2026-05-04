@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import JSON, Column, DateTime, Index, Integer, Text
+from sqlalchemy import JSON, Column, DateTime, Index, Integer, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -25,7 +25,22 @@ class WorkflowTraceEvent(Base):
     payload_json = Column(JSON, nullable=True)
 
     __table_args__ = (
+        UniqueConstraint(
+            "workflow_family",
+            "run_id",
+            "sequence",
+            name="uq_workflow_trace_event_run_sequence",
+        ),
         Index("ix_workflow_trace_event_thread_occurred", "thread_id", "occurred_at"),
         Index("ix_workflow_trace_event_family_occurred", "workflow_family", "occurred_at"),
-        Index("ix_workflow_trace_event_run_sequence", "run_id", "sequence"),
+        Index(
+            "ix_workflow_trace_event_seek",
+            "workflow_family",
+            "thread_id",
+            "occurred_at",
+            "sequence",
+            "trace_id",
+        ),
+        Index("ix_workflow_trace_event_actor_thread", "actor_user_id", "thread_id"),
+        Index("ix_workflow_trace_event_patient_thread", "patient_user_id", "thread_id"),
     )
