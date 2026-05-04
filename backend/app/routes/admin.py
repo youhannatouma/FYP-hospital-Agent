@@ -7,6 +7,10 @@ from app.database import get_db
 from app.models.user import User
 from app.models.appointment import Appointment
 from app.auth.dependencies import require_role
+try:
+    from telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
+except ImportError:
+    from backend.telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -47,3 +51,34 @@ def sync_clerk_users(
         return {"message": f"Successfully synced {count} users from Clerk"}
     except Exception as e:
         return {"message": f"Sync failed: {str(e)}"}, 500
+
+
+@router.get("/workflow-traces")
+def admin_workflow_traces(
+    workflow_family: str | None = None,
+    thread_id: str | None = None,
+    run_id: str | None = None,
+    before_trace_id: str | None = None,
+    limit: int = 50,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("admin"))],
+):
+    del user
+    rows = list_workflow_trace_events(
+        db=db,
+        workflow_family=workflow_family,
+        thread_id=thread_id,
+        run_id=run_id,
+        before_trace_id=before_trace_id,
+        limit=min(max(limit, 1), 200) + 1,
+    )
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    next_cursor = str(page[-1].trace_id) if has_more and page else None
+    return {
+        "workflow_family": workflow_family,
+        "thread_id": thread_id,
+        "run_id": run_id,
+        "events": [serialize_trace_event(r) for r in page],
+        "next_cursor": next_cursor,
+    }

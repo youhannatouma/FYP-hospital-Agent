@@ -12,3 +12,4 @@ from .langgraph_checkpoint import (
 	LangGraphCheckpointBlob,
 	LangGraphCheckpointWrite,
 )
+from .workflow_trace_event import WorkflowTraceEvent

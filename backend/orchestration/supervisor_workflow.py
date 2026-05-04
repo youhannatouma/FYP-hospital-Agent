@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import date, time
+from time import perf_counter
 from typing import Any, AsyncIterator, Callable, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -28,6 +29,7 @@ try:
     from orchestration.supervisor_routing import ToolTask, build_parallel_stages, execute_parallel_plan
     from orchestration.synthesis import synthesize_node
     from telemetry import emit_telemetry_event
+    from telemetry import emit_workflow_trace_event, new_run_id
     from tools.doctor_matching_tools import (
         BookingDomainError,
         book_appointment,
@@ -44,6 +46,7 @@ except ImportError:  # Fallback for backend package context
     from ..middleware import stream_manager
     from ..middleware.lock_manager import lock_manager
     from ..telemetry import emit_telemetry_event
+    from ..telemetry import emit_workflow_trace_event, new_run_id
     from ..tools.doctor_matching_tools import (
         BookingDomainError,
         book_appointment,
@@ -104,6 +107,7 @@ class SupervisorState(TypedDict, total=False):
     ai_message_type: str
     unified_response: dict[str, Any]
     medication_result: dict[str, Any] | None
+    trace_run_id: str
 
 
 CHECKPOINT_VERSION = "phase3-v1"
@@ -483,7 +487,19 @@ def _augment_booking_contract_fields(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 async def profile_user_node(state: SupervisorState) -> SupervisorState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
     patient_user_id = state.get("patient_user_id") or state.get("user_id")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_started",
+            node_name="profile_user_node",
+            actor_user_id=str(state.get("actor_user_id") or ""),
+            patient_user_id=str(patient_user_id or ""),
+        )
     if not patient_user_id:
         return {
             "structured_errors": _append_structured_error(
@@ -496,6 +512,17 @@ async def profile_user_node(state: SupervisorState) -> SupervisorState:
 
     try:
         snapshot = await asyncio.to_thread(profile_user, patient_user_id)
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_completed",
+            node_name="profile_user_node",
+            status="ok",
+            duration_ms=int((perf_counter() - started) * 1000),
+            actor_user_id=str(state.get("actor_user_id") or ""),
+            patient_user_id=str(patient_user_id),
+        )
         return {"patient_profile_snapshot": snapshot}
     except Exception as exc:
         return {
@@ -509,6 +536,8 @@ async def profile_user_node(state: SupervisorState) -> SupervisorState:
 
 
 async def match_doctors_node(state: SupervisorState) -> SupervisorState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
     need_text = str(state.get("need_text") or state.get("inferred_need") or "").strip()
     patient_user_id = state.get("patient_user_id") or state.get("user_id")
     max_suggestions = int(state.get("max_suggestions", 5))
@@ -579,6 +608,19 @@ async def match_doctors_node(state: SupervisorState) -> SupervisorState:
                 "top_candidates": top_rankings,
             },
         )
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="specialized_doctor",
+                thread_id=str(state.get("thread_id") or ""),
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="match_doctors_node",
+                status="ok",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=str(state.get("actor_user_id") or ""),
+                patient_user_id=str(patient_user_id),
+                payload={"candidate_count": len(ranked)},
+            )
         return {
             "inferred_need": need_text,
             "ranked_doctor_candidates": ranked,
@@ -609,6 +651,19 @@ def suggest_cards_node(state: SupervisorState) -> SupervisorState:
         }
         for c in ranked
     ]
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_completed",
+            node_name="suggest_cards_node",
+            status="ok",
+            actor_user_id=str(state.get("actor_user_id") or ""),
+            patient_user_id=str(state.get("patient_user_id") or ""),
+            payload={"suggestion_count": len(cards)},
+        )
     return {
         "suggestion_cards": cards,
         "cards_emitted": True,
@@ -616,6 +671,7 @@ def suggest_cards_node(state: SupervisorState) -> SupervisorState:
 
 
 async def profile_view_node(state: SupervisorState) -> SupervisorState:
+    started = perf_counter()
     selected_doctor = state.get("selected_doctor")
     resolved_doctor, resolution_status, resolution_candidates = await _resolve_selected_doctor_from_candidates(
         selected_doctor if isinstance(selected_doctor, dict) else None,
@@ -661,7 +717,7 @@ async def profile_view_node(state: SupervisorState) -> SupervisorState:
             node="profile_view_node",
         )
 
-    return {
+    result = {
         "selected_doctor": resolved_doctor if resolved_doctor is not None else selected_doctor,
         "doctor_resolution_status": resolution_status,
         "doctor_resolution_candidates": resolution_candidates,
@@ -676,9 +732,41 @@ async def profile_view_node(state: SupervisorState) -> SupervisorState:
         "booking_committed": bool(state.get("booking_committed", False)),
         "structured_errors": structured_errors,
     }
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_completed",
+            node_name="profile_view_node",
+            status="ok",
+            duration_ms=int((perf_counter() - started) * 1000),
+            actor_user_id=str(state.get("actor_user_id") or ""),
+            patient_user_id=str(state.get("patient_user_id") or ""),
+            payload={
+                "booking_ready": booking_ready,
+                "missing_fields": missing,
+                "doctor_resolution_status": resolution_status,
+            },
+        )
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="route_selected",
+            node_name="profile_view_node",
+            status="ok",
+            actor_user_id=str(state.get("actor_user_id") or ""),
+            patient_user_id=str(state.get("patient_user_id") or ""),
+            payload={"next_route": _route_booking_path(result)},
+        )
+    return result
 
 
 async def conditional_book_node(state: SupervisorState) -> SupervisorState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
     if bool(state.get("booking_committed", False)):
         return {
             "booking_attempted": True,
@@ -719,7 +807,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             elif resolution_status == "ambiguous":
                 blocked_reason = "doctor_name_ambiguous"
 
-        return {
+        result = {
             "booking_ready": False,
             "booking_mode": "suggest_only",
             "booking_missing_fields": missing,
@@ -730,9 +818,23 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             "booking_result": {},
             "structured_errors": list(state.get("structured_errors", [])),
         }
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="specialized_doctor",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="conditional_book_node",
+                status="blocked",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=actor_user_id,
+                patient_user_id=patient_user_id,
+                payload={"missing_fields": missing, "booking_blocked_reason": blocked_reason},
+            )
+        return result
 
     if not thread_id:
-        return {
+        result = {
             "booking_ready": True,
             "booking_mode": "booking_failed",
             "booking_attempted": False,
@@ -749,6 +851,20 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 node="conditional_book_node",
             ),
         }
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="specialized_doctor",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="conditional_book_node",
+                status="error",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=actor_user_id,
+                patient_user_id=patient_user_id,
+                payload={"denial_reason_code": "MissingThreadId"},
+            )
+        return result
 
     try:
         emit_telemetry_event(
@@ -779,7 +895,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             policy_context=policy_context,
             doctor_name=selected_doctor.get("doctor_name"),
         )
-        return {
+        result = {
             "booking_ready": True,
             "booking_mode": "booked",
             "booking_attempted": True,
@@ -787,6 +903,20 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             "booking_result": result,
             "structured_errors": list(state.get("structured_errors", [])),
         }
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="specialized_doctor",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="conditional_book_node",
+                status="ok",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=actor_user_id,
+                patient_user_id=patient_user_id,
+                payload={"booking_committed": True},
+            )
+        return result
     except BookingDomainError as exc:
         emit_telemetry_event(
             "booking_denied",
@@ -802,7 +932,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 "denial_category": _booking_denial_category(exc.code),
             },
         )
-        return {
+        result = {
             "booking_ready": True,
             "booking_mode": "booking_failed",
             "booking_attempted": True,
@@ -819,6 +949,20 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 node="conditional_book_node",
             ),
         }
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="specialized_doctor",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="conditional_book_node",
+                status="denied",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=actor_user_id,
+                patient_user_id=patient_user_id,
+                payload={"denial_reason_code": exc.code, "denial_category": _booking_denial_category(exc.code)},
+            )
+        return result
     except Exception as exc:
         emit_telemetry_event(
             "workflow_failed",
@@ -834,7 +978,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 "error_code_or_type": type(exc).__name__,
             },
         )
-        return {
+        result = {
             "booking_ready": True,
             "booking_mode": "booking_failed",
             "booking_attempted": True,
@@ -851,6 +995,20 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 node="conditional_book_node",
             ),
         }
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="specialized_doctor",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="conditional_book_node",
+                status="error",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=actor_user_id,
+                patient_user_id=patient_user_id,
+                payload={"denial_reason_code": "BookingUnhandledError"},
+            )
+        return result
 
 
 def _route_booking_path(state: SupervisorState) -> str:
@@ -995,7 +1153,18 @@ async def execute_supervisor_workflow(user_id: str, task_specs: list[dict[str, A
 
 
 async def execute_doctor_match_workflow(state: SupervisorState) -> dict[str, Any]:
+    run_id = str(state.get("trace_run_id") or new_run_id())
+    state["trace_run_id"] = run_id
     thread_id = str(state.get("thread_id") or "").strip()
+    emit_workflow_trace_event(
+        workflow_family="specialized_doctor",
+        thread_id=thread_id,
+        run_id=run_id,
+        event_type="run_started",
+        actor_user_id=str(state.get("actor_user_id") or ""),
+        patient_user_id=str(state.get("patient_user_id") or ""),
+        status="started",
+    )
     emit_telemetry_event(
         "workflow_started",
         request_path="/supervisor/doctor/route",
@@ -1128,6 +1297,23 @@ async def execute_doctor_match_workflow(state: SupervisorState) -> dict[str, Any
             "booking_blocked_reason": response.get("booking_blocked_reason"),
         },
     )
+    emit_workflow_trace_event(
+        workflow_family="specialized_doctor",
+        thread_id=thread_id,
+        run_id=run_id,
+        event_type="run_completed",
+        actor_user_id=str(state.get("actor_user_id") or ""),
+        patient_user_id=str(state.get("patient_user_id") or ""),
+        status="ok" if response.get("booking_mode") != "booking_failed" else "error",
+        payload={
+            "booking_mode": response.get("booking_mode"),
+            "booking_committed": bool(response.get("booking_committed", False)),
+            "booking_ready": bool(response.get("booking_ready", False)),
+            "doctor_resolution_status": response.get("doctor_resolution_status"),
+            "missing_fields": response.get("booking_missing_fields", []),
+            "booking_blocked_reason": response.get("booking_blocked_reason"),
+        },
+    )
     return response
 
 
@@ -1209,6 +1395,8 @@ async def execute_doctor_match_workflow_legacy(state: SupervisorState) -> dict[s
 async def stream_doctor_match_workflow(state: SupervisorState) -> AsyncIterator[dict[str, Any]]:
     """Streaming specialized workflow while preserving existing SSE event envelope."""
     thread_id = str(state.get("thread_id") or "").strip()
+    run_id = str(state.get("trace_run_id") or new_run_id())
+    state["trace_run_id"] = run_id
     stream_owner = str(state.get("actor_user_id") or state.get("user_id") or thread_id).strip()
 
     if not thread_id:
@@ -1222,7 +1410,26 @@ async def stream_doctor_match_workflow(state: SupervisorState) -> AsyncIterator[
     stage_index = {name: idx for idx, name in enumerate(_DOCTOR_GRAPH_NODE_ORDER, start=1)}
 
     try:
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=thread_id,
+            run_id=run_id,
+            event_type="run_started",
+            actor_user_id=str(state.get("actor_user_id") or ""),
+            patient_user_id=str(state.get("patient_user_id") or ""),
+            status="started",
+            payload={"streaming": True},
+        )
         if cancel_token.is_set():
+            emit_workflow_trace_event(
+                workflow_family="specialized_doctor",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="run_cancelled",
+                actor_user_id=str(state.get("actor_user_id") or ""),
+                patient_user_id=str(state.get("patient_user_id") or ""),
+                status="cancelled",
+            )
             yield {"type": "cancelled"}
             return
 
@@ -1240,6 +1447,15 @@ async def stream_doctor_match_workflow(state: SupervisorState) -> AsyncIterator[
 
             async for chunk in _DOCTOR_WORKFLOW.astream(merged_state, config=config):
                 if cancel_token.is_set():
+                    emit_workflow_trace_event(
+                        workflow_family="specialized_doctor",
+                        thread_id=thread_id,
+                        run_id=run_id,
+                        event_type="run_cancelled",
+                        actor_user_id=str(state.get("actor_user_id") or ""),
+                        patient_user_id=str(state.get("patient_user_id") or ""),
+                        status="cancelled",
+                    )
                     yield {"type": "cancelled"}
                     return
 
@@ -1277,9 +1493,34 @@ async def stream_doctor_match_workflow(state: SupervisorState) -> AsyncIterator[
                             "stage_index": idx,
                         },
                     )
+                    emit_workflow_trace_event(
+                        workflow_family="specialized_doctor",
+                        thread_id=thread_id,
+                        run_id=run_id,
+                        event_type="node_completed",
+                        node_name=node_name,
+                        actor_user_id=str(state.get("actor_user_id") or ""),
+                        patient_user_id=str(state.get("patient_user_id") or ""),
+                        status="ok",
+                        payload={"stream_stage_index": idx},
+                    )
 
             final_state = await load_thread_state(thread_id)
             response = _doctor_workflow_response(final_state or merged_state)
+            emit_workflow_trace_event(
+                workflow_family="specialized_doctor",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="run_completed",
+                actor_user_id=str(state.get("actor_user_id") or ""),
+                patient_user_id=str(state.get("patient_user_id") or ""),
+                status="ok",
+                payload={
+                    "streaming": True,
+                    "booking_mode": response.get("booking_mode"),
+                    "booking_committed": bool(response.get("booking_committed", False)),
+                },
+            )
             yield {
                 "type": "complete",
                 "results": response,
@@ -1287,11 +1528,31 @@ async def stream_doctor_match_workflow(state: SupervisorState) -> AsyncIterator[
                 "stages": [[name] for name in _DOCTOR_GRAPH_NODE_ORDER],
             }
     except TimeoutError as exc:
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=thread_id,
+            run_id=run_id,
+            event_type="run_failed",
+            actor_user_id=str(state.get("actor_user_id") or ""),
+            patient_user_id=str(state.get("patient_user_id") or ""),
+            status="error",
+            payload={"error_code": "ThreadLockTimeout"},
+        )
         yield {
             "type": "error",
             "message": str(exc),
         }
     except Exception as exc:
+        emit_workflow_trace_event(
+            workflow_family="specialized_doctor",
+            thread_id=thread_id,
+            run_id=run_id,
+            event_type="run_failed",
+            actor_user_id=str(state.get("actor_user_id") or ""),
+            patient_user_id=str(state.get("patient_user_id") or ""),
+            status="error",
+            payload={"error_code": type(exc).__name__},
+        )
         log.error("Streaming doctor workflow failed for thread %s: %s", thread_id, exc)
         yield {
             "type": "error",

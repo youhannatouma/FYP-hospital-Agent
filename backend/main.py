@@ -6,13 +6,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from pydantic import ValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 # Load environment variables from repo root so local run works from any cwd.
@@ -38,6 +39,10 @@ from .middleware import stream_manager, approval_manager
 from .scripts.db_apply_migrations import apply_phase_migrations, verify_required_indexes
 from .telemetry import emit_telemetry_event
 from .tools.doctor_matching_tools import BookingDomainError
+from app.auth.dependencies import get_current_user
+from app.database import get_db
+from app.models.user import User
+from .telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -518,6 +523,29 @@ def _build_sse_response(event_generator):
     )
 
 
+def _trace_event_visible_to_user(event: dict, user: User) -> bool:
+    if str(user.role) == "admin":
+        return True
+    user_id = str(user.user_id)
+    return user_id in {
+        str(event.get("actor_user_id") or ""),
+        str(event.get("patient_user_id") or ""),
+    }
+
+
+def _mask_trace_event_for_user(event: dict, user: User) -> dict:
+    if str(user.role) == "admin":
+        return event
+
+    masked = dict(event)
+    user_id = str(user.user_id)
+    actor = str(masked.get("actor_user_id") or "")
+    patient = str(masked.get("patient_user_id") or "")
+    masked["actor_user_id"] = actor if actor == user_id else None
+    masked["patient_user_id"] = patient if patient == user_id else None
+    return masked
+
+
 # ── Memory API Routes ───────────────────────────────────────────────────
 @app.post("/memory/add")
 def add_memory_facts(request: AddFactsRequest):
@@ -793,6 +821,41 @@ async def cancel_supervisor_doctor_stream(actor_user_id: str):
     if cancelled:
         return {"message": f"Doctor stream cancelled for actor {actor_user_id}"}
     return {"message": f"No active doctor stream for actor {actor_user_id}"}
+
+
+@app.get("/supervisor/doctor/threads/{thread_id}/workflow-traces")
+def get_supervisor_doctor_workflow_traces(
+    thread_id: str,
+    run_id: str | None = None,
+    before_trace_id: str | None = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    safe_limit = min(max(int(limit), 1), 200)
+    rows = list_workflow_trace_events(
+        db=db,
+        workflow_family="specialized_doctor",
+        thread_id=str(thread_id),
+        run_id=run_id,
+        before_trace_id=before_trace_id,
+        limit=safe_limit + 1,
+    )
+    serialized = [serialize_trace_event(r) for r in rows]
+    visible = [e for e in serialized if _trace_event_visible_to_user(e, user)]
+    if not visible and str(user.role) != "admin":
+        raise HTTPException(status_code=404, detail="Trace thread not found")
+
+    page = visible[:safe_limit]
+    has_more = len(visible) > safe_limit
+    next_cursor = str(page[-1]["trace_id"]) if has_more and page else None
+    return {
+        "thread_id": str(thread_id),
+        "workflow_family": "specialized_doctor",
+        "run_id": run_id,
+        "events": [_mask_trace_event_for_user(e, user) for e in page],
+        "next_cursor": next_cursor,
+    }
 
 
 @app.get("/rate-limit/status/{user_id}")
