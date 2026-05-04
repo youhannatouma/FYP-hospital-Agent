@@ -227,6 +227,23 @@ class BookingOutcome(BaseModel):
         return _parse_time_boundary_value(value)
 
 
+class ApprovalOutcome(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    approval_id: str
+    status: Literal[
+        "pending",
+        "approved_resumed",
+        "approved_resume_failed",
+        "rejected",
+        "expired",
+    ]
+    requested_at: str | None = None
+    expires_at: str | None = None
+    required_by_policy: bool = True
+    review_context_summary: dict[str, Any] = Field(default_factory=dict)
+
+
 class StructuredError(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -248,8 +265,9 @@ class DoctorMatchAgentResponse(BaseModel):
     patient_profile_snapshot: PatientProfileSnapshot
     suggestions: list[DoctorSuggestionCard] = Field(default_factory=list)
     booking_readiness: BookingReadiness
-    booking_mode: Literal["suggest_only", "booked", "booking_failed"]
+    booking_mode: Literal["suggest_only", "booked", "booking_failed", "booking_pending_approval"]
     booking_outcome: BookingOutcome | None = None
+    approval_outcome: ApprovalOutcome | None = None
     scope: PhaseScopeBoundaries = Field(default_factory=PhaseScopeBoundaries)
     errors: list[StructuredError] = Field(default_factory=list)
 
@@ -268,11 +286,17 @@ class DoctorMatchAgentResponse(BaseModel):
 
         if self.booking_mode in {"booked", "booking_failed"} and self.booking_outcome is None:
             raise ValueError("booking_outcome is required when booking_mode is booked/booking_failed")
+        if self.booking_mode == "booking_pending_approval":
+            if self.approval_outcome is None:
+                raise ValueError("approval_outcome is required when booking_mode is booking_pending_approval")
+            if self.booking_outcome is not None:
+                raise ValueError("booking_outcome must be null when booking_mode is booking_pending_approval")
 
         return self
 
 
 __all__ = [
+    "ApprovalOutcome",
     "BookingOutcome",
     "BookingReadiness",
     "BookingSelectionInput",

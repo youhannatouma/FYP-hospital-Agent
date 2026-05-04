@@ -61,9 +61,17 @@ except ImportError:
             sys.path.append(backend_root)
         from telemetry import emit_telemetry_event
 try:
-    from telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
+    from telemetry.workflow_trace import (
+        encode_trace_cursor,
+        list_workflow_trace_events,
+        serialize_trace_event,
+    )
 except ImportError:
-    from backend.telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
+    from backend.telemetry.workflow_trace import (
+        encode_trace_cursor,
+        list_workflow_trace_events,
+        serialize_trace_event,
+    )
 
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
@@ -608,6 +616,7 @@ def get_thread_workflow_traces(
     thread_id: UUID,
     run_id: str | None = Query(default=None),
     workflow_family: str | None = Query(default=None),
+    before_cursor: str | None = Query(default=None),
     before_trace_id: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -620,12 +629,20 @@ def get_thread_workflow_traces(
         workflow_family=effective_family,
         thread_id=str(thread.thread_id),
         run_id=run_id,
-        before_trace_id=before_trace_id,
+        before_cursor=before_cursor or before_trace_id,
         limit=limit + 1,
     )
     has_more = len(rows) > limit
     page = rows[:limit]
-    next_cursor = str(page[-1].trace_id) if has_more and page else None
+    next_cursor = (
+        encode_trace_cursor(
+            occurred_at=page[-1].occurred_at,
+            sequence=int(page[-1].sequence),
+            trace_id=str(page[-1].trace_id),
+        )
+        if has_more and page
+        else None
+    )
     return {
         "thread_id": str(thread.thread_id),
         "workflow_family": effective_family,

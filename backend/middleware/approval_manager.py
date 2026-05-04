@@ -152,7 +152,11 @@ def create_approval_request(
 def get_approval_request(approval_id: str) -> Optional[ApprovalRequest]:
     """Get an approval request by ID."""
     with _approval_lock:
-        return _pending_approvals.get(approval_id)
+        request = _pending_approvals.get(approval_id)
+        if request and request.status == ApprovalStatus.PENDING and request.expires_at < datetime.now():
+            request.status = ApprovalStatus.EXPIRED
+            log.info(f"Approval {approval_id} expired")
+        return request
 
 
 def list_pending_approvals(user_id: Optional[str] = None) -> list[ApprovalRequest]:
@@ -248,6 +252,26 @@ def reject_request(
         
         log.info(f"Approval {approval_id} rejected by {human_user_id}")
         return True, "Rejected"
+
+
+def complete_request(
+    approval_id: str,
+    *,
+    status: ApprovalStatus,
+    response_message: Optional[str] = None,
+) -> tuple[bool, str]:
+    """Mark an approved request as terminal after resume attempt."""
+    if status not in {ApprovalStatus.APPROVED, ApprovalStatus.REJECTED, ApprovalStatus.EXPIRED}:
+        return False, "Invalid terminal status"
+    with _approval_lock:
+        request = _pending_approvals.get(approval_id)
+        if not request:
+            return False, "Approval request not found"
+        request.status = status
+        if response_message:
+            request.human_response = response_message
+        request.responded_at = datetime.now()
+        return True, "Updated"
 
 
 def cleanup_expired_approvals():
@@ -377,6 +401,7 @@ __all__ = [
     "approve_request",
     "reject_request",
     "cleanup_expired_approvals",
+    "complete_request",
     "set_approval_policy",
     "get_approval_policy",
     "execute_with_approval_check",

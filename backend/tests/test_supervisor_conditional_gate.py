@@ -345,3 +345,56 @@ def test_booking_timezone_defaults_to_utc_when_absent(monkeypatch):
 
     assert out["booking_mode"] == "booked"
     assert captured["booking_timezone"] == "UTC"
+
+
+def test_approval_required_returns_pending_mode(monkeypatch):
+    def fake_profile_user(_patient_user_id: str):
+        return {"user_id": _patient_user_id, "first_name": "P"}
+
+    def fake_search_doctors_for_need(_need_text: str, _patient_user_id: str, _max: int):
+        return {
+            "candidates": [
+                {
+                    "doctor_id": "doc-1",
+                    "doctor_name": "Dr One",
+                    "specialty": "general medicine",
+                    "clinic_address": "A",
+                    "earliest_available_at": "2026-04-20T10:00:00",
+                    "avg_session_price": 100.0,
+                    "ranking_features": {"proximity_score": 0.6},
+                    "ranking_reason": "deterministic",
+                }
+            ]
+        }
+
+    def fake_book_appointment(**_kwargs):
+        raise swf.BookingDomainError(
+            "ApprovalRequired",
+            "Human approval required before booking",
+            detail={
+                "approval_id": "approval-1",
+                "requested_at": "2026-05-04T10:00:00",
+                "expires_at": "2026-05-04T10:05:00",
+                "review_context_summary": {"high_risk_flag": True},
+            },
+        )
+
+    monkeypatch.setattr(swf, "profile_user", fake_profile_user)
+    monkeypatch.setattr(swf, "search_doctors_for_need", fake_search_doctors_for_need)
+    monkeypatch.setattr(swf, "book_appointment", fake_book_appointment)
+
+    state: swf.SupervisorState = {
+        "thread_id": f"thread-{uuid.uuid4()}",
+        "actor_user_id": f"actor-{uuid.uuid4()}",
+        "patient_user_id": f"patient-{uuid.uuid4()}",
+        "need_text": "severe cough",
+        "max_suggestions": 3,
+        "selected_doctor": {"doctor_id": "doc-1", "doctor_name": "Dr One"},
+        "selected_appointment_date": "2026-04-21",
+        "selected_appointment_time": "09:30:00",
+    }
+
+    out = asyncio.run(swf.execute_doctor_matching_workflow(state))
+    assert out["booking_mode"] == "booking_pending_approval"
+    assert out["booking_committed"] is False
+    assert out["approval_outcome"]["approval_id"] == "approval-1"

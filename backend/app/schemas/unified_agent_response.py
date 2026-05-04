@@ -37,7 +37,7 @@ class AppointmentResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    booking_mode: Literal["suggest_only", "booked", "booking_failed"] = "suggest_only"
+    booking_mode: Literal["suggest_only", "booked", "booking_failed", "booking_pending_approval"] = "suggest_only"
     booking_ready: bool = False
     suggestions: list[dict[str, Any]] = Field(default_factory=list)
     booking_outcome: dict[str, Any] | None = None

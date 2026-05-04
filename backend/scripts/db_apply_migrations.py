@@ -25,6 +25,8 @@ REQUIRED_INDEXES: dict[str, str] = {
     "idx_time_slot_doctor_start_available": "time_slot",
     "uq_appointment_active_slot": "appointment",
     "idx_appointment_patient_doctor_active": "appointment",
+    "uq_workflow_trace_event_run_sequence": "workflow_trace_event",
+    "ix_workflow_trace_event_seek": "workflow_trace_event",
 }
 
 

@@ -92,7 +92,8 @@ class SupervisorState(TypedDict, total=False):
     checkpoint_version: str | int
     booking_result: dict[str, Any]
     booking_failed_validation: bool
-    booking_mode: Literal["suggest_only", "booked", "booking_failed"]
+    booking_mode: Literal["suggest_only", "booked", "booking_failed", "booking_pending_approval"]
+    approval_outcome: dict[str, Any]
     structured_errors: list[dict[str, Any]]
     doctor_resolution_status: str
     doctor_resolution_candidates: list[dict[str, Any]]
@@ -145,7 +146,6 @@ _VALIDATION_BOOKING_ERROR_CODES = {
     "InvalidPatientRole",
     "InvalidBookingActorRole",
     "MissingAuditReason",
-    "ApprovalRequired",
     "DoctorIdentityMismatch",
     "BookingSlotNotFound",
     "BookingSlotUnavailable",
@@ -773,6 +773,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             "booking_committed": True,
             "booking_mode": state.get("booking_mode", "booked"),
             "booking_result": state.get("booking_result", {}),
+            "approval_outcome": state.get("approval_outcome"),
             "structured_errors": list(state.get("structured_errors", [])),
         }
 
@@ -816,6 +817,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             "booking_attempted": False,
             "booking_committed": False,
             "booking_result": {},
+            "approval_outcome": None,
             "structured_errors": list(state.get("structured_errors", [])),
         }
         if run_id:
@@ -844,6 +846,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 "code": "MissingThreadId",
                 "message": "thread_id is required",
             },
+            "approval_outcome": None,
             "structured_errors": _append_structured_error(
                 state,
                 code="MissingThreadId",
@@ -901,6 +904,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             "booking_attempted": True,
             "booking_committed": True,
             "booking_result": result,
+            "approval_outcome": None,
             "structured_errors": list(state.get("structured_errors", [])),
         }
         if run_id:
@@ -918,6 +922,56 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
             )
         return result
     except BookingDomainError as exc:
+        if exc.code == "ApprovalRequired":
+            detail = dict(exc.detail or {})
+            approval_id = str(detail.get("approval_id") or "")
+            approval_outcome = {
+                "approval_id": approval_id,
+                "status": "pending",
+                "requested_at": detail.get("requested_at"),
+                "expires_at": detail.get("expires_at"),
+                "required_by_policy": True,
+                "review_context_summary": detail.get("review_context_summary") if isinstance(detail.get("review_context_summary"), dict) else {},
+            }
+            emit_telemetry_event(
+                "approval_requested",
+                request_path="/supervisor/doctor/route",
+                endpoint_family="specialized",
+                sample_key=f"{thread_id}:{approval_id}:approval_requested",
+                payload={
+                    "thread_id": thread_id,
+                    "actor_user_id": actor_user_id,
+                    "patient_user_id": patient_user_id,
+                    "approval_id": approval_id,
+                    "policy_decision": detail.get("policy_decision"),
+                },
+            )
+            if run_id:
+                emit_workflow_trace_event(
+                    workflow_family="specialized_doctor",
+                    thread_id=thread_id,
+                    run_id=run_id,
+                    event_type="approval_requested",
+                    node_name="conditional_book_node",
+                    status="pending",
+                    duration_ms=int((perf_counter() - started) * 1000),
+                    actor_user_id=actor_user_id,
+                    patient_user_id=patient_user_id,
+                    payload={
+                        "approval_id": approval_id,
+                        "approval_status": "pending",
+                        "policy_decision": detail.get("policy_decision"),
+                    },
+                )
+            return {
+                "booking_ready": True,
+                "booking_mode": "booking_pending_approval",
+                "booking_attempted": True,
+                "booking_committed": False,
+                "booking_result": {},
+                "approval_outcome": approval_outcome,
+                "structured_errors": list(state.get("structured_errors", [])),
+            }
         emit_telemetry_event(
             "booking_denied",
             request_path="/supervisor/doctor/route",
@@ -942,6 +996,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 "code": exc.code,
                 "message": exc.message,
             },
+            "approval_outcome": None,
             "structured_errors": _append_structured_error(
                 state,
                 code=exc.code,
@@ -988,6 +1043,7 @@ async def conditional_book_node(state: SupervisorState) -> SupervisorState:
                 "code": "BookingUnhandledError",
                 "message": str(exc),
             },
+            "approval_outcome": None,
             "structured_errors": _append_structured_error(
                 state,
                 code="BookingUnhandledError",
@@ -1130,6 +1186,7 @@ def _doctor_workflow_response(out: SupervisorState) -> dict[str, Any]:
         "checkpoint_version": out.get("checkpoint_version", CHECKPOINT_VERSION),
         "booking_mode": out.get("booking_mode", "suggest_only"),
         "booking_result": out.get("booking_result", {}),
+        "approval_outcome": out.get("approval_outcome"),
         "structured_errors": out.get("structured_errors", []),
         "doctor_resolution_status": out.get("doctor_resolution_status", ""),
         "doctor_resolution_candidates": out.get("doctor_resolution_candidates", []),
@@ -1267,6 +1324,20 @@ async def execute_doctor_match_workflow(state: SupervisorState) -> dict[str, Any
                 "appointment_id_present": bool(response.get("booking_result", {}).get("appointment_id")),
             },
         )
+    elif response.get("booking_mode") == "booking_pending_approval":
+        approval_id = str((response.get("approval_outcome") or {}).get("approval_id") or "")
+        emit_telemetry_event(
+            "approval_pending",
+            request_path="/supervisor/doctor/route",
+            endpoint_family="specialized",
+            sample_key=f"{thread_id}:{approval_id}:approval_pending",
+            payload={
+                "thread_id": thread_id,
+                "actor_user_id": state.get("actor_user_id"),
+                "patient_user_id": state.get("patient_user_id"),
+                "approval_id": approval_id,
+            },
+        )
     elif response.get("booking_mode") in {"booking_failed", "suggest_only"}:
         denial_code = str(response.get("booking_result", {}).get("code") or response.get("booking_blocked_reason") or "unknown")
         emit_telemetry_event(
@@ -1304,11 +1375,12 @@ async def execute_doctor_match_workflow(state: SupervisorState) -> dict[str, Any
         event_type="run_completed",
         actor_user_id=str(state.get("actor_user_id") or ""),
         patient_user_id=str(state.get("patient_user_id") or ""),
-        status="ok" if response.get("booking_mode") != "booking_failed" else "error",
+        status="ok" if response.get("booking_mode") in {"suggest_only", "booked", "booking_pending_approval"} else "error",
         payload={
             "booking_mode": response.get("booking_mode"),
             "booking_committed": bool(response.get("booking_committed", False)),
             "booking_ready": bool(response.get("booking_ready", False)),
+            "approval_outcome": response.get("approval_outcome"),
             "doctor_resolution_status": response.get("doctor_resolution_status"),
             "missing_fields": response.get("booking_missing_fields", []),
             "booking_blocked_reason": response.get("booking_blocked_reason"),
@@ -1492,17 +1564,6 @@ async def stream_doctor_match_workflow(state: SupervisorState) -> AsyncIterator[
                             "stage_name": node_name,
                             "stage_index": idx,
                         },
-                    )
-                    emit_workflow_trace_event(
-                        workflow_family="specialized_doctor",
-                        thread_id=thread_id,
-                        run_id=run_id,
-                        event_type="node_completed",
-                        node_name=node_name,
-                        actor_user_id=str(state.get("actor_user_id") or ""),
-                        patient_user_id=str(state.get("patient_user_id") or ""),
-                        status="ok",
-                        payload={"stream_stage_index": idx},
                     )
 
             final_state = await load_thread_state(thread_id)

@@ -23,7 +23,7 @@ os.environ.setdefault("SECRET_KEY", "ci-dev-secret")
 from app.database import Base, engine
 
 # Ensure model metadata is registered before create_all.
-from app.models import appointment, time_slot, user  # noqa: F401
+from app.models import appointment, time_slot, user, workflow_trace_event  # noqa: F401
 
 
 def main() -> int:

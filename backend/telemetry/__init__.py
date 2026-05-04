@@ -2,6 +2,8 @@
 
 from .events import emit_telemetry_event
 from .workflow_trace import (
+    decode_trace_cursor,
+    encode_trace_cursor,
     emit_workflow_trace_event,
     list_workflow_trace_events,
     new_run_id,
@@ -11,6 +13,8 @@ from .workflow_trace import (
 __all__ = [
     "emit_telemetry_event",
     "emit_workflow_trace_event",
+    "encode_trace_cursor",
+    "decode_trace_cursor",
     "list_workflow_trace_events",
     "new_run_id",
     "serialize_trace_event",
