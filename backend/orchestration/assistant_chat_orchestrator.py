@@ -5,6 +5,7 @@ import difflib
 import logging
 import re
 from datetime import date
+from time import perf_counter
 from typing import Any, AsyncIterator, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -23,6 +24,7 @@ try:
         invoke_with_model_fallback,
         log_assistant_llm_status_once,
     )
+    from telemetry import emit_workflow_trace_event, new_run_id
 except ImportError:  # Fallback for backend package context
     from app.models.user import User
     from backend.memory import memory_tools
@@ -37,6 +39,7 @@ except ImportError:  # Fallback for backend package context
         invoke_with_model_fallback,
         log_assistant_llm_status_once,
     )
+    from backend.telemetry import emit_workflow_trace_event, new_run_id
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +64,7 @@ class DetectedIntents(TypedDict):
 
 
 class AssistantChatState(TypedDict, total=False):
+    trace_run_id: str
     user_id: str
     thread_id: str
     message: str
@@ -274,13 +278,49 @@ def _assistant_graph_config(thread_id: str) -> dict[str, Any]:
 
 
 async def load_profile_node(state: AssistantChatState) -> AssistantChatState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_started",
+            node_name="load_profile_node",
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+        )
     patient_profile = dict(state.get("patient_profile") or {})
     if not patient_profile.get("user_id") and state.get("user_id"):
         patient_profile["user_id"] = state["user_id"]
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_completed",
+            node_name="load_profile_node",
+            status="ok",
+            duration_ms=int((perf_counter() - started) * 1000),
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+        )
     return {"patient_profile": patient_profile}
 
 
 async def load_memory_node(state: AssistantChatState) -> AssistantChatState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_started",
+            node_name="load_memory_node",
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+        )
     message = str(state.get("message") or "")
     memory_context = ""
     errors = list(state.get("structured_errors") or [])
@@ -314,15 +354,41 @@ async def load_memory_node(state: AssistantChatState) -> AssistantChatState:
         contextual_message = f"{message}\n\n" + "\n\n".join(context_parts)
     synthesis_context = "\n\n".join(context_parts).strip()
 
-    return {
+    result = {
         "memory_context": memory_context,
         "contextual_message": contextual_message,
         "synthesis_context": synthesis_context,
         "structured_errors": errors,
     }
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_completed",
+            node_name="load_memory_node",
+            status="ok",
+            duration_ms=int((perf_counter() - started) * 1000),
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+            payload={"structured_error_count": len(errors)},
+        )
+    return result
 
 
 async def classify_intent_node(state: AssistantChatState) -> AssistantChatState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_started",
+            node_name="classify_intent_node",
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+        )
     message = str(state.get("message") or "")
     base = _detect_intents(message)
     route: AssistantRoute = base["route"]
@@ -352,18 +418,60 @@ async def classify_intent_node(state: AssistantChatState) -> AssistantChatState:
     intents["route"] = route
     intents["confidence"] = confidence
     intents["source"] = source
-    return {
+    result = {
         "intents": intents,
         "intent": route,
         "intent_confidence": confidence,
         "intent_source": source,
         "clarification_required": clarification_required,
     }
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_completed",
+            node_name="classify_intent_node",
+            status="ok",
+            duration_ms=int((perf_counter() - started) * 1000),
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+            payload={
+                "intent_route": route,
+                "intent_confidence": round(confidence, 4),
+                "intent_source": source,
+                "clarification_required": clarification_required,
+            },
+        )
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="route_selected",
+            node_name="classify_intent_node",
+            status="ok",
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+            payload={"next_route": _route_after_intent(result)},
+        )
+    return result
 
 
 async def doctor_node(state: AssistantChatState) -> AssistantChatState:
+    started = perf_counter()
     thread_id = str(state.get("thread_id") or "").strip()
     user_id = str(state.get("user_id") or "").strip()
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=thread_id,
+            run_id=run_id,
+            event_type="node_started",
+            node_name="doctor_node",
+            actor_user_id=user_id,
+            patient_user_id=user_id,
+        )
     try:
         result = await execute_doctor_match_workflow(
             {
@@ -374,10 +482,35 @@ async def doctor_node(state: AssistantChatState) -> AssistantChatState:
                 "max_suggestions": int(state.get("max_suggestions") or 5),
             }
         )
-        return {"doctor_result": result}
+        output = {"doctor_result": result}
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="assistant",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="doctor_node",
+                status="ok",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=user_id,
+                patient_user_id=user_id,
+                payload={"doctor_workflow_invoked": True},
+            )
+            emit_workflow_trace_event(
+                workflow_family="assistant",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="route_selected",
+                node_name="doctor_node",
+                status="ok",
+                actor_user_id=user_id,
+                patient_user_id=user_id,
+                payload={"next_route": _route_after_doctor(state)},
+            )
+        return output
     except Exception as exc:
         log.warning("Doctor workflow failed: %s", exc)
-        return {
+        output = {
             "structured_errors": _append_error(
                 state,
                 code="DoctorWorkflowFailed",
@@ -385,9 +518,35 @@ async def doctor_node(state: AssistantChatState) -> AssistantChatState:
                 node="doctor_node",
             )
         }
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="assistant",
+                thread_id=thread_id,
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="doctor_node",
+                status="error",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=user_id,
+                patient_user_id=user_id,
+                payload={"error_code": "DoctorWorkflowFailed"},
+            )
+        return output
 
 
 async def medication_node(state: AssistantChatState) -> AssistantChatState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_started",
+            node_name="medication_node",
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+        )
     try:
         result = await asyncio.to_thread(
             medication_pipeline,
@@ -395,10 +554,23 @@ async def medication_node(state: AssistantChatState) -> AssistantChatState:
             str(state.get("user_id") or ""),
             user_profile=dict(state.get("patient_profile") or {}),
         )
-        return {"medication_result": result}
+        output = {"medication_result": result}
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="assistant",
+                thread_id=str(state.get("thread_id") or ""),
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="medication_node",
+                status="ok",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=str(state.get("user_id") or ""),
+                patient_user_id=str(state.get("user_id") or ""),
+            )
+        return output
     except Exception as exc:
         log.warning("Medication pipeline failed: %s", exc)
-        return {
+        output = {
             "structured_errors": _append_error(
                 state,
                 code="MedicationPipelineFailed",
@@ -406,11 +578,51 @@ async def medication_node(state: AssistantChatState) -> AssistantChatState:
                 node="medication_node",
             )
         }
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="assistant",
+                thread_id=str(state.get("thread_id") or ""),
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="medication_node",
+                status="error",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=str(state.get("user_id") or ""),
+                patient_user_id=str(state.get("user_id") or ""),
+                payload={"error_code": "MedicationPipelineFailed"},
+            )
+        return output
 
 
 async def general_chat_node(state: AssistantChatState) -> AssistantChatState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_started",
+            node_name="general_chat_node",
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+        )
     if state.get("clarification_required"):
-        return {"general_response": _clarification_message()}
+        output = {"general_response": _clarification_message()}
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="assistant",
+                thread_id=str(state.get("thread_id") or ""),
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="general_chat_node",
+                status="ok",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=str(state.get("user_id") or ""),
+                patient_user_id=str(state.get("user_id") or ""),
+                payload={"clarification_required": True},
+            )
+        return output
 
     patient = dict(state.get("patient_profile") or {})
     prompt = (
@@ -443,10 +655,35 @@ async def general_chat_node(state: AssistantChatState) -> AssistantChatState:
         log.warning("General assistant LLM failed; using fallback: %s", exc)
         text = _general_chat_fallback_message(state)
 
-    return {"general_response": text}
+    output = {"general_response": text}
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_completed",
+            node_name="general_chat_node",
+            status="ok",
+            duration_ms=int((perf_counter() - started) * 1000),
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+        )
+    return output
 
 
 async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_started",
+            node_name="synthesis_node",
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+        )
     general_response = str(state.get("general_response") or "").strip()
     user_id = str(state.get("user_id") or "")
     if general_response:
@@ -462,11 +699,25 @@ async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
                 "clarification_required": bool(state.get("clarification_required") or False),
             },
         }
-        return {
+        output = {
             "ai_message": general_response,
             "ai_message_type": "general_health",
             "unified_response": unified,
         }
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="assistant",
+                thread_id=str(state.get("thread_id") or ""),
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="synthesis_node",
+                status="ok",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=str(state.get("user_id") or ""),
+                patient_user_id=str(state.get("user_id") or ""),
+                payload={"message_type": "general_health"},
+            )
+        return output
 
     scoped_need = str(state.get("message") or "").strip()
     synthesis_context = str(state.get("synthesis_context") or "").strip()
@@ -492,11 +743,25 @@ async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
         "clarification_required": bool(state.get("clarification_required") or False),
     }
 
-    return {
+    output = {
         "ai_message": result.message,
         "ai_message_type": result.message_type,
         "unified_response": unified,
     }
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_completed",
+            node_name="synthesis_node",
+            status="ok",
+            duration_ms=int((perf_counter() - started) * 1000),
+            actor_user_id=str(state.get("user_id") or ""),
+            patient_user_id=str(state.get("user_id") or ""),
+            payload={"message_type": result.message_type},
+        )
+    return output
 
 
 def _route_after_intent(state: AssistantChatState) -> str:
@@ -593,6 +858,16 @@ async def stream_assistant_response(
         )
 
     patient_profile = _build_user_profile(user)
+    run_id = new_run_id()
+    emit_workflow_trace_event(
+        workflow_family="assistant",
+        thread_id=str(thread_id),
+        run_id=run_id,
+        event_type="run_started",
+        actor_user_id=str(user.user_id),
+        patient_user_id=str(user.user_id),
+        status="started",
+    )
     initial_state: AssistantChatState = {
         "user_id": str(user.user_id),
         "thread_id": str(thread_id),
@@ -601,11 +876,24 @@ async def stream_assistant_response(
         "recent_messages": list(recent_messages or []),
         "patient_profile": patient_profile,
         "structured_errors": [],
+        "trace_run_id": run_id,
     }
-    final_state = await _ASSISTANT_GRAPH.ainvoke(
-        initial_state,
-        config=_assistant_graph_config(str(thread_id)),
-    )
+    try:
+        final_state = await _ASSISTANT_GRAPH.ainvoke(
+            initial_state,
+            config=_assistant_graph_config(str(thread_id)),
+        )
+    except Exception:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(thread_id),
+            run_id=run_id,
+            event_type="run_failed",
+            actor_user_id=str(user.user_id),
+            patient_user_id=str(user.user_id),
+            status="error",
+        )
+        raise
 
     ai_message = str(final_state.get("ai_message") or "").strip()
     if not ai_message:
@@ -644,7 +932,24 @@ async def stream_assistant_response(
     metadata["intent_source"] = str(final_state.get("intent_source") or metadata.get("intent_source") or "message_only")
     metadata["repeat_guard_triggered"] = repeat_guard_triggered or bool(metadata.get("repeat_guard_triggered"))
     metadata["clarification_required"] = clarification_required
+    metadata["trace_run_id"] = run_id
     unified_response["metadata"] = metadata
+    emit_workflow_trace_event(
+        workflow_family="assistant",
+        thread_id=str(thread_id),
+        run_id=run_id,
+        event_type="run_completed",
+        actor_user_id=str(user.user_id),
+        patient_user_id=str(user.user_id),
+        status="ok",
+        payload={
+            "intent_route": str(final_state.get("intent") or ""),
+            "intent_source": str(final_state.get("intent_source") or "message_only"),
+            "intent_confidence": float(final_state.get("intent_confidence") or 0.0),
+            "clarification_required": clarification_required,
+            "message_type": unified_response.get("message_type"),
+        },
+    )
     yield {"type": "complete", "response": unified_response}
 
 

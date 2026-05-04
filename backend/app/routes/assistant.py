@@ -60,6 +60,10 @@ except ImportError:
         if backend_root not in sys.path:
             sys.path.append(backend_root)
         from telemetry import emit_telemetry_event
+try:
+    from telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
+except ImportError:
+    from backend.telemetry.workflow_trace import list_workflow_trace_events, serialize_trace_event
 
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
@@ -434,10 +438,11 @@ async def stream_thread_reply(
             error_message = str(exc)
             error_code = "assistant_stream_error"
             safe_message = "Streaming failed"
-            if isinstance(exc, AssistantConfigError):
+            exc_code = str(getattr(exc, "code", "") or "")
+            if isinstance(exc, AssistantConfigError) or exc_code == "assistant_config_error":
                 error_code = exc.code
                 safe_message = "Assistant configuration is missing or invalid. Please contact support."
-            elif isinstance(exc, AssistantRuntimeError):
+            elif isinstance(exc, AssistantRuntimeError) or exc_code == "assistant_runtime_error":
                 error_code = exc.code
                 safe_message = "Assistant is temporarily unavailable. Please try again."
 
@@ -596,3 +601,35 @@ def assistant_telemetry_summary(
 ):
     parsed_start, parsed_end = parse_summary_range(start=start, end=end)
     return assistant_telemetry_store.summary(start=parsed_start, end=parsed_end)
+
+
+@router.get("/threads/{thread_id}/workflow-traces")
+def get_thread_workflow_traces(
+    thread_id: UUID,
+    run_id: str | None = Query(default=None),
+    workflow_family: str | None = Query(default=None),
+    before_trace_id: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    thread = _get_thread_or_404(db, thread_id, user)
+    effective_family = workflow_family or "assistant"
+    rows = list_workflow_trace_events(
+        db=db,
+        workflow_family=effective_family,
+        thread_id=str(thread.thread_id),
+        run_id=run_id,
+        before_trace_id=before_trace_id,
+        limit=limit + 1,
+    )
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    next_cursor = str(page[-1].trace_id) if has_more and page else None
+    return {
+        "thread_id": str(thread.thread_id),
+        "workflow_family": effective_family,
+        "run_id": run_id,
+        "events": [serialize_trace_event(r) for r in page],
+        "next_cursor": next_cursor,
+    }

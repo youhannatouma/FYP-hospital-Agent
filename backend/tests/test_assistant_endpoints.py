@@ -9,6 +9,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 from fastapi import APIRouter, FastAPI
 from app.database import Base
 from app.models.chat import ChatThread, ChatMessage
+from app.models.workflow_trace_event import WorkflowTraceEvent
 from app.routes import assistant as assistant_routes
 from backend.shared.gemini import AssistantConfigError
 from backend.shared.gemini import AssistantRuntimeError
@@ -73,6 +74,7 @@ def _seed_db_schema():
     Table("usr", test_metadata, Column("user_id", SqlUuid(as_uuid=True), primary_key=True))
     ChatThread.__table__.to_metadata(test_metadata)
     ChatMessage.__table__.to_metadata(test_metadata)
+    WorkflowTraceEvent.__table__.to_metadata(test_metadata)
     test_metadata.create_all(bind=TEST_ENGINE)
     yield
     test_metadata.drop_all(bind=TEST_ENGINE)
@@ -247,6 +249,46 @@ def test_stream_reply_sse_contract(client, db_session, monkeypatch):
     assert "message" in complete_event
     assert complete_event["message"]["content"] == "Delta1 Delta2"
     assert complete_event["message"]["metadata"]["status"] == "complete"
+
+
+def test_workflow_trace_endpoint_owner_access(client, db_session):
+    t = ChatThread(owner_user_id=_FakeUser.user_id, title="Trace Chat")
+    db_session.add(t)
+    db_session.commit()
+    db_session.refresh(t)
+
+    db_session.add(
+        WorkflowTraceEvent(
+            workflow_family="assistant",
+            thread_id=str(t.thread_id),
+            actor_user_id=str(_FakeUser.user_id),
+            patient_user_id=str(_FakeUser.user_id),
+            run_id="run-1",
+            node_name="classify_intent_node",
+            event_type="node_completed",
+            sequence=1,
+            status="ok",
+            payload_json={"intent_route": "general_health"},
+        )
+    )
+    db_session.commit()
+
+    res = client.get(f"/api/assistant/threads/{t.thread_id}/workflow-traces", headers=_auth_headers())
+    assert res.status_code == 200
+    body = res.json()
+    assert body["thread_id"] == str(t.thread_id)
+    assert len(body["events"]) == 1
+    assert body["events"][0]["workflow_family"] == "assistant"
+
+
+def test_workflow_trace_endpoint_rejects_non_owner(client, db_session):
+    other_user = uuid.UUID("00000000-0000-0000-0000-000000000099")
+    t = ChatThread(owner_user_id=other_user, title="Other Trace Chat")
+    db_session.add(t)
+    db_session.commit()
+
+    res = client.get(f"/api/assistant/threads/{t.thread_id}/workflow-traces", headers=_auth_headers())
+    assert res.status_code == 404
 
 
 def test_stream_reply_cancellation(client, db_session, monkeypatch):
