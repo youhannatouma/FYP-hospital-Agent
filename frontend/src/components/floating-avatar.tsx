@@ -1,185 +1,134 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
-import Image from "next/image"
-import { X } from "lucide-react"
-import ThreeAvatar from "./ThreeAvatar"
+import { useState, useRef, useCallback, useEffect, useMemo } from "react"
+import dynamic from "next/dynamic"
+import { X } from "lucide-react" 
+
+const ThreeAvatar = dynamic(() => import("./ThreeAvatar"), { ssr: false })
 
 export function FloatingAvatar() {
   const [expanded, setExpanded] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
-  const [initialized, setInitialized] = useState(false)
+
+  const messages = useMemo(
+    () => [
+      "Hi there, how can I help you today?",
+      "Need a hand with your schedule?",
+      "I can help you find your next appointment.",
+      "Ask me anything about your health records.",
+      "Ready to assist with your care plan.",
+    ],
+    []
+  )
+
+  const speechText = useMemo(
+    () => (expanded ? messages[Math.floor(Math.random() * messages.length)] : ""),
+    [expanded, messages]
+  )
+
   const dragRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasDragged = useRef(false)
 
-  // Initialize position to bottom-right on mount
   useEffect(() => {
+    setMounted(true)
     setPosition({
       x: window.innerWidth - 80,
       y: window.innerHeight - 80,
     })
-    setInitialized(true)
   }, [])
 
-  const startDrag = useCallback(
-    (clientX: number, clientY: number) => {
-      if (!dragRef.current) return
-      hasDragged.current = false
-      const rect = dragRef.current.getBoundingClientRect()
-      offsetRef.current = {
-        x: clientX - rect.left,
-        y: clientY - rect.top,
-      }
-      longPressTimer.current = setTimeout(() => {
-        setIsDragging(true)
-      }, 300)
-    },
-    [],
-  )
+  const startDrag = useCallback((x: number, y: number) => {
+    if (!dragRef.current) return
+    hasDragged.current = false
+    const rect = dragRef.current.getBoundingClientRect()
+    offsetRef.current = { x: x - rect.left, y: y - rect.top }
+    longPressTimer.current = setTimeout(() => setIsDragging(true), 300)
+  }, [])
 
   const onDrag = useCallback(
-    (clientX: number, clientY: number) => {
+    (x: number, y: number) => {
       if (!isDragging) return
       hasDragged.current = true
-      const avatarSize = expanded ? 128 : 64
-      const newX = Math.min(
-        Math.max(0, clientX - offsetRef.current.x),
-        window.innerWidth - avatarSize,
-      )
-      const newY = Math.min(
-        Math.max(0, clientY - offsetRef.current.y),
-        window.innerHeight - avatarSize,
-      )
-      setPosition({ x: newX, y: newY })
+      const size = expanded ? 128 : 64
+      setPosition({
+        x: Math.min(Math.max(0, x - offsetRef.current.x), window.innerWidth - size),
+        y: Math.min(Math.max(0, y - offsetRef.current.y), window.innerHeight - size),
+      })
     },
-    [isDragging, expanded],
+    [isDragging, expanded]
   )
 
   const stopDrag = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
     setIsDragging(false)
   }, [])
 
   const handleClick = useCallback(() => {
-    if (!hasDragged.current) {
-      setExpanded((prev) => {
-        const next = !prev
-        // Adjust position to keep avatar in viewport when expanding
-        if (next) {
-          setPosition((pos) => ({
-            x: Math.min(pos.x, window.innerWidth - 128),
-            y: Math.min(pos.y, window.innerHeight - 128),
-          }))
-        }
-        return next
-      })
-    }
+    if (!hasDragged.current) setExpanded((prev) => !prev)
   }, [])
 
-  // Mouse events
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => onDrag(e.clientX, e.clientY)
-    const handleMouseUp = () => stopDrag()
-
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove)
-      window.addEventListener("mouseup", handleMouseUp)
-    }
+    if (!isDragging) return
+    const move = (e: MouseEvent) => onDrag(e.clientX, e.clientY)
+    const up = () => stopDrag()
+    window.addEventListener("mousemove", move)
+    window.addEventListener("mouseup", up)
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove)
-      window.removeEventListener("mouseup", handleMouseUp)
+      window.removeEventListener("mousemove", move)
+      window.removeEventListener("mouseup", up)
     }
   }, [isDragging, onDrag, stopDrag])
 
-  // Touch events
-  useEffect(() => {
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isDragging) return
-      e.preventDefault()
-      const touch = e.touches[0]
-      onDrag(touch.clientX, touch.clientY)
-    }
-    const handleTouchEnd = () => stopDrag()
-
-    if (isDragging) {
-      window.addEventListener("touchmove", handleTouchMove, { passive: false })
-      window.addEventListener("touchend", handleTouchEnd)
-    }
-    return () => {
-      window.removeEventListener("touchmove", handleTouchMove)
-      window.removeEventListener("touchend", handleTouchEnd)
-    }
-  }, [isDragging, onDrag, stopDrag])
-
-  if (!initialized) return null
+  if (!mounted) return null
 
   const size = expanded ? 128 : 64
+  // The canvas renders larger than the circle to keep the face centred
+  // after the circular clip. We offset it so it stays centred.
+  const canvasSize = Math.round(size * 1.8)
+  const canvasOffset = -Math.round((canvasSize - size) / 2)
 
   return (
     <div
       ref={dragRef}
-      className="fixed z-50 select-none"
+      className="fixed z-50"
       style={{
         left: position.x,
         top: position.y,
         width: size,
         height: size,
-        transition: isDragging ? "none" : "width 0.3s ease, height 0.3s ease, left 0.3s ease, top 0.3s ease",
         cursor: isDragging ? "grabbing" : "pointer",
       }}
-      onMouseDown={(e) => {
-        e.preventDefault()
-        startDrag(e.clientX, e.clientY)
-      }}
+      onMouseDown={(e) => startDrag(e.clientX, e.clientY)}
       onMouseUp={handleClick}
-      onTouchStart={(e) => {
-        const touch = e.touches[0]
-        startDrag(touch.clientX, touch.clientY)
-      }}
-      onTouchEnd={(e) => {
-        e.preventDefault()
-        stopDrag()
-        handleClick()
-      }}
-      role="button"
-      tabIndex={0}
-      aria-label={expanded ? "Collapse avatar" : "Expand avatar"}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault()
-          setExpanded((prev) => !prev)
-        }
-      }}
     >
+      {/* Pulse ring */}
+      <div className="absolute inset-0 rounded-full bg-primary/20 animate-pulse" />
+
+      {/* Circular clipping container */}
       <div
-        className={`absolute inset-0 rounded-full bg-primary/20 ${isDragging ? "" : "animate-pulse-slow"}`}
-        style={{
-          transform: "scale(1.15)",
-          borderRadius: "50%",
-          willChange: "opacity, transform"
-        }}
-      />
-
-      {/* Avatar container */}
-      <div className="relative h-full w-full overflow-hidden rounded-full border-2 border-primary/60 bg-card shadow-xl flex items-center justify-center">
-        <div className="translate-y-4">
-          <ThreeAvatar size={size * 1.5} />
+        className="relative rounded-full overflow-hidden border shadow-xl"
+        style={{ width: size, height: size }}
+      >
+        {/* Canvas is larger and centred via negative offset so the face fills the circle */}
+        <div
+          style={{
+            position: "absolute",
+            top: canvasOffset,
+            left: canvasOffset,
+            pointerEvents: "none",
+          }}
+        >
+          <ThreeAvatar size={canvasSize} textToSpeak={expanded ? speechText : ""} />
         </div>
-
-        {/* Online indicator */}
-        <div className="absolute right-0 bottom-0 h-4 w-4 rounded-full border-2 border-card bg-emerald-500 shadow-sm shadow-emerald-500/50" />
       </div>
 
-      {/* Close hint when expanded */}
       {expanded && (
-        <div className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border shadow-md">
-          <X className="h-3 w-3 text-muted-foreground" />
+        <div className="absolute -top-2 -right-2">
+          <X size={12} />
         </div>
       )}
     </div>

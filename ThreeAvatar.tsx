@@ -14,6 +14,7 @@ interface HeadProps {
 
 function Head({ textToSpeak = "", onSpeechStart, onSpeechEnd }: HeadProps) {
   const { scene } = useGLTF("/models/avatar.glb")
+
   const clone = useMemo(() => SkeletonUtils.clone(scene), [scene])
   const { nodes } = useGraph(clone)
 
@@ -23,14 +24,12 @@ function Head({ textToSpeak = "", onSpeechStart, onSpeechEnd }: HeadProps) {
   const activeViseme = useRef<number>(0)
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null)
 
-  // Load female voice on mount
   useEffect(() => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices()
       if (!voices?.length) return
 
-      // Prioritize known female voice names
-      const femaleVoiceCandidates = [
+      const candidates = [
         "zira",
         "samantha",
         "kendra",
@@ -48,28 +47,17 @@ function Head({ textToSpeak = "", onSpeechStart, onSpeechEnd }: HeadProps) {
         "bella",
         "linda",
         "audrey",
-        "moira",
-        "fiona",
-        "joelle",
-        "raven",
-        "susie",
-        "susan",
-        "alice",
       ]
 
-      // First try to match by name, then by regex pattern, then fallback to any female voice, then any English voice
-      const selectedVoice =
-        voices.find((v) =>
-          femaleVoiceCandidates.some((name) =>
-            v.name.toLowerCase().includes(name.toLowerCase())
-          )
+      const voice =
+        voices.find((voice) =>
+          candidates.some((candidate) => voice.name.toLowerCase().includes(candidate))
         ) ||
-        voices.find((v) => /female|woman|girl|lady/.test(v.name.toLowerCase())) ||
-        voices.find((v) => v.name.includes("Female")) ||
-        voices.find((v) => v.lang.startsWith("en")) ||
+        voices.find((voice) => /female|woman|girl/.test(voice.name.toLowerCase())) ||
+        voices.find((voice) => voice.lang.startsWith("en")) ||
         voices[0]
 
-      setSelectedVoice(selectedVoice)
+      setSelectedVoice(voice)
     }
 
     loadVoices()
@@ -79,7 +67,6 @@ function Head({ textToSpeak = "", onSpeechStart, onSpeechEnd }: HeadProps) {
     }
   }, [])
 
-  // Setup mesh and visemes
   useEffect(() => {
     if (!scene) return
 
@@ -99,47 +86,33 @@ function Head({ textToSpeak = "", onSpeechStart, onSpeechEnd }: HeadProps) {
     })
   }, [nodes, scene])
 
-  // Handle speech synthesis
   useEffect(() => {
     if (!textToSpeak) return
 
     const utterance = new SpeechSynthesisUtterance(textToSpeak)
-
-    // Apply selected female voice
     if (selectedVoice) {
       utterance.voice = selectedVoice
-      utterance.lang = selectedVoice.lang || "en-US"
+      utterance.lang = selectedVoice.lang
     }
-
-    // Adjust pitch for female voice (higher pitch)
-    utterance.pitch = 1.3
-    utterance.rate = 0.95 // Slightly slower for clarity
+    utterance.pitch = 1.2
+    utterance.rate = 1.05
     utterance.volume = 1
 
     utterance.onstart = () => {
       onSpeechStart?.()
     }
 
-    // Map characters to visemes for natural mouth movement
     utterance.onboundary = (event) => {
       const char = textToSpeak[event.charIndex]?.toLowerCase()
       if (!char) return
 
-      if ("aeiouäöü".includes(char)) {
-        activeViseme.current = visemes.current["viseme_aa"] ?? 0
-      } else if ("bmp".includes(char)) {
-        activeViseme.current = visemes.current["viseme_PP"] ?? 0
-      } else if ("fv".includes(char)) {
-        activeViseme.current = visemes.current["viseme_FF"] ?? 0
-      } else if ("lr".includes(char)) {
-        activeViseme.current = visemes.current["viseme_RR"] ?? 0
-      } else if ("s".includes(char)) {
-        activeViseme.current = visemes.current["viseme_SS"] ?? 0
-      } else if ("kgt".includes(char)) {
-        activeViseme.current = visemes.current["viseme_kk"] ?? 0
-      } else {
-        activeViseme.current = visemes.current["viseme_sil"] ?? 0
-      }
+      if ("aeiou".includes(char)) activeViseme.current = visemes.current["viseme_aa"] ?? 0
+      else if ("bmp".includes(char)) activeViseme.current = visemes.current["viseme_PP"] ?? 0
+      else if ("fv".includes(char)) activeViseme.current = visemes.current["viseme_FF"] ?? 0
+      else if ("lr".includes(char)) activeViseme.current = visemes.current["viseme_RR"] ?? 0
+      else if (char === "s") activeViseme.current = visemes.current["viseme_SS"] ?? 0
+      else if ("kgt".includes(char)) activeViseme.current = visemes.current["viseme_kk"] ?? 0
+      else activeViseme.current = visemes.current["viseme_sil"] ?? 0
     }
 
     utterance.onend = () => {
@@ -157,53 +130,31 @@ function Head({ textToSpeak = "", onSpeechStart, onSpeechEnd }: HeadProps) {
     return () => window.speechSynthesis.cancel()
   }, [textToSpeak, onSpeechEnd, onSpeechStart, selectedVoice])
 
-  // Animate mouth movement with smooth natural motion
   useFrame((state) => {
     if (!groupRef.current) return
 
-    // Smooth head stabilization
-    groupRef.current.rotation.y = THREE.MathUtils.lerp(
-      groupRef.current.rotation.y,
-      0,
-      0.1
-    )
-    groupRef.current.rotation.x = THREE.MathUtils.lerp(
-      groupRef.current.rotation.x,
-      0,
-      0.1
-    )
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, 0, 0.1)
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1)
 
     const mesh = headMeshRef.current
     if (!mesh?.morphTargetInfluences) return
 
     const influences = mesh.morphTargetInfluences
     const talking = Boolean(textToSpeak.trim())
-
-    // Decay all influences smoothly
-    const decayRate = talking ? 0.1 : 0.2
+    const decay = talking ? 0.12 : 0.25
     for (let i = 0; i < influences.length; i++) {
-      influences[i] = THREE.MathUtils.lerp(influences[i], 0, decayRate)
+      influences[i] = THREE.MathUtils.lerp(influences[i], 0, decay)
     }
 
-    // Natural mouth pulse with multiple frequency components for realistic movement
-    if (talking) {
-      // Combine two sine waves at different frequencies for organic motion
-      const primaryPulse = Math.sin(state.clock.elapsedTime * 8) * 0.06
-      const secondaryPulse = Math.sin(state.clock.elapsedTime * 15) * 0.04
-      const baseAmount = 0.1
+    const mouthPulse = talking ? Math.sin(state.clock.elapsedTime * 18) * 0.08 + 0.08 : 0
+    const targetValue = talking ? 0.75 + mouthPulse : 0
+    influences[activeViseme.current] = THREE.MathUtils.lerp(
+      influences[activeViseme.current],
+      targetValue,
+      0.3
+    )
 
-      const mouthMovement = baseAmount + primaryPulse + secondaryPulse
-
-      const targetValue = THREE.MathUtils.clamp(0.7 + mouthMovement, 0.5, 0.95)
-      influences[activeViseme.current] = THREE.MathUtils.lerp(
-        influences[activeViseme.current],
-        targetValue,
-        0.25
-      )
-    }
-
-    // Subtle vertical bobbing while talking
-    groupRef.current.position.y = -1.58 + Math.sin(state.clock.elapsedTime * 2) * 0.015
+    groupRef.current.position.y = -1.58 + Math.sin(state.clock.elapsedTime) * 0.02
   })
 
   return (
