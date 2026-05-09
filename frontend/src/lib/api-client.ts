@@ -88,6 +88,11 @@ export async function cancelStream(threadId: string): Promise<{ message: string 
   return res.data;
 }
 
+export async function deleteThread(threadId: string): Promise<{ deleted: boolean; thread_id: string }> {
+  const res = await apiClient.delete(`/assistant/threads/${threadId}`);
+  return res.data;
+}
+
 
 // ── SSE streaming (fetch-based) ────────────────────────────────────────
 

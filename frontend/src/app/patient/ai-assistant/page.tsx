@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Bot,
   CalendarPlus,
   Clock,
@@ -20,17 +30,20 @@ import {
   Sparkles,
   Square,
   Stethoscope,
+  Trash2,
   User,
 } from "lucide-react"
 import {
   cancelStream,
   createThread,
+  deleteThread,
   fetchMessages,
   listThreads,
   streamAssistantReply,
   Thread,
   ThreadMessage,
 } from "@/lib/api-client"
+import { useToast } from "@/hooks/use-toast"
 
 const suggestedQuestions = [
   "What should I know about my cholesterol levels?",
@@ -67,6 +80,9 @@ export default function PatientAIAssistantPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [streamingText, setStreamingText] = useState("")
+  const [threadToDelete, setThreadToDelete] = useState<Thread | null>(null)
+  const [isDeletingThread, setIsDeletingThread] = useState(false)
+  const { toast } = useToast()
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -123,6 +139,27 @@ export default function PatientAIAssistantPage() {
       setStreamingText("")
     } catch (error) {
       console.error("Failed to create thread", error)
+    }
+  }
+
+  const handleDeleteThread = async () => {
+    if (!threadToDelete) return
+    setIsDeletingThread(true)
+    try {
+      await deleteThread(threadToDelete.thread_id)
+      setThreads((prev) => prev.filter((t) => t.thread_id !== threadToDelete.thread_id))
+      if (currentThreadId === threadToDelete.thread_id) {
+        setCurrentThreadId(null)
+        setMessages([])
+        setStreamingText("")
+      }
+      toast({ title: "Conversation deleted", description: "The thread was removed successfully." })
+      setThreadToDelete(null)
+    } catch (error) {
+      console.error("Failed to delete thread", error)
+      toast({ title: "Delete failed", description: "Could not delete conversation.", variant: "destructive" })
+    } finally {
+      setIsDeletingThread(false)
     }
   }
 
@@ -419,18 +456,34 @@ export default function PatientAIAssistantPage() {
                   </div>
                 )}
                 {threads.map((thread) => (
-                  <button
+                  <div
                     key={thread.thread_id}
-                    onClick={() => handleSelectThread(thread.thread_id)}
-                    className={`flex flex-col rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/50 ${
+                    className={`group flex items-start gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-muted/50 ${
                       currentThreadId === thread.thread_id ? "bg-muted" : ""
                     }`}
                   >
-                    <span className="truncate text-sm font-medium text-card-foreground">{thread.title || "New Conversation"}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {thread.last_message_at ? new Date(thread.last_message_at).toLocaleString() : "No messages yet"}
-                    </span>
-                  </button>
+                    <button
+                      onClick={() => handleSelectThread(thread.thread_id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <span className="block truncate text-sm font-medium text-card-foreground" title={thread.title || "New Conversation"}>
+                        {thread.title || "New Conversation"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {thread.last_message_at ? new Date(thread.last_message_at).toLocaleString() : "No messages yet"}
+                      </span>
+                    </button>
+                    <button
+                      aria-label="Delete conversation"
+                      className="mt-0.5 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setThreadToDelete(thread)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 ))}
                 {threads.length === 0 && !isLoadingThreads && <p className="text-xs text-muted-foreground">No conversations yet.</p>}
               </div>
@@ -438,6 +491,29 @@ export default function PatientAIAssistantPage() {
           </Card>
         </div>
       </div>
+      <AlertDialog open={Boolean(threadToDelete)} onOpenChange={(open) => !open && setThreadToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the thread and all its messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingThread}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                void handleDeleteThread()
+              }}
+              disabled={isDeletingThread}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingThread ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
