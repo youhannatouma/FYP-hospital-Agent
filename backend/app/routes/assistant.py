@@ -152,11 +152,85 @@ def _hash_content(content: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def _generate_title(message: str, max_length: int = 50) -> str:
-    normalized = " ".join(message.split())
-    if len(normalized) > max_length:
-        return normalized[:max_length].rsplit(" ", 1)[0] + "..."
-    return normalized or "New Conversation"
+def _title_case_phrase(text: str) -> str:
+    minor = {
+        "a", "an", "and", "as", "at", "by", "for", "from", "in", "into",
+        "of", "on", "or", "the", "to", "with",
+    }
+    words = [w for w in text.split() if w]
+    if not words:
+        return ""
+    out: list[str] = []
+    for idx, raw in enumerate(words):
+        lower = raw.lower()
+        if idx > 0 and lower in minor:
+            out.append(lower)
+        else:
+            out.append(lower.capitalize())
+    return " ".join(out)
+
+
+def _generate_title(message: str, max_length: int = 42) -> str:
+    normalized = " ".join((message or "").strip().split())
+    if not normalized:
+        return "New Conversation"
+
+    lowered = normalized.lower()
+    fillers = [
+        "i need help with",
+        "can you help me with",
+        "can you help with",
+        "can you",
+        "could you",
+        "please help me with",
+        "please help with",
+        "what should i know about",
+        "what do i need to know about",
+        "i have a question about",
+        "i want to ask about",
+        "tell me about",
+        "help me with",
+    ]
+    for filler in fillers:
+        if lowered.startswith(filler + " "):
+            normalized = normalized[len(filler):].strip(" :,-")
+            lowered = normalized.lower()
+            break
+
+    compact = re.sub(r"[^\w\s-]", " ", normalized)
+    compact = " ".join(compact.split())
+    if not compact:
+        return "New Conversation"
+
+    keyword_map = [
+        ("advil", "Advil Safety"),
+        ("ibuprofen", "Ibuprofen Safety"),
+        ("interaction", "Medication Interactions"),
+        ("side effect", "Medication Side Effects"),
+        ("dose", "Dosage Guidance"),
+        ("dosage", "Dosage Guidance"),
+        ("cholesterol", "Cholesterol Guidance"),
+        ("blood pressure", "Blood Pressure Guidance"),
+        ("headache", "Headache Guidance"),
+        ("diabetes", "Diabetes Guidance"),
+        ("appointment", "Appointment Help"),
+    ]
+    lowered_compact = compact.lower()
+    for token, label in keyword_map:
+        if token in lowered_compact:
+            base = label
+            break
+    else:
+        words = compact.split()
+        meaningful = [w for w in words if w.lower() not in {"i", "me", "my", "please", "help", "with", "about"}]
+        base = " ".join(meaningful[:6]) if meaningful else " ".join(words[:6])
+        base = _title_case_phrase(base)
+
+    if not base:
+        return "New Conversation"
+    if len(base) <= max_length:
+        return base
+    return base[: max_length - 3].rstrip() + "..."
 
 
 def _parse_iso_datetime(raw: str | None) -> datetime | None:
@@ -254,6 +328,19 @@ def list_threads(
             next_cursor = last_thread.updated_at.isoformat()
 
     return ThreadListResponse(threads=threads, next_cursor=next_cursor)
+
+
+@router.delete("/threads/{thread_id}")
+def delete_thread(
+    thread_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    thread = _get_thread_or_404(db, thread_id, user)
+    db.query(ChatMessage).filter(ChatMessage.thread_id == thread.thread_id).delete(synchronize_session=False)
+    db.delete(thread)
+    db.commit()
+    return {"deleted": True, "thread_id": str(thread_id)}
 
 
 @router.get("/threads/{thread_id}/messages", response_model=MessagePageResponse)

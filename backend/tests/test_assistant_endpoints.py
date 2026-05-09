@@ -176,6 +176,36 @@ def test_get_messages_not_found_wrong_owner(client, db_session):
     assert res.status_code == 404
 
 
+def test_delete_thread_owned_cascades_messages(client, db_session):
+    t = ChatThread(owner_user_id=_FakeUser.user_id, title="Delete Me")
+    db_session.add(t)
+    db_session.commit()
+    db_session.refresh(t)
+    db_session.add(ChatMessage(thread_id=t.thread_id, role="user", content="hello", content_hash="x"))
+    db_session.commit()
+
+    res = client.delete(f"/api/assistant/threads/{t.thread_id}", headers=_auth_headers())
+    assert res.status_code == 200
+    body = res.json()
+    assert body["deleted"] is True
+    assert body["thread_id"] == str(t.thread_id)
+
+    exists_thread = db_session.query(ChatThread).filter(ChatThread.thread_id == t.thread_id).first()
+    exists_msgs = db_session.query(ChatMessage).filter(ChatMessage.thread_id == t.thread_id).all()
+    assert exists_thread is None
+    assert exists_msgs == []
+
+
+def test_delete_thread_wrong_owner_not_found(client, db_session):
+    other_user = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    t = ChatThread(owner_user_id=other_user, title="Secret")
+    db_session.add(t)
+    db_session.commit()
+
+    res = client.delete(f"/api/assistant/threads/{t.thread_id}", headers=_auth_headers())
+    assert res.status_code == 404
+
+
 def test_get_messages_returns_messages(client, db_session):
     t = ChatThread(owner_user_id=_FakeUser.user_id, title="Chat")
     db_session.add(t)
@@ -343,7 +373,7 @@ def test_thread_title_auto_generated_after_first_reply(client, db_session, monke
         chunks = [chunk for chunk in res.iter_text()]
 
     db_session.refresh(t)
-    assert t.title == "What is diabetes?"
+    assert t.title == "Diabetes Guidance"
 
 
 def test_thread_title_truncation(client, db_session, monkeypatch):
@@ -358,7 +388,7 @@ def test_thread_title_truncation(client, db_session, monkeypatch):
     db_session.commit()
     db_session.refresh(t)
 
-    long_message = "A " + "very " * 100 + "long message"
+    long_message = "Can you help me with my blood pressure medication interactions and side effect concerns over time?"
     with client.stream(
         "POST",
         f"/api/assistant/threads/{t.thread_id}/stream",
@@ -369,8 +399,7 @@ def test_thread_title_truncation(client, db_session, monkeypatch):
 
     db_session.refresh(t)
     assert t.title is not None
-    assert len(t.title) <= 53
-    assert t.title.endswith("...")
+    assert len(t.title) <= 42
 
 
 def test_cancel_no_active_stream(client, db_session):

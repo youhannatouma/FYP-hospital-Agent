@@ -63,14 +63,14 @@ def sync_clerk_users(
 
 @router.get("/workflow-traces")
 def admin_workflow_traces(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role("admin"))],
     workflow_family: str | None = None,
     thread_id: str | None = None,
     run_id: str | None = None,
     before_cursor: str | None = None,
     before_trace_id: str | None = None,
     limit: int = 50,
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(require_role("admin"))],
 ):
     del user
     rows = list_workflow_trace_events(
