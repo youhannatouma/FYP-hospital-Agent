@@ -1,5 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { getServerClerkToken } from "@/lib/server/clerk-token";
 
 const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
@@ -9,8 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
 
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -39,8 +38,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
     const body = await request.json();
 
     if (!token) {
@@ -81,8 +79,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
 
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

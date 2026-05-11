@@ -1,23 +1,20 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { getServerClerkToken } from "@/lib/server/clerk-token";
 
 const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
 export async function GET(request: Request) {
   try {
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
     const { searchParams } = new URL(request.url);
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // Proxy to FastAPI backend - list all doctors
     const res = await fetch(`${BACKEND}/doctors/?${searchParams}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : undefined,
     });
 
     const data = await res.json();

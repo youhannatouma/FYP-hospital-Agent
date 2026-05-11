@@ -1,12 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { getServerClerkToken } from "@/lib/server/clerk-token";
 
 const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
 export async function GET(request: Request) {
   try {
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
     const { searchParams } = new URL(request.url);
 
     if (!token) {
@@ -36,8 +35,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
     const body = await request.json();
 
     if (!token) {

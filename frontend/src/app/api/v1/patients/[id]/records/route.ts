@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { getServerClerkToken } from "@/lib/server/clerk-token";
 
 const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
@@ -9,8 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
 
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -40,8 +39,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
     const body = await request.json();
 
     if (!token) {

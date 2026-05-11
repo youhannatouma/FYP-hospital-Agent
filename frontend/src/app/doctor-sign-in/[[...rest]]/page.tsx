@@ -1,10 +1,24 @@
-"use client"
-
+import { auth } from "@clerk/nextjs/server"
 import { SignIn } from "@clerk/nextjs"
 import { Activity, Stethoscope } from "lucide-react"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 
-export default function DoctorSignInPage() {
+function resolveSignedInRedirect(role?: string) {
+  if (role === "doctor") return "/doctor"
+  if (role === "admin") return "/admin"
+  if (role === "patient") return "/patient"
+  return "/onboarding"
+}
+
+export default async function DoctorSignInPage() {
+  const { userId, sessionClaims } = await auth()
+  const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role
+
+  if (userId) {
+    redirect(resolveSignedInRedirect(role))
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans">
       {/* Left Decoration */}
@@ -61,6 +75,7 @@ export default function DoctorSignInPage() {
           <SignIn
             path="/doctor-sign-in"
             routing="path"
+            signUpUrl="/sign-up"
             forceRedirectUrl="/doctor"
             appearance={{
               elements: {

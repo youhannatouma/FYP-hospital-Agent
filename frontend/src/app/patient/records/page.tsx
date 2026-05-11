@@ -47,5 +47,6 @@ export default function RecordsPage() {
           </CardContent>
         </Card>
       </div>
+    </div>
   )
 }

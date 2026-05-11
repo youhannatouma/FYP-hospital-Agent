@@ -6,7 +6,7 @@ from uuid import UUID
 from app.auth.dependencies import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.schemas.message import MessageCreate, MessageResponse
+from app.schemas.message import InboxMessageResponse, MessageCreate, MessageResponse
 from app.skills.message_skill import MessageSkill
 from app.skills.error_handling_skill import ErrorHandlingSkill
 
@@ -39,7 +39,7 @@ def send_message(
     except Exception as e:
         raise ErrorHandlingSkill.handle(e)
 
-@router.get("/my")
+@router.get("/my", response_model=List[InboxMessageResponse])
 def get_my_messages(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)]

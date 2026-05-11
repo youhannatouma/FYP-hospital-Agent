@@ -3,103 +3,134 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CalendarDays, Clock, Video } from "lucide-react"
+import { CalendarDays, Clock, Loader2 } from "lucide-react"
 import Link from "next/link"
 import React from "react"
-import { VideoCallDialog } from "@/components/shared/video-call-dialog"
+import { getServiceContainer } from "@/lib/services/service-container"
+import type { Appointment } from "@/lib/services/repositories/appointment-repository"
 
-const visits = [
-  {
-    id: 1,
-    title: "Cardiology Follow-up",
-    doctor: "Dr. Michael Chen",
-    date: "Jan 25, 2024",
-    time: "10:00 AM",
-    type: "Next",
-    typeColor: "bg-primary text-primary-foreground",
-    isVirtual: true,
-  },
-  {
-    id: 2,
-    title: "Annual Physical",
-    doctor: "Dr. Emily Watson",
-    date: "Feb 15, 2024",
-    time: "2:30 PM",
-    type: "Scheduled",
-    typeColor: "bg-muted text-muted-foreground",
-    isVirtual: false,
-  },
-]
+type DoctorVisit = Appointment & {
+  title: string
+  badgeLabel: string
+  badgeClassName: string
+}
 
 export interface UpcomingVisitsProps {
   onViewAppointment?: (visit: unknown) => void
 }
 
 export function UpcomingVisits({ onViewAppointment }: Readonly<UpcomingVisitsProps>) {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [activePatient, setActivePatient] = React.useState("")
+  const [visits, setVisits] = React.useState<DoctorVisit[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
 
-  const handleJoin = (e: React.MouseEvent, name: string) => {
-    e.stopPropagation()
-    setActivePatient(name)
-    setIsOpen(true)
-  }
+  React.useEffect(() => {
+    let isActive = true
+
+    const fetchAppointments = async () => {
+      try {
+        setIsLoading(true)
+        const container = getServiceContainer()
+        const appointments = await container.appointment.getDoctorAppointments()
+        if (!isActive) return
+
+        const normalized = (Array.isArray(appointments) ? appointments : [])
+          .slice(0, 3)
+          .map((appointment, index) => ({
+            ...appointment,
+            title: appointment.appointment_type || "Consultation",
+            badgeLabel: index === 0 ? "Next" : "Scheduled",
+            badgeClassName:
+              index === 0
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground",
+          }))
+
+        setVisits(normalized)
+      } catch (error) {
+        console.error("[DoctorUpcomingVisits] Failed to load appointments:", error)
+        if (!isActive) return
+        setVisits([])
+      } finally {
+        if (isActive) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    fetchAppointments()
+
+    return () => {
+      isActive = false
+    }
+  }, [])
 
   return (
     <Card className="premium-card rounded-[2rem] border-none shadow-premium overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-card-foreground">
           <CalendarDays className="h-4 w-4 text-accent" />
-          Upcoming patient
+          Upcoming appointments
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {visits.map((visit) => (
-          <div
-            key={visit.id}
-            role="button"
-            tabIndex={0}
-            className="rounded-2xl border border-border/50 p-4 transition-all hover:bg-primary/5 cursor-pointer group/visit active:scale-98"
-            onClick={() => onViewAppointment?.(visit)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                onViewAppointment?.(visit)
-              }
-            }}
-          >
-            <div className="flex items-start justify-between mb-2">
-              <h4 className="text-sm font-semibold text-card-foreground">
-                {visit.title}
-              </h4>
-              <Badge className={`text-xs ${visit.typeColor} border-0`}>
-                {visit.type}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mb-2">
-              {visit.doctor}
-            </p>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <CalendarDays className="h-3 w-3 text-destructive" />
-                {visit.date}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {visit.time}
-              </span>
-            </div>
-            {visit.isVirtual && (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading upcoming appointments...</p>
+          </div>
+        ) : visits.length > 0 ? (
+          visits.map((visit) => (
+            <div
+              key={visit.appointment_id}
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer rounded-2xl border border-border/50 p-4 transition-all hover:bg-primary/5 group/visit active:scale-98"
+              onClick={() => onViewAppointment?.(visit)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  onViewAppointment?.(visit)
+                }
+              }}
+            >
+              <div className="mb-2 flex items-start justify-between">
+                <h4 className="text-sm font-semibold text-card-foreground">
+                  {visit.title}
+                </h4>
+                <Badge className={`border-0 text-xs ${visit.badgeClassName}`}>
+                  {visit.badgeLabel}
+                </Badge>
+              </div>
+              <p className="mb-2 text-xs text-muted-foreground">
+                {visit.patient_name || "Patient"}
+              </p>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <CalendarDays className="h-3 w-3 text-destructive" />
+                  {visit.date || "Date pending"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {visit.time || "Time pending"}
+                </span>
+              </div>
               <Button
                 size="sm"
-                className="mt-3 w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={(e) => handleJoin(e, visit.doctor)} // Note: doctor field in mock data seems to be used as patient name here
+                variant="outline"
+                className="mt-3 w-full"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onViewAppointment?.(visit)
+                }}
               >
-                <Video className="mr-2 h-3 w-3" />
-                Join Virtual Visit
+                Review appointment
               </Button>
-            )}
+            </div>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border/60 p-6 text-center text-sm text-muted-foreground">
+            No scheduled appointments yet.
           </div>
-        ))}
+        )}
         <Link
           href="/doctor/appointments"
           className="text-center text-sm text-primary hover:underline"
@@ -107,14 +138,6 @@ export function UpcomingVisits({ onViewAppointment }: Readonly<UpcomingVisitsPro
           View All Appointments
         </Link>
       </CardContent>
-
-      <VideoCallDialog 
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        remoteName={activePatient}
-        role="doctor"
-        roomId={`visit_${activePatient.replaceAll(" ", "_")}`}
-      />
     </Card>
   )
 }

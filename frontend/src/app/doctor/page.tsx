@@ -13,7 +13,7 @@ import { StatCards } from "@/components/doctor/dashboard/stat-cards"
 import { DoctorMedicalTimeline } from "@/components/doctor/dashboard/doctor-history-timeline"
 import { DoctorAIAvatar } from "@/components/doctor/dashboard/ai-avatar"
 import { UpcomingVisits } from "@/components/doctor/dashboard/upcoming-visits"
-import { MessagesSection } from "@/components/patient/dashboard/messages-section"
+import { DoctorMessagesSection } from "@/components/doctor/dashboard/messages-section"
 import { RecentPatients } from "@/components/doctor/dashboard/recent-patients"
 import { AppointmentsTable } from "@/components/doctor/dashboard/appointment-table"
 import { VitalsTracking } from "@/components/doctor/dashboard/vitals-tracking"
@@ -162,7 +162,7 @@ export default function DoctorDashboardPage() {
       </div>
 
       {/* Messages & Communication */}
-      <MessagesSection onNewMessage={() => setIsNewMessageOpen(true)} aiAssistantPath="/doctor/ai-assistant" />
+      <DoctorMessagesSection onNewMessage={() => setIsNewMessageOpen(true)} />
     </m.div>
   )
 }

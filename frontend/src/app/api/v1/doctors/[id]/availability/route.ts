@@ -1,5 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { getServerClerkToken } from "@/lib/server/clerk-token";
 
 const BACKEND = process.env.BACKEND_URL || "http://localhost:8000/api";
 
@@ -9,8 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { getToken } = await auth();
-    const token = await getToken();
+    const token = await getServerClerkToken();
     const { searchParams } = new URL(request.url);
 
     if (!token) {

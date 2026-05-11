@@ -50,30 +50,30 @@ export function DoctorAIAvatar() {
         </div>
 
         <div className="relative aspect-square max-w-[180px] mx-auto group-hover:scale-105 transition-transform duration-700">
-           <ThreeAvatar size={180} textToSpeak="Doctor, I've identified 3 high-priority clinical reviews pending. Ready for analysis." />
+           <ThreeAvatar size={180} />
            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 glass-dark rounded-full border border-white/10 text-[10px] font-black uppercase tracking-widest whitespace-nowrap shadow-xl">
-             Neural Link Active
+             AI Assistant Ready
            </div>
         </div>
 
         <div className="rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 p-5 mt-2 inner-glow">
           <div className="flex items-center gap-2 mb-3">
             <Brain className="h-4 w-4 text-blue-200 animate-pulse" />
-            <span className="text-xs font-black uppercase tracking-widest text-indigo-100">Clinic Analytics</span>
+            <span className="text-xs font-black uppercase tracking-widest text-indigo-100">Assistant Workspace</span>
           </div>
           <p className="text-xs text-indigo-50/70 leading-relaxed font-bold">
-            Clinic throughput is <span className="text-emerald-300">up 5%</span> today. Identified 3 high-risk hypertension reviews pending.
+            Open the assistant for research, drafting, note summarization, and protocol questions using your live workspace context.
           </p>
           <div className="mt-4 flex items-center gap-3">
             <div className="flex-1 h-3 rounded-full bg-white/10 overflow-hidden relative border border-white/5">
                 <m.div 
                 initial={{ width: 0 }}
-                animate={{ width: "85%" }}
+                animate={{ width: "100%" }}
                 transition={{ duration: 1.5, delay: 0.5, ease: "circOut" }}
                 className="h-full bg-gradient-to-r from-blue-400 to-indigo-300 rounded-full shadow-glow" 
                 />
             </div>
-            <span className="text-[10px] font-black text-white">85% Sync</span>
+            <span className="text-[10px] font-black text-white">Ready</span>
           </div>
         </div>
 
@@ -100,7 +100,7 @@ export function DoctorAIAvatar() {
           <Link href="/doctor/ai-assistant">
             <Button className="w-full bg-slate-900 text-white hover:bg-slate-800 border-0 h-11 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl transition-all active:scale-95">
               <MessageCircle className="mr-2 h-4 w-4" />
-              Chat Admin
+              Open Assistant
             </Button>
           </Link>
           <Button
@@ -109,7 +109,7 @@ export function DoctorAIAvatar() {
             onClick={() => {
               toast({
                 title: "Voice Transcription",
-                description: "Clinical-note agent is listening...",
+                description: "Opening dictation workspace...",
               })
               openAssistant("Transcribe this clinical note and summarize key findings")
             }}

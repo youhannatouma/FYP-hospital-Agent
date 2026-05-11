@@ -1,6 +1,5 @@
 "use client"
 
-import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 
 import { Heart, AlertTriangle, Apple, Bot, ChevronRight, Sparkles } from "lucide-react"
@@ -10,7 +9,6 @@ import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 export function AIHealthInsights() {
-  const { toast } = useToast()
   const router = useRouter()
 
   const handleAnalystClick = () => {
@@ -18,40 +16,36 @@ export function AIHealthInsights() {
   }
 
   const handleInsightAction = (action: string) => {
-    toast({
-      title: "Action Initiated",
-      description: `Preparing interface for: ${action}`,
-    })
     router.push(`/patient/ai-assistant?prompt=${encodeURIComponent(`Help me with this health insight action: ${action}`)}`)
   }
 
   const insights = [
     {
       id: 1,
-      title: "Cardiac Resonance",
+      title: "Heart Health Questions",
       icon: Heart,
       iconBg: "bg-blue-500/10 text-blue-500",
-      description: "Heart rate variability (HRV) is trending upward. This suggests improved aerobic fitness. Maintain current protocol.",
-      tags: [{ label: "Optimal", color: "bg-emerald-500/10 text-emerald-500" }],
-      action: "Review Sync",
+      description: "Get help understanding common heart-health questions and what information to bring to your next visit.",
+      tags: [{ label: "Educational", color: "bg-emerald-500/10 text-emerald-500" }],
+      action: "Explore Questions",
     },
     {
       id: 2,
-      title: "Lipid Trajectory",
+      title: "Lab Result Prep",
       icon: AlertTriangle,
       iconBg: "bg-amber-500/10 text-amber-500",
-      description: "Recent panel shows LDL at 165mg/dL. We suggest a dietary adjustment focusing on polyunsaturated fats.",
-      tags: [{ label: "Action required", color: "bg-amber-500/10 text-amber-500" }],
-      action: "View Strategy",
+      description: "Generate a list of follow-up questions for your doctor before reviewing bloodwork or other recent test results.",
+      tags: [{ label: "Visit prep", color: "bg-amber-500/10 text-amber-500" }],
+      action: "Plan Discussion",
     },
     {
       id: 3,
-      title: "Metabolic Focus",
+      title: "Lifestyle Planning",
       icon: Apple,
       iconBg: "bg-violet-500/10 text-violet-500",
-      description: "Consider Mediterranean-style intermittent fasting to optimize glucose response patterns.",
-      tags: [{ label: "Strategic", color: "bg-primary/10 text-primary" }],
-      action: "Expand",
+      description: "Ask for practical habit ideas you can discuss with your clinician based on your goals and routine.",
+      tags: [{ label: "Coaching", color: "bg-primary/10 text-primary" }],
+      action: "Get Ideas",
     },
   ]
 

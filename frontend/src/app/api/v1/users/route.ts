@@ -44,6 +44,11 @@ async function resolveBearerToken(request: Request): Promise<string | null> {
   }
   try {
     const { getToken } = await auth();
+    const template = process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE?.trim();
+    if (template) {
+      const templated = await getToken({ template });
+      if (templated) return templated;
+    }
     return await getToken();
   } catch {
     return null;

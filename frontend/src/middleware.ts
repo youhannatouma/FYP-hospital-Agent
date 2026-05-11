@@ -57,7 +57,6 @@ export default clerkMiddleware(async (auth, req) => {
   let role = claimRole;
   const { pathname } = req.nextUrl;
 
-  // Fallback role resolution when Clerk session claims are stale.
   if (!role && userId) {
     let token: string | null = null;
     try {
@@ -75,58 +74,45 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
-  // ── 1. Authenticated users on auth pages → redirect to their dashboard ──
   if (userId) {
     const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up") || pathname.startsWith("/doctor-sign-in");
     if (isAuthPage) {
       if (role === "doctor") return NextResponse.redirect(new URL("/doctor", req.url));
-      if (role === "admin")  return NextResponse.redirect(new URL("/admin", req.url));
+      if (role === "admin") return NextResponse.redirect(new URL("/admin", req.url));
       if (role === "patient") return NextResponse.redirect(new URL("/patient", req.url));
-      // Signed-in users should keep moving through onboarding instead of
-      // lingering on an auth page while role resolution catches up.
       return NextResponse.redirect(new URL("/onboarding", req.url));
     }
   }
 
-  // ── 2. Protect all dashboard routes — must be signed in ──
   if (isProtectedRoute(req)) {
     await auth.protect();
 
-    // ── 3. Role-based access control ──
-
-    // DOCTOR routes
     if (pathname.startsWith("/doctor")) {
       if (role !== "doctor") {
         if (role === "patient") return NextResponse.redirect(new URL("/patient", req.url));
-        if (role === "admin")   return NextResponse.redirect(new URL("/admin", req.url));
-        // No role yet - allow access, role will be set on load
+        if (role === "admin") return NextResponse.redirect(new URL("/admin", req.url));
       }
     }
 
-    // PATIENT routes
     if (pathname.startsWith("/patient")) {
       if (role !== "patient") {
         if (role === "doctor") return NextResponse.redirect(new URL("/doctor", req.url));
-        if (role === "admin")  return NextResponse.redirect(new URL("/admin", req.url));
-        // Missing role can happen briefly right after sign-in/session refresh.
-        // Allow rendering instead of forcing a redirect loop/blank transition.
+        if (role === "admin") return NextResponse.redirect(new URL("/admin", req.url));
         if (userId && !role) return NextResponse.next();
       }
     }
 
-    // ADMIN routes
     if (pathname.startsWith("/admin")) {
       if (role !== "admin") {
-        if (role === "doctor")  return NextResponse.redirect(new URL("/doctor", req.url));
+        if (role === "doctor") return NextResponse.redirect(new URL("/doctor", req.url));
         if (role === "patient") return NextResponse.redirect(new URL("/patient", req.url));
         return NextResponse.redirect(new URL("/onboarding", req.url));
       }
     }
 
-    // ONBOARDING — skip if already has a role & dashboard
     if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
-      if (role === "doctor")  return NextResponse.redirect(new URL("/doctor", req.url));
-      if (role === "admin")   return NextResponse.redirect(new URL("/admin", req.url));
+      if (role === "doctor") return NextResponse.redirect(new URL("/doctor", req.url));
+      if (role === "admin") return NextResponse.redirect(new URL("/admin", req.url));
       if (role === "patient") return NextResponse.redirect(new URL("/patient", req.url));
     }
   }
