@@ -25,37 +25,9 @@ import { useToast } from "@/components/ui/use-toast"
 import { LabReportDetailDialog } from "@/components/patient/dialogs/lab-report-detail-dialog"
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-
-const labResults = [
-  {
-    id: 1,
-    testName: "Comprehensive Lipid Panel",
-    collectedDate: "Jan 8, 2024",
-    orderedBy: "Dr. Michael Chen",
-    status: "Review Required",
-    statusColor: "bg-amber-500/10 text-amber-500",
-    icon: AlertTriangle,
-    results: [
-      { name: "Total Cholesterol", value: "245", unit: "mg/dL", range: "< 200", trend: "up", flag: "High" },
-      { name: "LDL (Bad)", value: "165", unit: "mg/dL", range: "< 130", trend: "up", flag: "High" },
-      { name: "HDL (Good)", value: "48", unit: "mg/dL", range: "> 40", trend: "stable", flag: null },
-      { name: "Triglycerides", value: "160", unit: "mg/dL", range: "< 150", trend: "up", flag: "Borderline" },
-    ],
-  },
-  {
-    id: 2,
-    testName: "CBC with Differential",
-    collectedDate: "Dec 15, 2023",
-    orderedBy: "Dr. Emily Watson",
-    status: "Optimal",
-    statusColor: "bg-emerald-500/10 text-emerald-500",
-    icon: CheckCircle2,
-    results: [
-      { name: "WBC Count", value: "7.2", unit: "K/uL", range: "4.5-11.0", trend: "stable", flag: null },
-      { name: "Hemoglobin", value: "14.2", unit: "g/dL", range: "13.5-17.5", trend: "stable", flag: null },
-    ],
-  },
-]
+import { useMedicalRecords } from "@/hooks/use-medical-records"
+import { useEffect, useState } from "react"
+import { TrendingUp, TrendingDown, Minus } from "lucide-react"
 
 function TrendIndicator({ trend }: { trend: string }) {
   if (trend === "up") return <TrendingUp className="h-3.5 w-3.5 text-amber-500" />
@@ -65,8 +37,38 @@ function TrendIndicator({ trend }: { trend: string }) {
 
 export default function LabResultsPage() {
   const { toast } = useToast()
+  const { records, loading: isLoading } = useMedicalRecords()
+  
+  const [labResults, setLabResults] = useState([])
   const [selectedReport, setSelectedReport] = useState<unknown | null>(null)
   const [showDetail, setShowDetail] = useState(false)
+
+  useEffect(() => {
+    if (records) {
+      const filtered = records
+        .filter(r => r.record_type === "Lab Result")
+        .map(r => ({
+          id: r.id,
+          testName: r.title,
+          collectedDate: r.date ? new Date(r.date).toLocaleDateString() : "TBD",
+          orderedBy: r.doctor_name || "Staff Physician",
+          status: "Verified",
+          statusColor: "bg-emerald-500/10 text-emerald-500",
+          icon: CheckCircle2,
+          results: r.vitals ? Object.entries(r.vitals).map(([name, val]) => ({
+            name,
+            value: String(val),
+            unit: "",
+            range: "N/A",
+            trend: "stable",
+            flag: null
+          })) : [
+            { name: "Result", value: r.diagnosis || "Normal", unit: "", range: "N/A", trend: "stable", flag: null }
+          ]
+        }))
+      setLabResults(filtered)
+    }
+  }, [records])
 
   const handleExportAll = () => {
     toast({

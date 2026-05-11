@@ -173,8 +173,10 @@ export default function ClinicalHistoryPage() {
                 <Stethoscope className="h-5 w-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-xs font-bold uppercase text-muted-foreground">Primary Care</p>
-                <h3 className="text-2xl font-bold">Dr. Michael Chen</h3>
+                <p className="text-xs font-bold uppercase text-muted-foreground">Primary Provider</p>
+                <h3 className="text-xl font-bold truncate max-w-[150px]">
+                  {patientRecords[0]?.doctor_name || "Staff Physician"}
+                </h3>
               </div>
             </div>
           </CardContent>

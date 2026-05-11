@@ -62,68 +62,7 @@ type ApiAppointment = {
   room_id?: string
 }
 
-const upcomingAppointments: Appointment[] = [
-  {
-    id: 1,
-    doctor: "Dr. Michael Chen",
-    specialty: "Cardiology",
-    avatar: "MC",
-    date: "Jan 25, 2024",
-    time: "10:00 AM",
-    type: "Video",
-    typeIcon: Video,
-    status: "Confirmed",
-    statusColor: "bg-emerald-500/10 text-emerald-500",
-    location: "Virtual - Telehealth",
-    notes: "Follow-up for cholesterol management",
-  },
-  {
-    id: 2,
-    doctor: "Dr. Emily Watson",
-    specialty: "General Practice",
-    avatar: "EW",
-    date: "Feb 15, 2024",
-    time: "2:30 PM",
-    type: "In-person",
-    typeIcon: MapPin,
-    status: "Scheduled",
-    statusColor: "bg-blue-500/10 text-blue-500",
-    location: "Westside Clinic, Suite 204",
-    notes: "Annual physical examination",
-  },
-  {
-    id: 3,
-    doctor: "Dr. Raj Patel",
-    specialty: "Endocrinology",
-    avatar: "RP",
-    date: "Mar 5, 2024",
-    time: "11:00 AM",
-    type: "Phone",
-    typeIcon: Phone,
-    status: "Pending",
-    statusColor: "bg-amber-500/10 text-amber-500",
-    location: "Phone consultation",
-    notes: "Blood sugar monitoring review",
-  },
-]
-
-const pastAppointments: Appointment[] = [
-  {
-    id: 4,
-    doctor: "Dr. Michael Chen",
-    specialty: "Cardiology",
-    avatar: "MC",
-    date: "Jan 10, 2024",
-    time: "10:00 AM",
-    type: "In-person",
-    typeIcon: MapPin,
-    status: "Completed",
-    statusColor: "bg-emerald-500/10 text-emerald-500",
-    location: "Downtown Medical Center",
-  },
-]
-
-const cancelledAppointments: Appointment[] = []
+// Real-time data will be populated via component state
 
 
 function AppointmentCard({

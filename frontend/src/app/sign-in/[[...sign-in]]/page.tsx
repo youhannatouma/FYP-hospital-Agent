@@ -48,7 +48,7 @@ export default function SignInPage() {
           </div>
           
           <SignIn 
-            forceRedirectUrl="/onboarding"
+            fallbackRedirectUrl="/onboarding"
             appearance={{
               elements: {
                 formButtonPrimary: "bg-primary hover:bg-primary/90 text-sm font-bold h-11 rounded-xl shadow-lg shadow-primary/20",

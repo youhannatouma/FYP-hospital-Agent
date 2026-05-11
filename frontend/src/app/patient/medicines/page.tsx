@@ -33,78 +33,43 @@ import { PharmacyOrderDialog } from "@/components/patient/dialogs/pharmacy-order
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
+import { usePrescriptions } from "@/hooks/use-prescriptions"
+import { useEffect } from "react"
+
 export default function MedicinesPage() {
   const { toast } = useToast()
+  const { prescriptions, loading: isLoading } = usePrescriptions()
   
   const [searchQuery, setSearchQuery] = useState("")
-  
   const [selectedPrescription, setSelectedPrescription] = useState<unknown | null>(null)
   const [showRefill, setShowRefill] = useState(false)
-  
   const [selectedPharmacy, setSelectedPharmacy] = useState<unknown | null>(null)
   const [showOrder, setShowOrder] = useState(false)
 
-  const [activePrescriptions] = useState([
-    {
-      id: 1,
-      name: "Lisinopril",
-      dosage: "10mg",
-      frequency: "1x Daily",
-      purpose: "Hypertension Control",
-      doctor: "Dr. Michael Chen",
-      startDate: "Oct 15, 2023",
-      endDate: "Apr 15, 2024",
-      refillsLeft: 2,
-      progress: 60,
-      status: "Active",
-      nextDose: "08:00 AM",
-      accent: "primary",
-    },
-    {
-      id: 2,
-      name: "Atorvastatin",
-      dosage: "20mg",
-      frequency: "1x Daily",
-      purpose: "Lipid Management",
-      doctor: "Dr. Michael Chen",
-      startDate: "Nov 1, 2023",
-      endDate: "May 1, 2024",
-      refillsLeft: 5,
-      progress: 45,
-      status: "Active",
-      nextDose: "09:00 PM",
-      accent: "emerald",
-    },
-    {
-      id: 3,
-      name: "Aspirin",
-      dosage: "81mg",
-      frequency: "1x Daily",
-      purpose: "Cardiac Protection",
-      doctor: "Dr. Emily Watson",
-      startDate: "Sep 1, 2023",
-      endDate: "Ongoing",
-      refillsLeft: 8,
-      progress: 100,
-      status: "Controlled",
-      nextDose: "08:00 AM",
-      accent: "blue",
-    },
-  ])
+  const [activePrescriptions, setActivePrescriptions] = useState([])
+  const [pastPrescriptions, setPastPrescriptions] = useState([])
 
-  const [pastPrescriptions] = useState([
-    {
-      id: 4,
-      name: "Amoxicillin",
-      dosage: "500mg",
-      frequency: "3x Daily",
-      purpose: "Bacterial Infection",
-      doctor: "Dr. Emily Watson",
-      startDate: "Dec 1, 2023",
-      endDate: "Dec 14, 2023",
-      status: "Completed",
-    },
-  ])
+  useEffect(() => {
+    if (prescriptions) {
+      const mapped = prescriptions.map(rx => ({
+        id: rx.id || rx.prescription_id,
+        name: rx.medicine_name,
+        dosage: rx.dosage,
+        frequency: rx.frequency,
+        purpose: rx.instructions || "Therapeutic Protocol",
+        doctor: rx.doctor_name || "Staff Physician",
+        startDate: rx.created_at ? new Date(rx.created_at).toLocaleDateString() : "TBD",
+        endDate: "Ongoing",
+        refillsLeft: 5,
+        progress: 100,
+        status: rx.status || "Active",
+        nextDose: "Scheduled",
+        accent: rx.status === "Active" ? "primary" : "blue",
+      }))
+      setActivePrescriptions(mapped.filter(rx => rx.status === "Active"))
+      setPastPrescriptions(mapped.filter(rx => rx.status !== "Active"))
+    }
+  }, [prescriptions])
 
   const [pharmacyResults] = useState([
     {
