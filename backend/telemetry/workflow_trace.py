@@ -107,22 +107,27 @@ def emit_workflow_trace_event(
     last_error: Exception | None = None
     try:
         for _attempt in range(3):
-            event = WorkflowTraceEvent(
-                workflow_family=workflow_family,
-                thread_id=str(thread_id or ""),
-                actor_user_id=str(actor_user_id) if actor_user_id else None,
-                patient_user_id=str(patient_user_id) if patient_user_id else None,
-                run_id=run_id,
-                node_name=node_name,
-                event_type=event_type,
-                sequence=_next_sequence(
-                    session, workflow_family=workflow_family, run_id=run_id
-                ),
-                status=status,
-                duration_ms=duration_ms,
-                payload_json=_sanitize_payload(payload),
-                occurred_at=datetime.utcnow(),
-            )
+            try:
+                event = WorkflowTraceEvent(
+                    workflow_family=workflow_family,
+                    thread_id=str(thread_id or ""),
+                    actor_user_id=str(actor_user_id) if actor_user_id else None,
+                    patient_user_id=str(patient_user_id) if patient_user_id else None,
+                    run_id=run_id,
+                    node_name=node_name,
+                    event_type=event_type,
+                    sequence=_next_sequence(
+                        session, workflow_family=workflow_family, run_id=run_id
+                    ),
+                    status=status,
+                    duration_ms=duration_ms,
+                    payload_json=_sanitize_payload(payload),
+                    occurred_at=datetime.utcnow(),
+                )
+            except Exception as exc:
+                # Fail open when telemetry DB is unavailable so product flows/tests continue.
+                last_error = exc
+                break
             try:
                 session.add(event)
                 session.commit()

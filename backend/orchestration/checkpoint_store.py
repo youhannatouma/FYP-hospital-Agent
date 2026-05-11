@@ -43,27 +43,28 @@ class SqlCheckpointSaver(BaseCheckpointSaver[str]):
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"].get("checkpoint_id")
 
-        with self._session() as db:
-            query = db.query(LangGraphCheckpoint).filter(
-                LangGraphCheckpoint.thread_id == thread_id,
-                LangGraphCheckpoint.checkpoint_ns == checkpoint_ns,
-            )
-            if checkpoint_id:
-                record = query.filter(
-                    LangGraphCheckpoint.checkpoint_id == checkpoint_id
-                ).first()
-            else:
-                record = query.order_by(desc(LangGraphCheckpoint.created_at)).first()
+        try:
+            with self._session() as db:
+                query = db.query(LangGraphCheckpoint).filter(
+                    LangGraphCheckpoint.thread_id == thread_id,
+                    LangGraphCheckpoint.checkpoint_ns == checkpoint_ns,
+                )
+                if checkpoint_id:
+                    record = query.filter(
+                        LangGraphCheckpoint.checkpoint_id == checkpoint_id
+                    ).first()
+                else:
+                    record = query.order_by(desc(LangGraphCheckpoint.created_at)).first()
 
-            if not record:
-                return None
+                if not record:
+                    return None
 
-            checkpoint = self.serde.loads_typed(
-                (record.checkpoint_type, record.checkpoint_blob)
-            )
-            metadata = self.serde.loads_typed(
-                (record.metadata_type, record.metadata_blob)
-            )
+                checkpoint = self.serde.loads_typed(
+                    (record.checkpoint_type, record.checkpoint_blob)
+                )
+                metadata = self.serde.loads_typed(
+                    (record.metadata_type, record.metadata_blob)
+                )
 
             versions = checkpoint.get("channel_versions", {})
             channel_values: dict[str, Any] = {}
@@ -113,19 +114,22 @@ class SqlCheckpointSaver(BaseCheckpointSaver[str]):
                     }
                 }
 
-            return CheckpointTuple(
-                config={
-                    "configurable": {
-                        "thread_id": thread_id,
-                        "checkpoint_ns": checkpoint_ns,
-                        "checkpoint_id": record.checkpoint_id,
-                    }
-                },
-                checkpoint=checkpoint,
-                metadata=metadata,
-                parent_config=parent_config,
-                pending_writes=pending_writes,
-            )
+                return CheckpointTuple(
+                    config={
+                        "configurable": {
+                            "thread_id": thread_id,
+                            "checkpoint_ns": checkpoint_ns,
+                            "checkpoint_id": record.checkpoint_id,
+                        }
+                    },
+                    checkpoint=checkpoint,
+                    metadata=metadata,
+                    parent_config=parent_config,
+                    pending_writes=pending_writes,
+                )
+        except Exception as exc:
+            log.warning("checkpoint_get_failed thread_id=%s error=%s", thread_id, type(exc).__name__)
+            return None
 
     def list(
         self,
@@ -141,30 +145,34 @@ class SqlCheckpointSaver(BaseCheckpointSaver[str]):
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
 
-        with self._session() as db:
-            query = db.query(LangGraphCheckpoint).filter(
-                LangGraphCheckpoint.thread_id == thread_id,
-                LangGraphCheckpoint.checkpoint_ns == checkpoint_ns,
-            )
-            if before:
-                before_id = before.get("configurable", {}).get("checkpoint_id")
-                if before_id:
-                    query = query.filter(LangGraphCheckpoint.checkpoint_id < before_id)
-            query = query.order_by(desc(LangGraphCheckpoint.created_at))
-            if limit:
-                query = query.limit(limit)
+        try:
+            with self._session() as db:
+                query = db.query(LangGraphCheckpoint).filter(
+                    LangGraphCheckpoint.thread_id == thread_id,
+                    LangGraphCheckpoint.checkpoint_ns == checkpoint_ns,
+                )
+                if before:
+                    before_id = before.get("configurable", {}).get("checkpoint_id")
+                    if before_id:
+                        query = query.filter(LangGraphCheckpoint.checkpoint_id < before_id)
+                query = query.order_by(desc(LangGraphCheckpoint.created_at))
+                if limit:
+                    query = query.limit(limit)
 
-            for record in query.all():
-                tuple_config = {
-                    "configurable": {
-                        "thread_id": record.thread_id,
-                        "checkpoint_ns": record.checkpoint_ns,
-                        "checkpoint_id": record.checkpoint_id,
+                for record in query.all():
+                    tuple_config = {
+                        "configurable": {
+                            "thread_id": record.thread_id,
+                            "checkpoint_ns": record.checkpoint_ns,
+                            "checkpoint_id": record.checkpoint_id,
+                        }
                     }
-                }
-                item = self.get_tuple(tuple_config)
-                if item:
-                    yield item
+                    item = self.get_tuple(tuple_config)
+                    if item:
+                        yield item
+        except Exception as exc:
+            log.warning("checkpoint_list_failed thread_id=%s error=%s", thread_id, type(exc).__name__)
+            return
 
     def put(
         self,
@@ -186,13 +194,14 @@ class SqlCheckpointSaver(BaseCheckpointSaver[str]):
             get_checkpoint_metadata(config, metadata)
         )
 
-        with self._session() as db:
-            for channel, version in new_versions.items():
-                value = values.get(channel)
-                if value is None:
-                    blob_type, blob = "empty", b""
-                else:
-                    blob_type, blob = self.serde.dumps_typed(value)
+        try:
+            with self._session() as db:
+                for channel, version in new_versions.items():
+                    value = values.get(channel)
+                    if value is None:
+                        blob_type, blob = "empty", b""
+                    else:
+                        blob_type, blob = self.serde.dumps_typed(value)
 
                 existing_blob = (
                     db.query(LangGraphCheckpointBlob)
@@ -249,7 +258,10 @@ class SqlCheckpointSaver(BaseCheckpointSaver[str]):
                     )
                 )
 
-            db.commit()
+                db.commit()
+        except Exception as exc:
+            log.warning("checkpoint_put_failed thread_id=%s error=%s", thread_id, type(exc).__name__)
+            return config
 
         return {
             "configurable": {
@@ -270,54 +282,60 @@ class SqlCheckpointSaver(BaseCheckpointSaver[str]):
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"]["checkpoint_id"]
 
-        with self._session() as db:
-            for idx, (channel, value) in enumerate(writes):
-                write_idx = WRITES_IDX_MAP.get(channel, idx)
-                if write_idx < 0:
-                    continue
+        try:
+            with self._session() as db:
+                for idx, (channel, value) in enumerate(writes):
+                    write_idx = WRITES_IDX_MAP.get(channel, idx)
+                    if write_idx < 0:
+                        continue
 
-                existing = (
-                    db.query(LangGraphCheckpointWrite)
-                    .filter(
-                        LangGraphCheckpointWrite.thread_id == thread_id,
-                        LangGraphCheckpointWrite.checkpoint_ns == checkpoint_ns,
-                        LangGraphCheckpointWrite.checkpoint_id == checkpoint_id,
-                        LangGraphCheckpointWrite.task_id == task_id,
-                        LangGraphCheckpointWrite.write_idx == str(write_idx),
+                    existing = (
+                        db.query(LangGraphCheckpointWrite)
+                        .filter(
+                            LangGraphCheckpointWrite.thread_id == thread_id,
+                            LangGraphCheckpointWrite.checkpoint_ns == checkpoint_ns,
+                            LangGraphCheckpointWrite.checkpoint_id == checkpoint_id,
+                            LangGraphCheckpointWrite.task_id == task_id,
+                            LangGraphCheckpointWrite.write_idx == str(write_idx),
+                        )
+                        .first()
                     )
-                    .first()
-                )
-                if existing:
-                    continue
+                    if existing:
+                        continue
 
-                value_type, value_blob = self.serde.dumps_typed(value)
-                db.add(
-                    LangGraphCheckpointWrite(
-                        thread_id=thread_id,
-                        checkpoint_ns=checkpoint_ns,
-                        checkpoint_id=checkpoint_id,
-                        task_id=task_id,
-                        write_idx=str(write_idx),
-                        channel=channel,
-                        value_type=value_type,
-                        value_blob=value_blob,
-                        task_path=task_path,
+                    value_type, value_blob = self.serde.dumps_typed(value)
+                    db.add(
+                        LangGraphCheckpointWrite(
+                            thread_id=thread_id,
+                            checkpoint_ns=checkpoint_ns,
+                            checkpoint_id=checkpoint_id,
+                            task_id=task_id,
+                            write_idx=str(write_idx),
+                            channel=channel,
+                            value_type=value_type,
+                            value_blob=value_blob,
+                            task_path=task_path,
+                        )
                     )
-                )
-            db.commit()
+                db.commit()
+        except Exception as exc:
+            log.warning("checkpoint_put_writes_failed thread_id=%s error=%s", thread_id, type(exc).__name__)
 
     def delete_thread(self, thread_id: str) -> None:
-        with self._session() as db:
-            db.query(LangGraphCheckpointWrite).filter(
-                LangGraphCheckpointWrite.thread_id == thread_id
-            ).delete()
-            db.query(LangGraphCheckpointBlob).filter(
-                LangGraphCheckpointBlob.thread_id == thread_id
-            ).delete()
-            db.query(LangGraphCheckpoint).filter(
-                LangGraphCheckpoint.thread_id == thread_id
-            ).delete()
-            db.commit()
+        try:
+            with self._session() as db:
+                db.query(LangGraphCheckpointWrite).filter(
+                    LangGraphCheckpointWrite.thread_id == thread_id
+                ).delete()
+                db.query(LangGraphCheckpointBlob).filter(
+                    LangGraphCheckpointBlob.thread_id == thread_id
+                ).delete()
+                db.query(LangGraphCheckpoint).filter(
+                    LangGraphCheckpoint.thread_id == thread_id
+                ).delete()
+                db.commit()
+        except Exception as exc:
+            log.warning("checkpoint_delete_failed thread_id=%s error=%s", thread_id, type(exc).__name__)
 
     async def aget_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
         return await asyncio.to_thread(self.get_tuple, config)
