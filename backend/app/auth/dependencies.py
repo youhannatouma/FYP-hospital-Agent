@@ -23,6 +23,31 @@ clerk = Clerk(bearer_auth=_CLERK_SECRET_KEY) if _CLERK_SECRET_KEY else None
 _jwks_cache: TTLCache = TTLCache(maxsize=8, ttl=3600)
 
 
+def _should_sync_role(current_role: str | None, claimed_role: str | None) -> bool:
+    """Prevent accidental privilege downgrades from stale Clerk metadata.
+
+    Allowed:
+    - setting role when empty
+    - same role (no-op)
+    - upgrades patient -> doctor/admin
+    - explicit doctor/admin switch when both privileged (admin <-> doctor)
+
+    Blocked:
+    - doctor/admin -> patient downgrade via metadata drift
+    """
+    current = str(current_role or "").strip().lower()
+    claimed = str(claimed_role or "").strip().lower()
+    if not claimed:
+        return False
+    if not current:
+        return True
+    if current == claimed:
+        return False
+    if current in {"doctor", "admin"} and claimed == "patient":
+        return False
+    return True
+
+
 def _normalize_issuer_url(issuer: str | None) -> str | None:
     if not issuer:
         return None
@@ -106,11 +131,22 @@ def get_current_user(
         payload = _verify_clerk_token(token)
         clerk_id = payload.get("sub")
         email = payload.get("email")
+        metadata = payload.get("public_metadata", {})
+        claimed_role = None
+        if isinstance(metadata, dict):
+            maybe_role = str(metadata.get("role") or "").strip().lower()
+            if maybe_role in {"doctor", "patient", "admin"}:
+                claimed_role = maybe_role
         
         if clerk_id:
             # Match by clerk_id (already linked)
             user = db.query(User).filter(User.clerk_id == clerk_id).first()
             if user:
+                # Keep DB role aligned with Clerk role metadata when available.
+                if _should_sync_role(str(user.role), claimed_role):
+                    user.role = claimed_role
+                    db.commit()
+                    db.refresh(user)
                 return user
             
             # Match by email (seeded users or manual entries)
@@ -119,6 +155,8 @@ def get_current_user(
                 if user:
                     # Link this Clerk account to the existing DB user
                     user.clerk_id = clerk_id
+                    if _should_sync_role(str(user.role), claimed_role):
+                        user.role = claimed_role
                     db.commit()
                     db.refresh(user)
                     return user
@@ -130,9 +168,8 @@ def get_current_user(
             phone_number = None
             
             # Extract role from Clerk metadata if available
-            metadata = payload.get("public_metadata", {})
-            if isinstance(metadata, dict) and "role" in metadata:
-                role = metadata["role"]
+            if claimed_role:
+                role = claimed_role
             
             # Fetch full user profile from Clerk API to get name and phone
             if clerk:

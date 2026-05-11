@@ -25,9 +25,10 @@ export interface Prescription {
 
 export interface CreatePrescriptionDto {
   patient_id: string;
-  medication_name: string;
-  dosage: string;
-  frequency: string;
+  medications?: string[];
+  medication_name?: string;
+  dosage?: string;
+  frequency?: string;
   duration?: string;
   instructions?: string;
   expires_at?: string;
@@ -57,7 +58,18 @@ export class PrescriptionRepository implements IPrescriptionRepository {
   }
 
   async createPrescription(data: CreatePrescriptionDto): Promise<Prescription> {
-    return this.apiHelper.post<Prescription>('/prescriptions/', data);
+    const medications = Array.isArray(data.medications) && data.medications.length > 0
+      ? data.medications
+      : [data.medication_name || "Medication"].filter(Boolean);
+    const instructions = data.instructions
+      || [data.dosage, data.frequency, data.duration].filter(Boolean).join(" | ")
+      || "Take as directed";
+
+    return this.apiHelper.post<Prescription>('/prescriptions/', {
+      patient_id: data.patient_id,
+      medications,
+      instructions,
+    });
   }
 
   async cancelPrescription(id: string): Promise<void> {

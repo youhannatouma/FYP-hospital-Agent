@@ -29,6 +29,7 @@ export interface CreateMedicalRecordDto {
   date: string;
   file_url?: string;
   patient_id?: string;
+  appointment_id?: string;
 }
 
 export interface IMedicalRecordRepository {

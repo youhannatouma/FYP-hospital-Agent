@@ -515,6 +515,10 @@ async def stream_thread_reply(
                     thread_id=str(thread.thread_id),
                     message=payload.message,
                     recent_messages=recent_messages_payload,
+                    assistant_context={
+                        "mode": payload.mode,
+                        "metadata": payload.metadata or {},
+                    },
                 ):
                     if stream_manager.is_cancelled(stream_key):
                         cancelled = True

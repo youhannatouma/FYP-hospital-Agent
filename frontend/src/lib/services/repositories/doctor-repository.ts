@@ -6,16 +6,21 @@
  * Follows: Repository Pattern
  */
 
-import { ApiRequestHelper } from '../api-request-helper';
+import { ApiRequestHelper, getApiRequestHelper } from '../api-request-helper';
 
 export interface Doctor {
   id: string;
   user_id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
   specialty: string;
   license_number: string;
   years_of_experience: number;
   qualifications: string[];
   clinic_address: string;
+  phone_number?: string;
+  status?: string;
   availability_status: string;
 }
 

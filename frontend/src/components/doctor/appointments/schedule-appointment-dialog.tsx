@@ -76,22 +76,23 @@ export function ScheduleAppointmentDialog({ open, onOpenChange, onSuccess }: Sch
       if (!selectedPatient) throw new Error("Patient not found")
 
       const container = getServiceContainer()
-      await container.appointment.bookAppointment({
+      const created = await container.appointment.doctorBookAppointment({
         patient_id: patient,
         appointment_type: type,
         date: format(date, 'yyyy-MM-dd'),
-        time: time
+        time: time,
       })
 
       const newAppt = {
-        id: Math.random().toString(),
+        id: (created as { appointment_id?: string })?.appointment_id || "",
+        appointment_id: (created as { appointment_id?: string })?.appointment_id || "",
         patient_id: patient,
         patientName: `${selectedPatient.first_name} ${selectedPatient.last_name}`,
         avatar: selectedPatient.first_name?.[0] || "P",
         type: type,
         specialty: "General",
-        date: format(date, "MMM d, yyyy"),
-        time: time,
+        date: (created as { date?: string })?.date || format(date, "MMM d, yyyy"),
+        time: (created as { time?: string })?.time || time,
         duration: "30 min",
         status: "Upcoming",
         notes: "",

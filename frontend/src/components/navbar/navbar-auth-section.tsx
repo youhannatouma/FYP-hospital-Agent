@@ -8,6 +8,8 @@
 
 import Link from "next/link";
 import {
+  ClerkLoaded,
+  ClerkLoading,
   SignedIn,
   SignedOut,
   SignInButton,
@@ -32,26 +34,29 @@ export function NavbarAuthSection({
     <div
       className={`flex items-center gap-2 ${showOnDesktop ? "hidden lg:flex" : ""} ${className}`}
     >
-      <SignedOut>
-        <SignInButton mode="modal">
-          <Button variant="ghost" className="text-foreground font-bold">
-            Sign In
+      <ClerkLoading />
+      <ClerkLoaded>
+        <SignedOut>
+          <SignInButton mode="modal">
+            <Button variant="ghost" className="text-foreground font-bold">
+              Sign In
+            </Button>
+          </SignInButton>
+          <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6">
+            <Link href="/sign-up">
+              Get Started
+            </Link>
           </Button>
-        </SignInButton>
-        <Link href="/sign-up">
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6">
-            Get Started
+        </SignedOut>
+        <SignedIn>
+          <Button asChild variant="ghost" className="text-foreground font-bold italic">
+            <Link href={dashboardRoute}>
+              Go to Dashboard
+            </Link>
           </Button>
-        </Link>
-      </SignedOut>
-      <SignedIn>
-        <Link href={dashboardRoute}>
-          <Button variant="ghost" className="text-foreground font-bold italic">
-            Go to Dashboard
-          </Button>
-        </Link>
-        <UserButton />
-      </SignedIn>
+          <UserButton />
+        </SignedIn>
+      </ClerkLoaded>
     </div>
   );
 }

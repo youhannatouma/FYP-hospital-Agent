@@ -106,6 +106,14 @@ export function BookAppointmentDialog({
   }, [loadDoctors])
 
   useEffect(() => {
+    if (open) {
+      setDoctor(defaultDoctor || "")
+      setSelectedSlotId(undefined)
+      setSlots([])
+    }
+  }, [defaultDoctor, open])
+
+  useEffect(() => {
     loadSlots()
   }, [loadSlots])
 

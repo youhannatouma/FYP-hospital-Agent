@@ -4,9 +4,10 @@ import asyncio
 import difflib
 import logging
 import re
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from time import perf_counter
 from typing import Any, AsyncIterator, Literal, TypedDict
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from langgraph.graph import END, START, StateGraph
 
@@ -16,12 +17,13 @@ try:
     from orchestration.checkpoint_store import get_checkpoint_saver
     from orchestration.synthesis import synthesize_response
     from orchestration.supervisor_workflow import execute_doctor_match_workflow
+    from tools.doctor_appointment_tools import list_doctor_appointments_for_day
     from tools.medication_tools import medication_pipeline
     from shared.gemini import (
         AssistantConfigError,
         assistant_llm_is_configured,
         classify_llm_error,
-        invoke_with_model_fallback,
+        invoke_with_model_fallback_cached,
         log_assistant_llm_status_once,
     )
     from telemetry import emit_workflow_trace_event, new_run_id
@@ -31,12 +33,13 @@ except ImportError:  # Fallback for backend package context
     from backend.orchestration.checkpoint_store import get_checkpoint_saver
     from backend.orchestration.synthesis import synthesize_response
     from backend.orchestration.supervisor_workflow import execute_doctor_match_workflow
+    from backend.tools.doctor_appointment_tools import list_doctor_appointments_for_day
     from backend.tools.medication_tools import medication_pipeline
     from backend.shared.gemini import (
         AssistantConfigError,
         assistant_llm_is_configured,
         classify_llm_error,
-        invoke_with_model_fallback,
+        invoke_with_model_fallback_cached,
         log_assistant_llm_status_once,
     )
     from backend.telemetry import emit_workflow_trace_event, new_run_id
@@ -47,6 +50,9 @@ log = logging.getLogger(__name__)
 AssistantRoute = Literal[
     "appointment_only",
     "combined",
+    "doctor_schedule",
+    "doctor_medication_decision_support",
+    "doctor_general",
     "general_health",
     "medication_only",
 ]
@@ -70,8 +76,11 @@ class AssistantChatState(TypedDict, total=False):
     message: str
     max_suggestions: int
     recent_messages: list[dict[str, str]]
+    assistant_context: dict[str, Any]
 
     patient_profile: dict[str, Any]
+    actor_role: str
+    actor_role_source: str
     memory_context: str
     contextual_message: str
     synthesis_context: str
@@ -84,6 +93,8 @@ class AssistantChatState(TypedDict, total=False):
 
     medication_result: dict[str, Any] | None
     doctor_result: dict[str, Any] | None
+    booking_selection: dict[str, Any]
+    doctor_schedule_result: dict[str, Any] | None
     general_response: str | None
 
     structured_errors: list[dict[str, Any]]
@@ -98,15 +109,144 @@ def _build_user_profile(user: User) -> dict[str, Any]:
         today = date.today()
         dob = user.date_of_birth
         age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    raw_role = getattr(user, "role", None)
+    role_value = str(raw_role.value if hasattr(raw_role, "value") else raw_role or "").strip().lower()
     return {
         "user_id": str(user.user_id),
         "first_name": user.first_name,
         "last_name": user.last_name,
+        "role": role_value,
         "age": age,
         "gender": user.gender,
         "allergies": user.allergies or [],
         "chronic_conditions": user.chronic_conditions or [],
     }
+
+
+def _actor_role_from_context(context: dict[str, Any] | None) -> str | None:
+    if not isinstance(context, dict):
+        return None
+    mode = context.get("mode")
+    metadata = context.get("metadata")
+    if not mode and isinstance(metadata, dict):
+        mode = metadata.get("mode")
+    value = str(mode or "").strip().lower()
+    if value in {"doctor", "patient", "admin"}:
+        return value
+    return None
+
+
+def _timezone_from_context(context: dict[str, Any] | None) -> str:
+    value = None
+    if isinstance(context, dict):
+        value = context.get("timezone") or context.get("time_zone")
+        metadata = context.get("metadata")
+        if not value and isinstance(metadata, dict):
+            value = metadata.get("timezone") or metadata.get("time_zone")
+    normalized = str(value or "UTC").strip() or "UTC"
+    try:
+        ZoneInfo(normalized)
+    except ZoneInfoNotFoundError:
+        return "UTC"
+    return normalized
+
+
+def _today_in_timezone(timezone_name: str) -> date:
+    return datetime.now(ZoneInfo(timezone_name)).date()
+
+
+def _parse_relative_or_iso_day(message: str, timezone_name: str) -> date | None:
+    lowered = (message or "").lower()
+    today = _today_in_timezone(timezone_name)
+    if re.search(r"\btoday\b", lowered):
+        return today
+    if re.search(r"\btomorrow\b", lowered):
+        return today + timedelta(days=1)
+
+    iso_match = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", lowered)
+    if iso_match:
+        try:
+            return date.fromisoformat(iso_match.group(1))
+        except ValueError:
+            return None
+
+    weekdays = {
+        "monday": 0,
+        "tuesday": 1,
+        "wednesday": 2,
+        "thursday": 3,
+        "friday": 4,
+        "saturday": 5,
+        "sunday": 6,
+    }
+    for name, weekday in weekdays.items():
+        if re.search(rf"\b{name}\b", lowered):
+            days_ahead = (weekday - today.weekday()) % 7
+            if days_ahead == 0 and "next " in lowered:
+                days_ahead = 7
+            return today + timedelta(days=days_ahead)
+    return None
+
+
+def _parse_time_from_message(message: str) -> time | None:
+    text = message or ""
+    patterns = [
+        r"\b(?:at|around|for)\s+([01]?\d|2[0-3])(?::([0-5]\d))?\s*(am|pm)\b",
+        r"\b(?:at|around|for)\s+([01]?\d|2[0-3]):([0-5]\d)\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            continue
+        hour = int(match.group(1))
+        minute = int(match.group(2) or 0)
+        meridiem = (match.group(3) or "").lower() if len(match.groups()) >= 3 else ""
+        if meridiem == "pm" and hour != 12:
+            hour += 12
+        elif meridiem == "am" and hour == 12:
+            hour = 0
+        try:
+            return time(hour=hour, minute=minute)
+        except ValueError:
+            return None
+    return None
+
+
+def _extract_selected_doctor(message: str) -> dict[str, Any] | None:
+    text = " ".join((message or "").split())
+    match = re.search(
+        r"\b(?:dr\.?|doctor)\s+([a-z][a-z'’-]*(?:\s+[a-z][a-z'’-]*){0,2})",
+        text,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    raw = match.group(1).strip(" .,:;")
+    stop_words = {
+        "today", "tomorrow", "monday", "tuesday", "wednesday", "thursday",
+        "friday", "saturday", "sunday", "at", "for", "around", "on", "with",
+    }
+    parts = [p for p in raw.split() if p.lower() not in stop_words]
+    if not parts:
+        return None
+    return {"doctor_name": " ".join(parts[:2])}
+
+
+def _extract_patient_booking_selection(message: str, timezone_name: str) -> dict[str, Any]:
+    doctor = _extract_selected_doctor(message)
+    selected_day = _parse_relative_or_iso_day(message, timezone_name)
+    selected_time = _parse_time_from_message(message)
+    selection: dict[str, Any] = {}
+    if doctor:
+        selection["selected_doctor"] = doctor
+    if selected_day:
+        selection["selected_appointment_date"] = selected_day
+    if selected_time:
+        selection["selected_appointment_time"] = selected_time
+    if selection:
+        selection["booking_timezone"] = timezone_name
+        selection["booking_reason"] = "assistant_patient_booking_request"
+    return selection
 
 
 def _detect_intents(message: str) -> DetectedIntents:
@@ -158,6 +298,46 @@ def _detect_intents(message: str) -> DetectedIntents:
     }
 
 
+def _detect_doctor_intents(message: str) -> DetectedIntents:
+    lowered = (message or "").lower()
+    appointment_tokens = {
+        "appointment", "appointments", "schedule", "calendar", "visit", "visits",
+        "consultation", "consultations",
+    }
+    medication_tokens = {
+        "medication", "medicine", "drug", "dose", "dosage", "prescribe",
+        "prescription", "contraindication", "interaction",
+    }
+    has_day_reference = any(
+        token in lowered
+        for token in ("today", "tomorrow", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "20")
+    )
+    has_schedule_keyword = any(token in lowered for token in appointment_tokens)
+    has_patient_day_pattern = bool(
+        re.search(r"\bpatients?\b.{0,30}\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", lowered)
+        or re.search(r"\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b.{0,30}\bpatients?\b", lowered)
+        or re.search(r"\bdo i have\b.{0,40}\bpatients?\b", lowered)
+    )
+    has_schedule = (has_schedule_keyword and has_day_reference) or has_patient_day_pattern
+    asks_medication = any(token in lowered for token in medication_tokens)
+    route: AssistantRoute
+    if has_schedule:
+        route = "doctor_schedule"
+    elif asks_medication:
+        route = "doctor_medication_decision_support"
+    else:
+        route = "doctor_general"
+    return {
+        "medication": asks_medication,
+        "appointment": has_schedule,
+        "general_health": route == "doctor_general",
+        "combined": False,
+        "route": route,
+        "confidence": 0.95 if route != "doctor_general" else 0.55,
+        "source": "message_only",
+    }
+
+
 def _is_short_followup(message: str) -> bool:
     lowered = (message or "").lower().strip()
     if len(lowered) > 80:
@@ -176,6 +356,15 @@ def _recent_user_topic(recent_messages: list[dict[str, str]]) -> str:
 
 def _clarification_message() -> str:
     return "Do you want help with doctor search or lifestyle guidance for this topic?"
+
+
+def _clarification_message_for_role(actor_role: str) -> str:
+    if actor_role == "doctor":
+        return (
+            "Do you want me to check your schedule, review patient-specific context, "
+            "or give general clinical workflow guidance?"
+        )
+    return _clarification_message()
 
 
 def _last_assistant_message(recent_messages: list[dict[str, str]]) -> str:
@@ -237,6 +426,7 @@ def _general_chat_fallback_message(state: AssistantChatState) -> str:
     message = str(state.get("message") or "").strip()
     lowered = message.lower()
     recent_messages = list(state.get("recent_messages") or [])
+    actor_role = str(state.get("actor_role") or "").lower()
 
     if "summary" in lowered or "summarize" in lowered:
         summary_lines = []
@@ -261,6 +451,25 @@ def _general_chat_fallback_message(state: AssistantChatState) -> str:
             f"You asked: {message}\n\n"
             "I can help with booking flow questions, doctor search, medication guidance, and chat history. "
             "If you are trying to schedule care, include the specialty or symptoms you want help with."
+        )
+
+    # Doctor-focused deterministic fallback for guideline-style clinical prompts.
+    if actor_role == "doctor" and any(token in lowered for token in ("guideline", "guidelines", "latest treatment", "recommendation", "recommendations")):
+        if "hypertension" in lowered or "blood pressure" in lowered:
+            return (
+                "For hypertension, a practical guideline-based approach is:\n\n"
+                "1. Confirm diagnosis with repeated standardized BP readings or out-of-office BP.\n"
+                "2. Start lifestyle therapy for all patients: sodium reduction, weight management, exercise, alcohol moderation.\n"
+                "3. Initiate pharmacotherapy based on overall CV risk and BP stage; common first-line classes are thiazide-type diuretics, ACEi/ARB, and CCB.\n"
+                "4. Typical treatment target is <130/80 mmHg for many high-risk adults, individualized by frailty/comorbidities/tolerability.\n"
+                "5. Reassess in ~1 month after treatment start/intensification, then titrate or add combination therapy if not at target.\n"
+                "6. Evaluate secondary causes and adherence if resistant/uncontrolled.\n\n"
+                "If you want, I can convert this into a clinic-ready stepwise protocol for a specific patient profile."
+            )
+        return (
+            "I can provide a structured guideline-style summary for that condition.\n\n"
+            "Share the exact condition plus patient context (age, key comorbidities, renal/hepatic status, pregnancy status when relevant), "
+            "and I will return a practical first-line approach, treatment targets, escalation criteria, and follow-up intervals."
         )
 
     return (
@@ -293,6 +502,7 @@ async def load_profile_node(state: AssistantChatState) -> AssistantChatState:
     patient_profile = dict(state.get("patient_profile") or {})
     if not patient_profile.get("user_id") and state.get("user_id"):
         patient_profile["user_id"] = state["user_id"]
+    actor_role = str(state.get("actor_role") or patient_profile.get("role") or "").lower()
     if run_id:
         emit_workflow_trace_event(
             workflow_family="assistant",
@@ -305,7 +515,7 @@ async def load_profile_node(state: AssistantChatState) -> AssistantChatState:
             actor_user_id=str(state.get("user_id") or ""),
             patient_user_id=str(state.get("user_id") or ""),
         )
-    return {"patient_profile": patient_profile}
+    return {"patient_profile": patient_profile, "actor_role": actor_role}
 
 
 async def load_memory_node(state: AssistantChatState) -> AssistantChatState:
@@ -390,7 +600,8 @@ async def classify_intent_node(state: AssistantChatState) -> AssistantChatState:
             patient_user_id=str(state.get("user_id") or ""),
         )
     message = str(state.get("message") or "")
-    base = _detect_intents(message)
+    actor_role = str(state.get("actor_role") or dict(state.get("patient_profile") or {}).get("role") or "").lower()
+    base = _detect_doctor_intents(message) if actor_role == "doctor" else _detect_intents(message)
     route: AssistantRoute = base["route"]
     confidence = float(base.get("confidence") or 0.0)
     source: IntentSource = "message_only"
@@ -404,7 +615,7 @@ async def classify_intent_node(state: AssistantChatState) -> AssistantChatState:
             part for part in (recent_topic, str(state.get("memory_context") or "")) if part
         ).strip()
         if context_text:
-            assisted = _detect_intents(context_text)
+            assisted = _detect_doctor_intents(context_text) if actor_role == "doctor" else _detect_intents(context_text)
             route = assisted["route"]
             confidence = max(confidence, float(assisted.get("confidence") or 0.65))
             source = "context_assisted"
@@ -412,7 +623,7 @@ async def classify_intent_node(state: AssistantChatState) -> AssistantChatState:
     if confidence < 0.4:
         clarification_required = True
         source = "clarified"
-        route = "general_health"
+        route = "doctor_general" if actor_role == "doctor" else "general_health"
 
     intents = dict(base)
     intents["route"] = route
@@ -473,16 +684,21 @@ async def doctor_node(state: AssistantChatState) -> AssistantChatState:
             patient_user_id=user_id,
         )
     try:
-        result = await execute_doctor_match_workflow(
-            {
-                "thread_id": f"doctor:{thread_id}",
-                "actor_user_id": user_id,
-                "patient_user_id": user_id,
-                "need_text": str(state.get("message") or ""),
-                "max_suggestions": int(state.get("max_suggestions") or 5),
-            }
-        )
+        context = dict(state.get("assistant_context") or {})
+        timezone_name = _timezone_from_context(context)
+        booking_selection = _extract_patient_booking_selection(str(state.get("message") or ""), timezone_name)
+        workflow_state = {
+            "thread_id": f"doctor:{thread_id}",
+            "actor_user_id": user_id,
+            "patient_user_id": user_id,
+            "need_text": str(state.get("message") or ""),
+            "max_suggestions": int(state.get("max_suggestions") or 5),
+        }
+        workflow_state.update(booking_selection)
+        result = await execute_doctor_match_workflow(workflow_state)
         output = {"doctor_result": result}
+        if booking_selection:
+            output["booking_selection"] = booking_selection
         if run_id:
             emit_workflow_trace_event(
                 workflow_family="assistant",
@@ -532,6 +748,94 @@ async def doctor_node(state: AssistantChatState) -> AssistantChatState:
                 payload={"error_code": "DoctorWorkflowFailed"},
             )
         return output
+
+
+def _format_doctor_schedule_response(result: dict[str, Any]) -> str:
+    requested_date = str(result.get("date") or "")
+    appointments = list(result.get("appointments") or [])
+    if not appointments:
+        return f"You have no scheduled appointments on {requested_date}."
+
+    label = "appointment" if len(appointments) == 1 else "appointments"
+    lines = [f"You have {len(appointments)} scheduled {label} on {requested_date}:"]
+    for item in appointments:
+        start = item.get("display_time") or item.get("start_time_local") or "time not set"
+        end = item.get("display_end_time")
+        time_label = f"{start} - {end}" if end else str(start)
+        patient = item.get("patient_name") or "Patient"
+        appointment_type = item.get("appointment_type")
+        type_label = f" ({appointment_type})" if appointment_type else ""
+        lines.append(f"- {time_label}: {patient}{type_label}")
+    return "\n".join(lines)
+
+
+async def doctor_schedule_node(state: AssistantChatState) -> AssistantChatState:
+    started = perf_counter()
+    run_id = str(state.get("trace_run_id") or "")
+    user_id = str(state.get("user_id") or "")
+    timezone_name = _timezone_from_context(dict(state.get("assistant_context") or {}))
+    requested_day = _parse_relative_or_iso_day(str(state.get("message") or ""), timezone_name)
+    if run_id:
+        emit_workflow_trace_event(
+            workflow_family="assistant",
+            thread_id=str(state.get("thread_id") or ""),
+            run_id=run_id,
+            event_type="node_started",
+            node_name="doctor_schedule_node",
+            actor_user_id=user_id,
+            patient_user_id="",
+        )
+    if not requested_day:
+        text = "Which day should I check? You can say today, tomorrow, a weekday, or a date like 2026-05-10."
+        return {
+            "general_response": text,
+            "doctor_schedule_result": None,
+            "clarification_required": True,
+        }
+    try:
+        result = await asyncio.to_thread(
+            list_doctor_appointments_for_day,
+            user_id,
+            requested_day,
+            timezone_name,
+        )
+        text = _format_doctor_schedule_response(result)
+        output = {"general_response": text, "doctor_schedule_result": result}
+        if run_id:
+            emit_workflow_trace_event(
+                workflow_family="assistant",
+                thread_id=str(state.get("thread_id") or ""),
+                run_id=run_id,
+                event_type="node_completed",
+                node_name="doctor_schedule_node",
+                status="ok",
+                duration_ms=int((perf_counter() - started) * 1000),
+                actor_user_id=user_id,
+                patient_user_id="",
+                payload={"requested_date": requested_day.isoformat(), "appointment_count": result.get("count", 0)},
+            )
+        return output
+    except Exception as exc:
+        log.warning("Doctor schedule lookup failed: %s", exc)
+        return {
+            "structured_errors": _append_error(
+                state,
+                code="DoctorScheduleLookupFailed",
+                message=str(exc),
+                node="doctor_schedule_node",
+            ),
+            "general_response": "I could not load your schedule right now. Please try again or open the appointments page.",
+            "doctor_schedule_result": None,
+        }
+
+
+async def doctor_medication_support_node(state: AssistantChatState) -> AssistantChatState:
+    text = (
+        "I can help as clinical decision support, but I should not prescribe or choose a dose for you. "
+        "Use the patient's chart, allergies, current medications, renal/hepatic status, pregnancy status when relevant, "
+        "and your local formulary or pharmacist review before finalizing medication decisions."
+    )
+    return {"general_response": text}
 
 
 async def medication_node(state: AssistantChatState) -> AssistantChatState:
@@ -608,7 +912,8 @@ async def general_chat_node(state: AssistantChatState) -> AssistantChatState:
             patient_user_id=str(state.get("user_id") or ""),
         )
     if state.get("clarification_required"):
-        output = {"general_response": _clarification_message()}
+        actor_role = str(state.get("actor_role") or "").lower()
+        output = {"general_response": _clarification_message_for_role(actor_role)}
         if run_id:
             emit_workflow_trace_event(
                 workflow_family="assistant",
@@ -625,13 +930,20 @@ async def general_chat_node(state: AssistantChatState) -> AssistantChatState:
         return output
 
     patient = dict(state.get("patient_profile") or {})
+    actor_role = str(state.get("actor_role") or "").lower()
+    role_line = (
+        "You are a professional hospital AI assistant for a doctor portal.\n"
+        if actor_role == "doctor"
+        else "You are a professional hospital AI assistant for a patient portal.\n"
+    )
     prompt = (
-        "You are a professional hospital AI assistant for a patient portal.\n"
+        role_line +
         "Help with general health education, hospital app questions, conversation summaries, "
         "and navigation support.\n"
         "Rules:\n"
         "- Do not diagnose disease.\n"
         "- Do not prescribe medication or dosages.\n"
+        "- For doctors, provide workflow support and clinical decision-support boundaries, not prescribing decisions.\n"
         "- Encourage urgent care for emergency symptoms.\n"
         "- Keep the answer clear, practical, and under 220 words.\n\n"
         f"Patient Profile: {_patient_summary(patient)}\n"
@@ -643,7 +955,7 @@ async def general_chat_node(state: AssistantChatState) -> AssistantChatState:
 
     try:
         response = await asyncio.to_thread(
-            invoke_with_model_fallback,
+            invoke_with_model_fallback_cached,
             prompt,
             temperature=0.7,
         )
@@ -687,9 +999,16 @@ async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
     general_response = str(state.get("general_response") or "").strip()
     user_id = str(state.get("user_id") or "")
     if general_response:
+        doctor_schedule = state.get("doctor_schedule_result")
+        metadata_extra: dict[str, Any] = {
+            "actor_role": str(state.get("actor_role") or ""),
+        }
+        if isinstance(doctor_schedule, dict):
+            metadata_extra["doctor_tool_used"] = "list_doctor_appointments_for_day"
+            metadata_extra["requested_date"] = doctor_schedule.get("date")
         unified = {
             "message": general_response,
-            "message_type": "general_health",
+            "message_type": "doctor_schedule" if isinstance(doctor_schedule, dict) else "general_health",
             "patient_user_id": user_id,
             "synthesis_source": ["general"],
             "metadata": {
@@ -697,11 +1016,12 @@ async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
                 "intent_source": str(state.get("intent_source") or "message_only"),
                 "repeat_guard_triggered": False,
                 "clarification_required": bool(state.get("clarification_required") or False),
+                **metadata_extra,
             },
         }
         output = {
             "ai_message": general_response,
-            "ai_message_type": "general_health",
+            "ai_message_type": unified["message_type"],
             "unified_response": unified,
         }
         if run_id:
@@ -741,6 +1061,7 @@ async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
         "intent_source": str(state.get("intent_source") or "message_only"),
         "repeat_guard_triggered": False,
         "clarification_required": bool(state.get("clarification_required") or False),
+        "actor_role": str(state.get("actor_role") or ""),
     }
 
     output = {
@@ -766,6 +1087,12 @@ async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
 
 def _route_after_intent(state: AssistantChatState) -> str:
     intent = state.get("intent")
+    if intent == "doctor_schedule":
+        return "doctor_schedule"
+    if intent == "doctor_medication_decision_support":
+        return "doctor_medication_support"
+    if intent == "doctor_general":
+        return "general"
     if intent == "combined":
         return "doctor_then_medication"
     if intent == "appointment_only":
@@ -785,6 +1112,8 @@ def _build_assistant_graph():
     graph.add_node("load_memory_node", load_memory_node)
     graph.add_node("classify_intent_node", classify_intent_node)
     graph.add_node("doctor_node", doctor_node)
+    graph.add_node("doctor_schedule_node", doctor_schedule_node)
+    graph.add_node("doctor_medication_support_node", doctor_medication_support_node)
     graph.add_node("medication_node", medication_node)
     graph.add_node("general_chat_node", general_chat_node)
     graph.add_node("synthesis_node", synthesis_node)
@@ -800,6 +1129,8 @@ def _build_assistant_graph():
             "medication": "medication_node",
             "doctor": "doctor_node",
             "doctor_then_medication": "doctor_node",
+            "doctor_schedule": "doctor_schedule_node",
+            "doctor_medication_support": "doctor_medication_support_node",
         },
     )
     graph.add_conditional_edges(
@@ -811,6 +1142,8 @@ def _build_assistant_graph():
         },
     )
     graph.add_edge("medication_node", "synthesis_node")
+    graph.add_edge("doctor_schedule_node", "synthesis_node")
+    graph.add_edge("doctor_medication_support_node", "synthesis_node")
     graph.add_edge("general_chat_node", "synthesis_node")
     graph.add_edge("synthesis_node", END)
     return graph
@@ -850,6 +1183,7 @@ async def stream_assistant_response(
     message: str,
     max_suggestions: int = 5,
     recent_messages: list[dict[str, str]] | None = None,
+    assistant_context: dict[str, Any] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     log_assistant_llm_status_once()
     if not assistant_llm_is_configured():
@@ -858,6 +1192,9 @@ async def stream_assistant_response(
         )
 
     patient_profile = _build_user_profile(user)
+    context_role = _actor_role_from_context(dict(assistant_context or {}))
+    actor_role = str(context_role or patient_profile.get("role") or "").lower()
+    actor_role_source = "context_mode" if context_role else "profile"
     run_id = new_run_id()
     emit_workflow_trace_event(
         workflow_family="assistant",
@@ -874,7 +1211,10 @@ async def stream_assistant_response(
         "message": message,
         "max_suggestions": max_suggestions,
         "recent_messages": list(recent_messages or []),
+        "assistant_context": dict(assistant_context or {}),
         "patient_profile": patient_profile,
+        "actor_role": actor_role,
+        "actor_role_source": actor_role_source,
         "structured_errors": [],
         "trace_run_id": run_id,
     }
@@ -933,6 +1273,8 @@ async def stream_assistant_response(
     metadata["repeat_guard_triggered"] = repeat_guard_triggered or bool(metadata.get("repeat_guard_triggered"))
     metadata["clarification_required"] = clarification_required
     metadata["trace_run_id"] = run_id
+    metadata["actor_role"] = str(final_state.get("actor_role") or actor_role or metadata.get("actor_role") or "")
+    metadata["role_source"] = str(final_state.get("actor_role_source") or actor_role_source)
     unified_response["metadata"] = metadata
     emit_workflow_trace_event(
         workflow_family="assistant",
@@ -963,6 +1305,8 @@ __all__ = [
     "_format_recent_messages",
     "classify_intent_node",
     "doctor_node",
+    "doctor_schedule_node",
+    "doctor_medication_support_node",
     "general_chat_node",
     "load_memory_node",
     "load_profile_node",

@@ -69,12 +69,15 @@ def get_my_records(
             patient = db.query(User).filter(User.user_id == r.patient_id).first()
             result.append({
                 "record_id": str(r.record_id),
+                "patient_id": str(r.patient_id),
+                "doctor_id": str(r.doctor_id),
                 "doctor_name": f"{doctor.first_name} {doctor.last_name}" if doctor else "Unknown",
                 "patient_name": f"{patient.first_name} {patient.last_name}" if patient else "Unknown",
                 "record_type": r.record_type,
                 "diagnosis": r.diagnosis,
                 "treatment": r.treatment,
                 "clinical_notes": r.clinical_notes,
+                "appointment_id": str(r.appointment_id) if r.appointment_id else None,
                 "created_at": r.created_at.isoformat() if r.created_at else None
             })
         return result
@@ -92,4 +95,3 @@ def delete_medical_record(
         return {"message": "Record deleted"}
     except Exception as e:
         raise ErrorHandlingSkill.handle(e)
-
