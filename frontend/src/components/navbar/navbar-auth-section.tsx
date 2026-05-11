@@ -14,6 +14,7 @@ import {
   SignedOut,
   SignInButton,
   UserButton,
+  useUser,
 } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 
@@ -26,9 +27,14 @@ export function NavbarAuthSection({
   showOnDesktop = true,
   className = "",
 }: NavbarAuthSectionProps) {
-  // Keep href stable across SSR/client hydration. Role routing is handled
-  // by middleware and onboarding checks after navigation.
-  const dashboardRoute = "/onboarding";
+  const { user } = useUser();
+  const role = user?.publicMetadata?.role as string | undefined;
+
+  // Dynamically resolve dashboard route based on user role
+  let dashboardRoute = "/onboarding";
+  if (role === "doctor") dashboardRoute = "/doctor";
+  else if (role === "admin") dashboardRoute = "/admin";
+  else if (role === "patient") dashboardRoute = "/patient";
 
   return (
     <div

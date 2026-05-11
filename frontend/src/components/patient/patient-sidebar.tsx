@@ -50,8 +50,9 @@ import ThreeAvatar from "../ThreeAvatar"
 
 const mainNavItems = [
   { label: "Dashboard", href: "/patient", icon: LayoutDashboard },
-  { label: "Find Doctors", href: "/patient/records", icon: Stethoscope },
+  { label: "Find Doctors", href: "/patient/find-doctor", icon: Stethoscope },
   { label: "Clinical History", href: "/patient/clinical-history", icon: History },
+  { label: "Medical Records", href: "/patient/records", icon: ShieldCheck },
   { label: "Appointments", href: "/patient/appointments", icon: CalendarDays },
   { label: "Medications", href: "/patient/medicines", icon: Pill },
   { label: "Lab Results", href: "/patient/lab-results", icon: FlaskConical },

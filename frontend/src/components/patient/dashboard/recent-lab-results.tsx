@@ -8,39 +8,38 @@ import Link from "next/link"
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
+import { useMedicalRecords } from "@/hooks/use-medical-records"
+import { useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
+
 export function RecentLabResults() {
-  const labResults = [
-    {
-      id: 1,
-      title: "Comprehensive Lipid Panel",
-      collected: "Collected: Jan 8, 2024",
-      status: "Review Required",
-      statusColor: "bg-amber-500/10 text-amber-500",
-      icon: AlertCircle,
-      values: [
-        { label: "Total Cholesterol", value: "245 mg/dL", flag: true },
-        { label: "LDL (Bad)", value: "165 mg/dL", flag: true },
-        { label: "HDL (Good)", value: "48 mg/dL", flag: false },
-        { label: "Triglycerides", value: "160 mg/dL", flag: false },
-      ],
-      premium: true,
-    },
-    {
-      id: 2,
-      title: "CBC with Differential",
-      collected: "Collected: Dec 15, 2023",
-      status: "Normal / Optimal",
-      statusColor: "bg-emerald-500/10 text-emerald-500",
-      icon: CheckCircle2,
-      values: [
-        { label: "WBC", value: "7.2 K/uL", flag: false },
-        { label: "Hemoglobin", value: "14.2 g/dL", flag: false },
-        { label: "Platelets", value: "250 K/uL", flag: false },
-        { label: "RBC", value: "4.8 M/uL", flag: false },
-      ],
-      premium: false,
-    },
-  ]
+  const { records, loading: isLoading } = useMedicalRecords()
+  const [labResults, setLabResults] = useState([])
+
+  useEffect(() => {
+    if (records) {
+      const filtered = records
+        .filter(r => r.record_type === "Lab Result")
+        .slice(0, 2)
+        .map(r => ({
+          id: r.id,
+          title: r.title,
+          collected: `Collected: ${r.date ? new Date(r.date).toLocaleDateString() : "TBD"}`,
+          status: "Verified",
+          statusColor: "bg-emerald-500/10 text-emerald-500",
+          icon: CheckCircle2,
+          values: r.vitals ? Object.entries(r.vitals).map(([label, value]) => ({
+            label,
+            value: String(value),
+            flag: false
+          })).slice(0, 4) : [
+            { label: "Result", value: r.diagnosis || "Normal", flag: false }
+          ],
+          premium: true,
+        }))
+      setLabResults(filtered)
+    }
+  }, [records])
 
   return (
     <div className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden h-full flex flex-col">
@@ -61,8 +60,18 @@ export function RecentLabResults() {
       </div>
       
       <div className="p-8 pt-4 flex flex-col gap-6 flex-1">
-        <AnimatePresence mode="popLayout">
-          {labResults.map((result, idx) => (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-4">
+             <Loader2 className="h-6 w-6 text-primary animate-spin" />
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Analyzing vitals...</p>
+          </div>
+        ) : labResults.length === 0 ? (
+          <div className="py-10 text-center italic text-sm text-muted-foreground">
+             No recent diagnostic findings identified.
+          </div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {labResults.map((result, idx) => (
             <m.div
               key={result.id}
               initial={{ opacity: 0, x: -20 }}

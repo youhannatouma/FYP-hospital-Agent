@@ -755,7 +755,10 @@ export default function PatientOnboarding() {
                       // 2. Set role in Clerk metadata
                       const roleRes = await fetch("/api/v1/set-role", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { 
+                          "Content-Type": "application/json",
+                          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
                         body: JSON.stringify({ role: "patient" }),
                       });
 
