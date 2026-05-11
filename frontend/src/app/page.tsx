@@ -1,5 +1,4 @@
 import { Navbar } from "@/components/navbar"
-import { FloatingAvatar } from "@/components/floating-avatar"
 import { LandingIntro } from "@/components/intro/LandingIntro"
 import { HeroSection } from "@/components/landing/LandingSections"
 import { FeaturesSection } from "@/components/landing/FeaturesSection"
@@ -17,7 +16,6 @@ export default function Page() {
   return (
     <main className="min-h-screen">
       <Navbar />
-      <FloatingAvatar />
       <LandingIntro />
       <HeroSection />
       <FeaturesSection />
