@@ -1,10 +1,9 @@
 "use client"
 import { useEffect, useState } from "react"
-import { useHospital } from "@/hooks/use-hospital"
-import { useAuth } from "@clerk/nextjs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Activity, Loader2 } from "lucide-react"
+import { getServiceContainer } from "@/lib/services/service-container"
 import {
   LineChart,
   Line,
@@ -36,8 +35,6 @@ type ChartPoint = {
 }
 
 export function VitalsTracking() {
-  const { medicalRecords } = useHospital();
-  const { getToken } = useAuth();
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [period] = useState("7d")
@@ -45,8 +42,8 @@ export function VitalsTracking() {
   useEffect(() => {
     const fetchVitals = async () => {
       try {
-        const token = await getToken();
-        const records = await medicalRecords.getMyRecords(token || undefined);
+        const container = getServiceContainer()
+        const records = await container.medicalRecord.getMyRecords()
         
         const extracted = (records as ApiRecord[])
           .filter((r) => r.vitals && typeof r.vitals === 'object')
@@ -68,7 +65,7 @@ export function VitalsTracking() {
       }
     };
     fetchVitals();
-  }, [medicalRecords, getToken]);
+  }, []);
 
   return (
     <Card className="premium-card rounded-[2.5rem] border-none shadow-premium overflow-hidden">

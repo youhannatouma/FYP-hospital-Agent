@@ -11,32 +11,58 @@ import { cn } from "@/lib/utils"
 import { useMedicalRecords } from "@/hooks/use-medical-records"
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
+import type { MedicalRecord } from "@/lib/services/repositories/medical-record-repository"
+
+type LabValue = {
+  label: string
+  value: string
+  flag: boolean
+}
+
+type LabResultCard = {
+  id: string
+  title: string
+  collected: string
+  status: string
+  statusColor: string
+  icon: typeof CheckCircle2
+  values: LabValue[]
+  premium: boolean
+}
 
 export function RecentLabResults() {
   const { records, loading: isLoading } = useMedicalRecords()
-  const [labResults, setLabResults] = useState([])
+  const [labResults, setLabResults] = useState<LabResultCard[]>([])
 
   useEffect(() => {
     if (records) {
       const filtered = records
-        .filter(r => r.record_type === "Lab Result")
+        .filter((r) => r.record_type === "Lab Result")
         .slice(0, 2)
-        .map(r => ({
+        .map((r): LabResultCard => {
+          const metadata = (r.metadata ?? {}) as {
+            vitals?: Record<string, unknown>
+            diagnosis?: string
+          }
+          const vitals = metadata.vitals
+
+          return {
           id: r.id,
           title: r.title,
           collected: `Collected: ${r.date ? new Date(r.date).toLocaleDateString() : "TBD"}`,
           status: "Verified",
           statusColor: "bg-emerald-500/10 text-emerald-500",
           icon: CheckCircle2,
-          values: r.vitals ? Object.entries(r.vitals).map(([label, value]) => ({
+          values: vitals ? Object.entries(vitals).map(([label, value]) => ({
             label,
             value: String(value),
             flag: false
           })).slice(0, 4) : [
-            { label: "Result", value: r.diagnosis || "Normal", flag: false }
+            { label: "Result", value: metadata.diagnosis || "Normal", flag: false }
           ],
           premium: true,
-        }))
+          }
+        })
       setLabResults(filtered)
     }
   }, [records])
@@ -72,63 +98,66 @@ export function RecentLabResults() {
         ) : (
           <AnimatePresence mode="popLayout">
             {labResults.map((result, idx) => (
-            <m.div
-              key={result.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className={cn(
-                "premium-card p-6 rounded-3xl border border-border/30 group transition-all duration-500 relative overflow-hidden",
-                result.premium ? "bg-muted/30" : "bg-transparent"
-              )}
-            >
-              <div className="flex items-start justify-between mb-4 relative z-10">
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-foreground tracking-tight leading-tight">
-                    {result.title}
-                  </h3>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                    {result.collected}
-                  </p>
-                </div>
-                <Badge className={cn("border-none text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg", result.statusColor)}>
-                   <result.icon className="h-3 w-3 mr-1" />
-                   {result.status}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4 relative z-10">
-                {result.values.map((val) => (
-                  <div key={val.label} className="space-y-1">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">
-                      {val.label}
-                    </span>
-                    <p className={cn(
-                      "text-sm font-black flex items-center gap-1",
-                      val.flag ? "text-amber-500" : "text-foreground"
-                    )}>
-                      {val.value}
-                      {val.flag && <span className="text-xs animate-bounce">&#x2191;</span>}
+              <m.div
+                key={result.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className={cn(
+                  "premium-card p-6 rounded-3xl border border-border/30 group transition-all duration-500 relative overflow-hidden",
+                  result.premium ? "bg-muted/30" : "bg-transparent"
+                )}
+              >
+                <div className="relative z-10 mb-4 flex items-start justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold leading-tight tracking-tight text-foreground">
+                      {result.title}
+                    </h3>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {result.collected}
                     </p>
                   </div>
-                ))}
-              </div>
+                  <Badge className={cn("rounded-lg border-none px-2 py-0.5 text-[9px] font-black uppercase tracking-widest", result.statusColor)}>
+                    <result.icon className="mr-1 h-3 w-3" />
+                    {result.status}
+                  </Badge>
+                </div>
 
-              <Button
-                size="sm"
-                className="mt-6 w-full gap-2 rounded-xl h-10 bg-background border border-border/50 text-foreground hover:bg-primary hover:text-white hover:border-primary font-black text-[10px] uppercase tracking-widest transition-all shadow-subtle group-hover:scale-[1.02]"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Retrieve Full Analysis
-              </Button>
-            </m.div>
-          ))}
-        </AnimatePresence>
-        
+                <div className="relative z-10 grid grid-cols-2 gap-x-6 gap-y-4">
+                  {result.values.map((val) => (
+                    <div key={val.label} className="space-y-1">
+                      <span className="text-[10px] font-black uppercase leading-none tracking-widest text-muted-foreground">
+                        {val.label}
+                      </span>
+                      <p
+                        className={cn(
+                          "flex items-center gap-1 text-sm font-black",
+                          val.flag ? "text-amber-500" : "text-foreground"
+                        )}
+                      >
+                        {val.value}
+                        {val.flag && <span className="animate-bounce text-xs">&#x2191;</span>}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  size="sm"
+                  className="mt-6 h-10 w-full gap-2 rounded-xl border border-border/50 bg-background text-[10px] font-black uppercase tracking-widest text-foreground shadow-subtle transition-all hover:border-primary hover:bg-primary hover:text-white group-hover:scale-[1.02]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Retrieve Full Analysis
+                </Button>
+              </m.div>
+            ))}
+          </AnimatePresence>
+        )}
+
         <div className="mt-auto pt-4 text-center">
-           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">
-             End of recent findings
-           </p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            End of recent findings
+          </p>
         </div>
       </div>
     </div>

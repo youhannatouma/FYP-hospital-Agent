@@ -35,9 +35,14 @@ import { UserProfile } from "@/lib/services/repositories/user-repository"
 export interface DoctorNewMessageDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  defaultRecipientId?: string
 }
 
-export function DoctorNewMessageDialog({ open, onOpenChange }: DoctorNewMessageDialogProps) {
+export function DoctorNewMessageDialog({
+  open,
+  onOpenChange,
+  defaultRecipientId = "",
+}: DoctorNewMessageDialogProps) {
   const { toast } = useToast()
   const [sending, setSending] = useState(false)
   const [selectedPatientId, setSelectedPatientId] = useState<string>("")
@@ -62,6 +67,8 @@ export function DoctorNewMessageDialog({ open, onOpenChange }: DoctorNewMessageD
     }
   }, [open, loadPatients])
 
+  const selectedRecipientId = selectedPatientId || defaultRecipientId
+
   const resetForm = () => {
     setSubject("")
     setContent("")
@@ -69,7 +76,7 @@ export function DoctorNewMessageDialog({ open, onOpenChange }: DoctorNewMessageD
   }
 
   const handleSend = async () => {
-    if (!selectedPatientId || !subject.trim() || !content.trim()) {
+    if (!selectedRecipientId || !subject.trim() || !content.trim()) {
       toast({
         title: "Missing Information",
         description: "Please fill in all fields before sending.",
@@ -79,12 +86,12 @@ export function DoctorNewMessageDialog({ open, onOpenChange }: DoctorNewMessageD
     }
 
     setSending(true)
-    const patient = patients.find((p) => p.user_id === selectedPatientId)
+    const patient = patients.find((p) => p.user_id === selectedRecipientId)
 
     try {
       const container = getServiceContainer()
       await container.message.sendMessage({
-        receiver_id: selectedPatientId,
+        receiver_id: selectedRecipientId,
         subject,
         body: content,
       })
@@ -120,7 +127,7 @@ export function DoctorNewMessageDialog({ open, onOpenChange }: DoctorNewMessageD
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <label className="text-sm font-medium text-foreground">To (Patient)</label>
-            <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+            <Select value={selectedRecipientId} onValueChange={setSelectedPatientId}>
               <SelectTrigger className="bg-muted/50 border-none h-11">
                 <SelectValue placeholder="Select patient" />
               </SelectTrigger>

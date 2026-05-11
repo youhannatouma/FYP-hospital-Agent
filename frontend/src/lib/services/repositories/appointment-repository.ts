@@ -6,19 +6,24 @@
  * Follows: Repository Pattern
  */
 
-import { ApiRequestHelper } from '../api-request-helper';
+import { ApiRequestHelper, getApiRequestHelper } from '../api-request-helper';
 
 export interface Appointment {
-  id: string;
-  patient_id: string;
-  doctor_id: string;
-  appointment_date: string;
-  start_time: string;
-  end_time: string;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
-  reason: string | null;
-  notes: string | null;
-  created_at: string;
+  appointment_id: string;
+  patient_id?: string;
+  doctor_id?: string;
+  doctor_name?: string;
+  patient_name?: string;
+  doctor_specialty?: string | null;
+  appointment_type?: string | null;
+  fee?: number | null;
+  date?: string | null;
+  time?: string | null;
+  room_id?: string | null;
+  created_at?: string | null;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled' | string;
+  reason?: string | null;
+  notes?: string | null;
 }
 
 export interface IAppointmentRepository {

@@ -23,6 +23,30 @@ clerk = Clerk(bearer_auth=_CLERK_SECRET_KEY) if _CLERK_SECRET_KEY else None
 _jwks_cache: TTLCache = TTLCache(maxsize=8, ttl=3600)
 
 
+def _extract_primary_email(clerk_user) -> str | None:
+    try:
+        email_addresses = getattr(clerk_user, "email_addresses", None) or []
+        if email_addresses:
+            primary = email_addresses[0]
+            value = getattr(primary, "email_address", None)
+            return str(value).strip() if value else None
+    except Exception:
+        return None
+    return None
+
+
+def _extract_claimed_role(clerk_user) -> str | None:
+    try:
+        metadata = getattr(clerk_user, "public_metadata", None) or {}
+        if isinstance(metadata, dict):
+            role = str(metadata.get("role") or "").strip().lower()
+            if role in {"doctor", "patient", "admin"}:
+                return role
+    except Exception:
+        return None
+    return None
+
+
 def _should_sync_role(current_role: str | None, claimed_role: str | None) -> bool:
     """Prevent accidental privilege downgrades from stale Clerk metadata.
 
@@ -137,6 +161,17 @@ def get_current_user(
             maybe_role = str(metadata.get("role") or "").strip().lower()
             if maybe_role in {"doctor", "patient", "admin"}:
                 claimed_role = maybe_role
+
+        clerk_user = None
+        if clerk and clerk_id and (not email or not claimed_role):
+            try:
+                clerk_user = clerk.users.get(user_id=clerk_id)
+                if not email:
+                    email = _extract_primary_email(clerk_user)
+                if not claimed_role:
+                    claimed_role = _extract_claimed_role(clerk_user)
+            except Exception as e:
+                print(f"[AUTH] Could not hydrate Clerk profile for {clerk_id}: {e}")
         
         if clerk_id:
             # Match by clerk_id (already linked)
@@ -172,7 +207,17 @@ def get_current_user(
                 role = claimed_role
             
             # Fetch full user profile from Clerk API to get name and phone
-            if clerk:
+            if clerk_user is not None:
+                try:
+                    first_name = clerk_user.first_name or ""
+                    last_name = clerk_user.last_name or ""
+                    if hasattr(clerk_user, 'phone_numbers') and clerk_user.phone_numbers:
+                        phone_number = clerk_user.phone_numbers[0].phone_number if hasattr(clerk_user.phone_numbers[0], 'phone_number') else None
+                    if not email:
+                        email = _extract_primary_email(clerk_user) or email
+                except Exception as e:
+                    print(f"[AUTO-REGISTER] Could not read hydrated Clerk profile for {clerk_id}: {e}")
+            elif clerk:
                 try:
                     clerk_user = clerk.users.get(user_id=clerk_id)
                     first_name = clerk_user.first_name or ""
@@ -180,6 +225,10 @@ def get_current_user(
                     # Get first phone number if available
                     if hasattr(clerk_user, 'phone_numbers') and clerk_user.phone_numbers:
                         phone_number = clerk_user.phone_numbers[0].phone_number if hasattr(clerk_user.phone_numbers[0], 'phone_number') else None
+                    if not email:
+                        email = _extract_primary_email(clerk_user) or email
+                    if not claimed_role:
+                        claimed_role = _extract_claimed_role(clerk_user) or claimed_role
                 except Exception as e:
                     print(f"[AUTO-REGISTER] Could not fetch Clerk profile for {clerk_id}: {e}")
             

@@ -1,8 +1,24 @@
+import { auth } from "@clerk/nextjs/server"
 import { SignIn } from "@clerk/nextjs"
 import { Activity } from "lucide-react"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 
-export default function SignInPage() {
+function resolveSignedInRedirect(role?: string) {
+  if (role === "doctor") return "/doctor"
+  if (role === "admin") return "/admin"
+  if (role === "patient") return "/patient"
+  return "/onboarding"
+}
+
+export default async function SignInPage() {
+  const { userId, sessionClaims } = await auth()
+  const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role
+
+  if (userId) {
+    redirect(resolveSignedInRedirect(role))
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Left Side: Branding / Info */}
@@ -48,7 +64,10 @@ export default function SignInPage() {
           </div>
           
           <SignIn 
-            fallbackRedirectUrl="/onboarding"
+            path="/sign-in"
+            routing="path"
+            signUpUrl="/sign-up"
+            forceRedirectUrl="/onboarding"
             appearance={{
               elements: {
                 formButtonPrimary: "bg-primary hover:bg-primary/90 text-sm font-bold h-11 rounded-xl shadow-lg shadow-primary/20",

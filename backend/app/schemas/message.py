@@ -18,3 +18,15 @@ class MessageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class InboxMessageResponse(BaseModel):
+    message_id: str
+    sender_id: str
+    sender_name: str
+    receiver_id: str
+    receiver_name: str
+    subject: Optional[str] = None
+    body: str
+    is_read: bool
+    created_at: Optional[str] = None

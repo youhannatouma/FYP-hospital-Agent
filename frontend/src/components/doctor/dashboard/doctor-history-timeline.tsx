@@ -38,8 +38,6 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { useHospital } from "@/hooks/use-hospital";
-import { useAuth } from "@clerk/nextjs";
 import { getServiceContainer } from "@/lib/services/service-container";
 
 const filterTabs = ["All", "Visits", "Labs", "Medications", "Flagged"];
@@ -180,8 +178,6 @@ export interface DoctorMedicalTimelineProps {
 }
 
 export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMedicalTimelineProps) {
-  const { medicalRecords } = useHospital();
-  const { getToken } = useAuth();
   const [activeFilter, setActiveFilter] = useState("All");
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -211,8 +207,8 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
   const fetchItems = useCallback(async () => {
     try {
       setIsLoading(true);
-      const token = await getToken();
-      const data = await medicalRecords.getMyRecords(token || undefined);
+      const container = getServiceContainer();
+      const data = await container.medicalRecord.getMyRecords();
       const mapped: TimelineItem[] = (data as TimelineApiRecord[]).map((r) => {
         const type =
           r.record_type?.toLowerCase() === "lab result"
@@ -245,7 +241,7 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
     } finally {
       setIsLoading(false);
     }
-  }, [getToken, medicalRecords]);
+  }, []);
 
   useEffect(() => {
     fetchItems();

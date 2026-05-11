@@ -27,16 +27,16 @@ import { getServiceContainer } from "@/lib/services/service-container"
 interface ComposeMessageDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  defaultRecipient?: string
+  defaultRecipientId?: string
 }
 
 export function ComposeMessageDialog({ 
   open, 
   onOpenChange, 
-  defaultRecipient = "" 
+  defaultRecipientId = "" 
 }: ComposeMessageDialogProps) {
   const { toast } = useToast()
-  const [recipient, setRecipient] = useState(defaultRecipient)
+  const [recipient, setRecipient] = useState("")
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
   const [isSending, setIsSending] = useState(false)
@@ -57,8 +57,10 @@ export function ComposeMessageDialog({
     }
   }, [open])
 
+  const selectedRecipient = recipient || defaultRecipientId
+
   const handleSend = async () => {
-    if (!recipient || !subject.trim() || !message.trim()) {
+    if (!selectedRecipient || !subject.trim() || !message.trim()) {
       toast({
         title: "Missing Information",
         description: "Please fill in all fields before sending.",
@@ -72,14 +74,14 @@ export function ComposeMessageDialog({
     try {
       const container = getServiceContainer()
       await container.message.sendMessage({
-        receiver_id: recipient,
+        receiver_id: selectedRecipient,
         subject: subject,
         body: message
       })
       
       setIsSending(false)
       onOpenChange(false)
-      const selectedDoc = doctorsList.find(d => d.id === recipient || d.user_id === recipient)
+      const selectedDoc = doctorsList.find(d => d.id === selectedRecipient || d.user_id === selectedRecipient)
       const docName = selectedDoc ? `Dr. ${(selectedDoc as unknown).last_name || (selectedDoc as unknown).first_name || 'Provider'}` : 'the provider'
       toast({
         title: "Message Sent",
@@ -104,14 +106,14 @@ export function ComposeMessageDialog({
         <DialogHeader>
           <DialogTitle>New Message</DialogTitle>
           <DialogDescription>
-            Send a secure message to your care team or the billing department.
+            Send a secure message to your doctor.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <label className="text-sm font-medium">To</label>
-            <Select value={recipient} onValueChange={setRecipient}>
+            <Select value={selectedRecipient} onValueChange={setRecipient}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a recipient" />
               </SelectTrigger>

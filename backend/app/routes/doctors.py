@@ -7,11 +7,12 @@ from datetime import datetime
 from app.database import get_db
 from app.models.user import User
 from app.models.time_slot import TimeSlot
-from app.auth.dependencies import get_current_user, require_role
+from app.auth.dependencies import require_role
 from app.schemas.doctor import DoctorCreate
 from app.auth.hashing import hash_password
 from app.skills.stats_skill import StatsSkill
 from app.skills.error_handling_skill import ErrorHandlingSkill
+from app.skills.clerk_sync_skill import ClerkSyncSkill
 from app.models.appointment import Appointment
 
 router = APIRouter(prefix="/doctors", tags=["Doctors"])
@@ -62,10 +63,16 @@ def get_recent_patients(
 def list_doctors(
     specialty: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
 ):
     """Return all users with role 'doctor'. Optional specialty filter."""
     try:
+        from app.auth.dependencies import clerk
+
+        try:
+            ClerkSyncSkill.sync_all_users(db, clerk, roles={"doctor"})
+        except Exception as sync_error:
+            print(f"[DOCTORS] Clerk doctor sync skipped: {sync_error}")
+
         query = db.query(User).filter(User.role == "doctor", User.status == "Active")
         if specialty:
             query = query.filter(User.specialty == specialty)
@@ -93,7 +100,6 @@ def list_doctors(
 def get_doctor(
     doctor_id: str,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
 ):
     """Return a single doctor's profile by ID."""
     try:
@@ -124,7 +130,6 @@ def get_slots(
     doctor_id: str,
     date: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
 ):
     """Return available time slots for a given doctor."""
     try:

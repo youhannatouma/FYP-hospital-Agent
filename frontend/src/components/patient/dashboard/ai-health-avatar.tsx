@@ -50,30 +50,30 @@ export function AIHealthAvatar() {
         </div>
 
         <div className="relative aspect-square max-w-[180px] mx-auto group-hover:scale-105 transition-transform duration-700">
-           <ThreeAvatar size={180} textToSpeak="Hello, I am your Health Assistant. How can I help you today?" />
+           <ThreeAvatar size={180} />
            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 glass-dark rounded-full border border-white/10 text-[10px] font-black uppercase tracking-widest whitespace-nowrap shadow-xl">
-             AI Active & Scanning
+             AI Assistant Ready
            </div>
         </div>
 
         <div className="rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 p-5 mt-2 inner-glow">
           <div className="flex items-center gap-2 mb-3">
             <Heart className="h-4 w-4 text-rose-300 animate-pulse" />
-            <span className="text-xs font-black uppercase tracking-widest text-indigo-100">Vital Diagnostics</span>
+            <span className="text-xs font-black uppercase tracking-widest text-indigo-100">Guided Support</span>
           </div>
           <p className="text-xs text-indigo-50/70 leading-relaxed font-medium">
-            Your cardiovascular health is currently <span className="text-emerald-300 font-black">optimal</span>. Blood pressure is within range (120/80).
+            Use the assistant for general guidance, visit preparation, and questions to bring to your care team.
           </p>
           <div className="mt-4 flex items-center gap-3">
             <div className="flex-1 h-3 rounded-full bg-white/10 overflow-hidden relative border border-white/5">
                <m.div 
                 initial={{ width: 0 }}
-                animate={{ width: "82%" }}
+                animate={{ width: "100%" }}
                 transition={{ duration: 1.5, delay: 0.5, ease: "circOut" }}
                 className="h-full bg-gradient-to-r from-emerald-400 to-emerald-300 rounded-full shadow-glow" 
                />
             </div>
-            <span className="text-[10px] font-black text-white">82% Score</span>
+            <span className="text-[10px] font-black text-white">Ready</span>
           </div>
         </div>
 
@@ -107,9 +107,10 @@ export function AIHealthAvatar() {
           <Button
             variant="outline"
             className="w-full border-white/20 bg-white/5 text-white hover:bg-white/10 h-11 rounded-2xl font-black text-[11px] uppercase tracking-widest backdrop-blur-md transition-all active:scale-95"
+            onClick={() => openAssistant("Help me prepare questions for my next appointment")}
           >
             <Mic className="mr-2 h-4 w-4" />
-            Vocalize
+            Visit Prep
           </Button>
         </div>
       </div>

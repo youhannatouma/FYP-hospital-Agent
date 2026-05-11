@@ -10,10 +10,12 @@
 import { ApiRequestHelper } from '../api-request-helper';
 
 export interface Message {
-  id: string;
+  message_id: string;
   sender_id: string;
+  sender_name?: string;
   receiver_id: string;
-  subject: string;
+  receiver_name?: string;
+  subject?: string | null;
   body: string;
   is_read: boolean;
   created_at: string;
@@ -27,7 +29,6 @@ export interface SendMessageDto {
 
 export interface IMessageRepository {
   getMessages(): Promise<Message[]>;
-  getConversation(userId: string): Promise<Message[]>;
   sendMessage(data: SendMessageDto): Promise<Message>;
   markAsRead(messageId: string): Promise<void>;
 }
@@ -36,11 +37,7 @@ export class MessageRepository implements IMessageRepository {
   constructor(private apiHelper: ApiRequestHelper) {}
 
   async getMessages(): Promise<Message[]> {
-    return this.apiHelper.get<Message[]>('/messages/');
-  }
-
-  async getConversation(userId: string): Promise<Message[]> {
-    return this.apiHelper.get<Message[]>(`/messages/conversation/${userId}`);
+    return this.apiHelper.get<Message[]>('/messages/my');
   }
 
   async sendMessage(data: SendMessageDto): Promise<Message> {
