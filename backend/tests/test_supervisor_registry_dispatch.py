@@ -20,6 +20,19 @@ def test_registry_dispatch_builds_known_tool_task():
     assert task.is_write is False
 
 
+def test_registry_dispatch_builds_doctor_schedule_read_task():
+    task = swf._validate_and_build_tool_task(
+        user_id="doctor-1",
+        task_spec={"tool_name": "list_doctor_appointments_for_day", "day": "2026-05-10"},
+        index=1,
+    )
+
+    assert task.task_id == "task_1"
+    assert task.tool_name == "list_doctor_appointments_for_day"
+    assert task.user_id == "doctor-1"
+    assert task.is_write is False
+
+
 def test_registry_dispatch_rejects_unknown_tool():
     with pytest.raises(ValueError) as exc:
         swf._validate_and_build_tool_task(

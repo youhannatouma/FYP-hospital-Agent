@@ -30,6 +30,7 @@ try:
     from orchestration.synthesis import synthesize_node
     from telemetry import emit_telemetry_event
     from telemetry import emit_workflow_trace_event, new_run_id
+    from tools.doctor_appointment_tools import list_doctor_appointments_for_day
     from tools.doctor_matching_tools import (
         BookingDomainError,
         book_appointment,
@@ -47,6 +48,7 @@ except ImportError:  # Fallback for backend package context
     from ..middleware.lock_manager import lock_manager
     from ..telemetry import emit_telemetry_event
     from ..telemetry import emit_workflow_trace_event, new_run_id
+    from ..tools.doctor_appointment_tools import list_doctor_appointments_for_day
     from ..tools.doctor_matching_tools import (
         BookingDomainError,
         book_appointment,
@@ -364,6 +366,34 @@ def _build_user_fact_count_task(task_id: str, user_id: str, _: dict[str, Any]) -
     )
 
 
+def _build_list_doctor_appointments_for_day_task(task_id: str, user_id: str, task_spec: dict[str, Any]) -> ToolTask:
+    raw_day = task_spec.get("day") or task_spec.get("date")
+    if not raw_day:
+        raise ValueError(f"{task_id}: list_doctor_appointments_for_day requires day")
+    try:
+        requested_day = raw_day if isinstance(raw_day, date) else date.fromisoformat(str(raw_day))
+    except ValueError as exc:
+        raise ValueError(f"{task_id}: day must be an ISO date") from exc
+    doctor_user_id = str(task_spec.get("doctor_user_id") or user_id)
+    timezone_name = str(task_spec.get("timezone") or "UTC")
+
+    async def run_list():
+        return await asyncio.to_thread(
+            list_doctor_appointments_for_day,
+            doctor_user_id,
+            requested_day,
+            timezone_name,
+        )
+
+    return ToolTask(
+        task_id=task_id,
+        tool_name="list_doctor_appointments_for_day",
+        user_id=user_id,
+        is_write=False,
+        runner=run_list,
+    )
+
+
 def _build_clear_user_task(task_id: str, user_id: str, _: dict[str, Any]) -> ToolTask:
     async def run_clear():
         await asyncio.to_thread(memory_tools.clear_user, user_id)
@@ -385,6 +415,7 @@ _TOOL_TASK_BUILDERS: dict[str, ToolTaskBuilder] = {
     "recall_memory": _build_recall_memory_task,
     "memory_context": _build_memory_context_task,
     "user_fact_count": _build_user_fact_count_task,
+    "list_doctor_appointments_for_day": _build_list_doctor_appointments_for_day_task,
     "clear_user": _build_clear_user_task,
 }
 

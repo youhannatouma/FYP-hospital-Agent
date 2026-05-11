@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
+import time
 from threading import Lock
+from typing import Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -22,6 +25,7 @@ class AssistantRuntimeError(RuntimeError):
 
 
 _LLM_CACHE: dict[tuple[str, float], ChatGoogleGenerativeAI] = {}
+_RESPONSE_CACHE: dict[str, tuple[float, Any]] = {}
 _LLM_LOCK = Lock()
 _STATUS_LOGGED = False
 _DEFAULT_MODEL = "gemini-2.5-flash"
@@ -161,3 +165,42 @@ def invoke_with_model_fallback(
         raise classify_llm_error(last_exc) from last_exc
 
     raise AssistantRuntimeError("Assistant AI generation failed at runtime.")
+
+
+def invoke_with_model_fallback_cached(
+    prompt: str,
+    *,
+    temperature: float,
+    preferred_model: str = _DEFAULT_MODEL,
+    cache_ttl_seconds: int | None = None,
+):
+    ttl = (
+        int(cache_ttl_seconds)
+        if cache_ttl_seconds is not None
+        else int(os.getenv("GEMINI_RESPONSE_CACHE_TTL_SECONDS", "300"))
+    )
+    if ttl <= 0:
+        return invoke_with_model_fallback(
+            prompt,
+            temperature=temperature,
+            preferred_model=preferred_model,
+        )
+
+    normalized = " ".join(str(prompt or "").split())
+    cache_key = hashlib.sha256(
+        f"{preferred_model}|{temperature}|{normalized}".encode("utf-8")
+    ).hexdigest()
+    now = time.monotonic()
+    with _LLM_LOCK:
+        cached = _RESPONSE_CACHE.get(cache_key)
+        if cached and now - cached[0] <= ttl:
+            return cached[1]
+
+    response = invoke_with_model_fallback(
+        prompt,
+        temperature=temperature,
+        preferred_model=preferred_model,
+    )
+    with _LLM_LOCK:
+        _RESPONSE_CACHE[cache_key] = (now, response)
+    return response

@@ -1,5 +1,4 @@
 "use client"
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 /**
  * Doctor Dashboard Page
@@ -9,7 +8,7 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Phone, RefreshCw } from "lucide-react"
+import { Phone } from "lucide-react"
 import { StatCards } from "@/components/doctor/dashboard/stat-cards"
 import { DoctorMedicalTimeline } from "@/components/doctor/dashboard/doctor-history-timeline"
 import { DoctorAIAvatar } from "@/components/doctor/dashboard/ai-avatar"
@@ -26,9 +25,7 @@ import { AppointmentDetailDialog } from "@/components/doctor/dialogs/appointment
 import { RecordDetailDialog } from "@/components/doctor/dialogs/record-detail-dialog"
 
 import { m } from "framer-motion"
-import { useToast } from "@/hooks/use-toast"
 import { useUserProfile } from "@/hooks/use-user-profile"
-import { getServiceContainer } from "@/lib/services/service-container"
 
 type AppointmentSelection = {
   appointment_id?: string
@@ -47,10 +44,7 @@ type AppointmentSelection = {
 }
 
 export default function DoctorDashboardPage() {
-  const { toast } = useToast()
-  const { profile, isLoading: profileLoading } = useUserProfile()
-
-  const [isSyncing, setIsSyncing] = useState(false)
+  const { profile } = useUserProfile()
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
   const [isPatientProfileOpen, setIsPatientProfileOpen] = useState(false)
   const [isAppointmentDetailOpen, setIsAppointmentDetailOpen] = useState(false)
@@ -68,30 +62,6 @@ export default function DoctorDashboardPage() {
     day: "numeric",
     year: "numeric",
   })
-
-  // Admin sync via IStatsRepository (DIP — no direct apiClient)
-  const handleSyncRegistry = useCallback(async () => {
-    setIsSyncing(true)
-    try {
-      const container = getServiceContainer()
-      const result = await container.stats.syncRegistry()
-      toast({
-        title: "Registry Synchronized",
-        description: result.message || "All clinicians and patients have been mapped to the local registry.",
-      })
-      // Reload to reflect newly synced records
-      window.location.reload()
-    } catch (error) {
-      console.error("[DoctorDashboard] Sync failed:", error)
-      toast({
-        title: "Sync Error",
-        description: "Could not communicate with the authentication server. Ensure you have Admin privileges.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSyncing(false)
-    }
-  }, [toast])
 
   const handleViewPatient = useCallback((patient: unknown) => {
     setSelectedPatient(patient)
@@ -121,20 +91,11 @@ export default function DoctorDashboardPage() {
           <h1 className="text-2xl font-bold text-foreground lg:text-3xl">
             Welcome Dr. {firstName}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground" suppressHydrationWarning>
             {`Here's your health overview for ${todayFormatted}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 border-border/50 font-bold"
-            onClick={handleSyncRegistry}
-            disabled={isSyncing}
-          >
-            <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-            {isSyncing ? "Syncing..." : "Sync Registry"}
-          </Button>
           <Button
             className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={() => setIsAdminDialogOpen(true)}

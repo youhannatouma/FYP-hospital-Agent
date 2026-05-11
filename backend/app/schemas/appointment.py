@@ -12,3 +12,12 @@ class BookingCreate(BaseModel):
     appointment_type: Optional[str] = None
     fee: Optional[float] = None
     is_virtual: bool = False
+
+
+class DoctorBookingCreate(BaseModel):
+    patient_id: str  # UUID as string
+    date: str        # YYYY-MM-DD
+    time: str        # HH:MM AM/PM or HH:MM
+    appointment_type: Optional[str] = None
+    fee: Optional[float] = None
+    notes: Optional[str] = None

@@ -13,10 +13,18 @@ class _FakeUser:
     user_id = uuid.UUID("123e4567-e89b-12d3-a456-426614174111")
     first_name = "Test"
     last_name = "User"
+    role = "patient"
     date_of_birth = None
     gender = None
     allergies = []
     chronic_conditions = []
+
+
+class _FakeDoctor(_FakeUser):
+    user_id = uuid.UUID("123e4567-e89b-12d3-a456-426614174222")
+    first_name = "Dana"
+    last_name = "Doctor"
+    role = "doctor"
 
 
 async def _drain(gen):
@@ -121,6 +129,283 @@ async def test_stream_assistant_response_appointment_only_runs_one_tool(monkeypa
     assert calls == ["appointment"]
     assert doctor_thread_ids == ["doctor:thread-2"]
     assert chunks[-1]["response"]["message_type"] == "appointment"
+
+
+@pytest.mark.asyncio
+async def test_patient_booking_request_passes_selection_to_supervisor(monkeypatch):
+    captured: dict[str, object] = {}
+
+    _patch_graph(monkeypatch)
+    monkeypatch.setattr(orch, "assistant_llm_is_configured", lambda: True)
+    monkeypatch.setattr(orch, "log_assistant_llm_status_once", lambda: None)
+    monkeypatch.setattr(orch.memory_tools, "memory_context", lambda *args, **kwargs: "")
+    monkeypatch.setattr(orch, "medication_pipeline", lambda *args, **kwargs: {})
+
+    async def fake_doctor_workflow(state):
+        captured.update(state)
+        return {
+            "booking_mode": "booking_failed",
+            "booking_result": {"code": "BookingSlotUnavailable"},
+            "suggestion_cards": [],
+        }
+
+    monkeypatch.setattr(orch, "execute_doctor_match_workflow", fake_doctor_workflow)
+    monkeypatch.setattr(orch, "synthesize_response", lambda **kwargs: _fake_synthesis_response("fallback", "appointment"))
+
+    chunks = await _drain(
+        orch.stream_assistant_response(
+            user=_FakeUser(),
+            thread_id="thread-book-selection",
+            message="Book an appointment with Dr Smith tomorrow at 9 AM",
+            assistant_context={"timezone": "UTC"},
+        )
+    )
+
+    assert captured["selected_doctor"] == {"doctor_name": "Smith"}
+    assert str(captured["selected_appointment_time"]) == "09:00:00"
+    assert "selected_appointment_date" in captured
+    assert captured["booking_timezone"] == "UTC"
+    assert chunks[-1]["response"]["message_type"] == "appointment"
+
+
+@pytest.mark.asyncio
+async def test_doctor_schedule_request_uses_read_only_schedule_tool(monkeypatch):
+    calls: list[str] = []
+
+    _patch_graph(monkeypatch)
+    monkeypatch.setattr(orch, "assistant_llm_is_configured", lambda: True)
+    monkeypatch.setattr(orch, "log_assistant_llm_status_once", lambda: None)
+    monkeypatch.setattr(orch.memory_tools, "memory_context", lambda *args, **kwargs: "")
+    monkeypatch.setattr(orch, "invoke_with_model_fallback_cached", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Gemini should not be called")))
+
+    def fake_schedule_tool(doctor_user_id, requested_day, timezone_name):
+        calls.append("schedule")
+        return {
+            "doctor_user_id": doctor_user_id,
+            "date": requested_day.isoformat(),
+            "timezone": timezone_name,
+            "count": 2,
+            "appointments": [
+                {
+                    "patient_name": "Mira Patient",
+                    "display_time": "9:00 AM",
+                    "display_end_time": "9:30 AM",
+                    "appointment_type": "Follow-up",
+                },
+                {
+                    "patient_name": "Omar Case",
+                    "display_time": "10:00 AM",
+                    "display_end_time": "10:30 AM",
+                },
+            ],
+        }
+
+    monkeypatch.setattr(orch, "list_doctor_appointments_for_day", fake_schedule_tool)
+
+    chunks = await _drain(
+        orch.stream_assistant_response(
+            user=_FakeDoctor(),
+            thread_id="thread-doctor-schedule",
+            message="What appointments do I have today?",
+            assistant_context={"timezone": "UTC"},
+        )
+    )
+
+    assert calls == ["schedule"]
+    response = chunks[-1]["response"]
+    assert response["message_type"] == "doctor_schedule"
+    assert "Mira Patient" in response["message"]
+    assert "9:00 AM - 9:30 AM" in response["message"]
+    assert response["metadata"]["doctor_tool_used"] == "list_doctor_appointments_for_day"
+    assert response["metadata"]["actor_role"] == "doctor"
+    assert response["metadata"]["role_source"] == "profile"
+
+
+@pytest.mark.asyncio
+async def test_doctor_schedule_patient_wording_uses_schedule_tool(monkeypatch):
+    calls: list[str] = []
+
+    _patch_graph(monkeypatch)
+    monkeypatch.setattr(orch, "assistant_llm_is_configured", lambda: True)
+    monkeypatch.setattr(orch, "log_assistant_llm_status_once", lambda: None)
+    monkeypatch.setattr(orch.memory_tools, "memory_context", lambda *args, **kwargs: "")
+    monkeypatch.setattr(orch, "invoke_with_model_fallback_cached", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Gemini should not be called")))
+
+    def fake_schedule_tool(doctor_user_id, requested_day, timezone_name):
+        calls.append("schedule")
+        return {
+            "doctor_user_id": doctor_user_id,
+            "date": requested_day.isoformat(),
+            "timezone": timezone_name,
+            "count": 1,
+            "appointments": [
+                {
+                    "patient_name": "Sara Patient",
+                    "display_time": "11:00 AM",
+                    "display_end_time": "11:30 AM",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(orch, "list_doctor_appointments_for_day", fake_schedule_tool)
+
+    chunks = await _drain(
+        orch.stream_assistant_response(
+            user=_FakeDoctor(),
+            thread_id="thread-doctor-schedule-phrasing",
+            message="Do I have any patients for today?",
+            assistant_context={"timezone": "UTC"},
+        )
+    )
+
+    assert calls == ["schedule"]
+    response = chunks[-1]["response"]
+    assert response["message_type"] == "doctor_schedule"
+    assert "Sara Patient" in response["message"]
+    assert response["metadata"]["actor_role"] == "doctor"
+
+
+@pytest.mark.asyncio
+async def test_doctor_schedule_any_day_wording_uses_schedule_tool(monkeypatch):
+    calls: list[str] = []
+    requested_dates: list[str] = []
+
+    _patch_graph(monkeypatch)
+    monkeypatch.setattr(orch, "assistant_llm_is_configured", lambda: True)
+    monkeypatch.setattr(orch, "log_assistant_llm_status_once", lambda: None)
+    monkeypatch.setattr(orch.memory_tools, "memory_context", lambda *args, **kwargs: "")
+    monkeypatch.setattr(orch, "invoke_with_model_fallback_cached", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Gemini should not be called")))
+
+    def fake_schedule_tool(doctor_user_id, requested_day, timezone_name):
+        calls.append("schedule")
+        requested_dates.append(requested_day.isoformat())
+        return {
+            "doctor_user_id": doctor_user_id,
+            "date": requested_day.isoformat(),
+            "timezone": timezone_name,
+            "count": 0,
+            "appointments": [],
+        }
+
+    monkeypatch.setattr(orch, "list_doctor_appointments_for_day", fake_schedule_tool)
+
+    chunks = await _drain(
+        orch.stream_assistant_response(
+            user=_FakeDoctor(),
+            thread_id="thread-doctor-schedule-any-day",
+            message="Do I have any patients on Tuesday?",
+            assistant_context={"timezone": "UTC"},
+        )
+    )
+
+    assert calls == ["schedule"]
+    response = chunks[-1]["response"]
+    assert response["message_type"] == "doctor_schedule"
+    assert len(requested_dates) == 1
+
+
+@pytest.mark.asyncio
+async def test_doctor_lab_results_question_does_not_hit_schedule_tool(monkeypatch):
+    schedule_calls: list[str] = []
+    llm_calls: list[str] = []
+
+    _patch_graph(monkeypatch)
+    monkeypatch.setattr(orch, "assistant_llm_is_configured", lambda: True)
+    monkeypatch.setattr(orch, "log_assistant_llm_status_once", lambda: None)
+    monkeypatch.setattr(orch.memory_tools, "memory_context", lambda *args, **kwargs: "")
+
+    def fake_schedule_tool(*args, **kwargs):
+        schedule_calls.append("schedule")
+        return {"count": 0, "appointments": []}
+
+    class _Resp:
+        content = "I can help interpret trends in the lab results."
+
+    def fake_llm(*args, **kwargs):
+        llm_calls.append("llm")
+        return _Resp()
+
+    monkeypatch.setattr(orch, "list_doctor_appointments_for_day", fake_schedule_tool)
+    monkeypatch.setattr(orch, "invoke_with_model_fallback_cached", fake_llm)
+
+    chunks = await _drain(
+        orch.stream_assistant_response(
+            user=_FakeDoctor(),
+            thread_id="thread-doctor-labs",
+            message="Can you summarize my patient's lab results?",
+            assistant_context={"timezone": "UTC"},
+        )
+    )
+
+    response = chunks[-1]["response"]
+    assert schedule_calls == []
+    assert llm_calls == ["llm"]
+    assert response["message_type"] == "general_health"
+    assert response["metadata"]["actor_role"] == "doctor"
+
+
+@pytest.mark.asyncio
+async def test_assistant_context_mode_doctor_overrides_profile_role_for_schedule(monkeypatch):
+    calls: list[str] = []
+
+    _patch_graph(monkeypatch)
+    monkeypatch.setattr(orch, "assistant_llm_is_configured", lambda: True)
+    monkeypatch.setattr(orch, "log_assistant_llm_status_once", lambda: None)
+    monkeypatch.setattr(orch.memory_tools, "memory_context", lambda *args, **kwargs: "")
+    monkeypatch.setattr(orch, "invoke_with_model_fallback_cached", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Gemini should not be called")))
+
+    def fake_schedule_tool(doctor_user_id, requested_day, timezone_name):
+        calls.append("schedule")
+        return {
+            "doctor_user_id": doctor_user_id,
+            "date": requested_day.isoformat(),
+            "timezone": timezone_name,
+            "count": 1,
+            "appointments": [
+                {"patient_name": "Mode Override Patient", "display_time": "2:00 PM", "display_end_time": "2:30 PM"}
+            ],
+        }
+
+    monkeypatch.setattr(orch, "list_doctor_appointments_for_day", fake_schedule_tool)
+
+    chunks = await _drain(
+        orch.stream_assistant_response(
+            user=_FakeUser(),  # profile role == patient
+            thread_id="thread-mode-override",
+            message="Do I have any patients for today?",
+            assistant_context={"mode": "doctor", "timezone": "UTC", "metadata": {"ui_source": "doctor_ai_assistant"}},
+        )
+    )
+
+    response = chunks[-1]["response"]
+    assert calls == ["schedule"]
+    assert response["message_type"] == "doctor_schedule"
+    assert response["metadata"]["actor_role"] == "doctor"
+    assert response["metadata"]["role_source"] == "context_mode"
+
+
+@pytest.mark.asyncio
+async def test_doctor_medication_question_is_decision_support_only(monkeypatch):
+    calls: list[str] = []
+
+    _patch_graph(monkeypatch)
+    monkeypatch.setattr(orch, "assistant_llm_is_configured", lambda: True)
+    monkeypatch.setattr(orch, "log_assistant_llm_status_once", lambda: None)
+    monkeypatch.setattr(orch.memory_tools, "memory_context", lambda *args, **kwargs: "")
+    monkeypatch.setattr(orch, "medication_pipeline", lambda *args, **kwargs: calls.append("medication") or {})
+
+    chunks = await _drain(
+        orch.stream_assistant_response(
+            user=_FakeDoctor(),
+            thread_id="thread-doctor-med",
+            message="What dose should I prescribe for ibuprofen?",
+        )
+    )
+
+    assert calls == []
+    response = chunks[-1]["response"]
+    assert "should not prescribe or choose a dose" in response["message"]
+    assert response["metadata"]["actor_role"] == "doctor"
 
 
 @pytest.mark.asyncio
@@ -238,7 +523,7 @@ async def test_stream_assistant_response_uses_assistant_checkpoint_prefix(monkey
 async def test_general_chat_node_uses_contextual_fallback_when_models_fail(monkeypatch):
     monkeypatch.setattr(
         orch,
-        "invoke_with_model_fallback",
+        "invoke_with_model_fallback_cached",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("503 UNAVAILABLE")),
     )
 
@@ -255,6 +540,30 @@ async def test_general_chat_node_uses_contextual_fallback_when_models_fail(monke
 
     assert "summary" in out["general_response"].lower()
     assert "i have a headache" in out["general_response"].lower()
+
+
+@pytest.mark.asyncio
+async def test_general_chat_node_doctor_hypertension_guideline_fallback_when_models_fail(monkeypatch):
+    monkeypatch.setattr(
+        orch,
+        "invoke_with_model_fallback_cached",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("503 UNAVAILABLE")),
+    )
+
+    out = await orch.general_chat_node(
+        {
+            "message": "What are the latest treatment guidelines for hypertension?",
+            "actor_role": "doctor",
+            "recent_messages": [],
+            "patient_profile": {"first_name": "Dana", "last_name": "Doctor"},
+        }
+    )
+
+    text = out["general_response"].lower()
+    assert "hypertension" in text
+    assert "first-line" in text or "acei/arb" in text
+    assert "<130/80" in out["general_response"]
+    assert "you asked:" not in text
 
 
 @pytest.mark.asyncio

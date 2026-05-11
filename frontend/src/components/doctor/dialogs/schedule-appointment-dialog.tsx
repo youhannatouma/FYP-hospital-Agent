@@ -1,7 +1,5 @@
 // @ts-nocheck
 "use client"
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import * as React from "react"
 import {
   Dialog,
@@ -24,12 +22,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@clerk/nextjs"
-import { useHospital } from "@/hooks/use-hospital"
 import { getServiceContainer } from "@/lib/services/service-container"
 import { CalendarDays, Video, MapPin, Plus } from "lucide-react"
-
-const CURRENT_DOCTOR_ID = "doc-1"
-const CURRENT_DOCTOR_NAME = "Dr. Michael Chen"
 
 interface Props {
   trigger?: React.ReactNode
@@ -38,7 +32,6 @@ interface Props {
 export function ScheduleAppointmentDialog({ trigger }: Props) {
   const { toast } = useToast()
   const { getToken } = useAuth()
-  const { booking } = useHospital()
   const [open, setOpen] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [patientList, setPatientList] = React.useState<unknown[]>([])
@@ -83,20 +76,19 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
 
     setIsSubmitting(true)
     try {
-      const patient = patientList.find((p: unknown) => p.id === form.patientId)
+      const patient = patientList.find((p: unknown) => (p.user_id || p.id) === form.patientId)
       if (!patient) return
 
-      const token = await getToken()
-      await booking.submitBooking({
-        patientId: form.patientId,
-        patientName: patient.first_name ? `${patient.first_name} ${patient.last_name}` : patient.name,
-        doctor_id: CURRENT_DOCTOR_ID, // backend uses auth token to resolve doctor usually, but passing won't hurt
-        day: form.date,
+      await getToken()
+      const container = getServiceContainer()
+      await container.appointment.doctorBookAppointment({
+        patient_id: form.patientId,
+        date: form.date,
         time: form.time,
         appointment_type: form.type,
         fee: parseInt(form.price) || 150,
-        is_virtual: form.isVirtual,
-      }, token || undefined)
+        notes: form.notes || undefined,
+      })
 
       toast({
         title: "Appointment Scheduled",
@@ -135,7 +127,7 @@ export function ScheduleAppointmentDialog({ trigger }: Props) {
               </SelectTrigger>
               <SelectContent>
                 {patientList.map((p: unknown) => (
-                  <SelectItem key={p.id || p.user_id} value={p.id || p.user_id}>{p.name || `${p.first_name} ${p.last_name}`}</SelectItem>
+                  <SelectItem key={p.user_id || p.id} value={p.user_id || p.id}>{p.name || `${p.first_name} ${p.last_name}`}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

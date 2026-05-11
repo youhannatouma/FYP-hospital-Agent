@@ -26,6 +26,7 @@ export interface IAppointmentRepository {
   getDoctorAppointments(): Promise<Appointment[]>;
   getAppointmentById(id: string): Promise<Appointment>;
   bookAppointment(data: unknown): Promise<Appointment>;
+  doctorBookAppointment(data: unknown): Promise<unknown>;
   cancelAppointment(id: string): Promise<void>;
   rescheduleAppointment(id: string, date: string, time: string): Promise<Appointment>;
   completeAppointment(id: string): Promise<Appointment>;
@@ -48,6 +49,10 @@ export class AppointmentRepository implements IAppointmentRepository {
 
   async bookAppointment(data: unknown): Promise<Appointment> {
     return this.apiHelper.post<Appointment>('/appointments/bookings', data);
+  }
+
+  async doctorBookAppointment(data: unknown): Promise<unknown> {
+    return this.apiHelper.post('/appointments/doctor/bookings', data);
   }
 
   async cancelAppointment(id: string): Promise<void> {

@@ -17,14 +17,14 @@ try:
         AssistantConfigError,
         classify_llm_error,
         get_gemini_llm,
-        invoke_with_model_fallback,
+        invoke_with_model_fallback_cached,
     )
 except ImportError:  # Fallback for backend package context
     from backend.shared.gemini import (
         AssistantConfigError,
         classify_llm_error,
         get_gemini_llm,
-        invoke_with_model_fallback,
+        invoke_with_model_fallback_cached,
     )
 
 try:
@@ -411,7 +411,7 @@ def synthesize_response(
         if _llm is not None:
             resp = _llm.invoke(prompt)
         else:
-            resp = invoke_with_model_fallback(prompt, temperature=0.7)
+            resp = invoke_with_model_fallback_cached(prompt, temperature=0.7)
         message = str(resp.content).strip()
     except Exception as exc:
         log.error("Synthesis LLM call failed: %s", exc)
