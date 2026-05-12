@@ -53,3 +53,4 @@ zstandard==0.25.0
 python-socketio>=5.10.0
 email-validator==2.2.0
 python-multipart==0.0.9
+bleach==6.1.0
