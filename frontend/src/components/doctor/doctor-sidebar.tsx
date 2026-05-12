@@ -43,7 +43,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-import ThreeAvatar from "../ThreeAvatar";
 
 const mainNavItems = [
   { label: "Dashboard", href: "/doctor", icon: LayoutDashboard },
@@ -196,11 +195,6 @@ export function DoctorSidebar() {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-indigo-500/10 opacity-50" />
             )}
 
-            <div className="flex items-center justify-center overflow-hidden rounded-2xl bg-white/5 border border-white/10">
-              <div className="translate-y-8">
-                <ThreeAvatar size={isCollapsed ? 32 : 160} />
-              </div>
-            </div>
 
             {!isCollapsed && (
               <div className="relative z-10">

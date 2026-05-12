@@ -20,14 +20,12 @@ import {
   Search,
 } from "lucide-react"
 
-import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { LabReportDetailDialog } from "@/components/patient/dialogs/lab-report-detail-dialog"
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { useMedicalRecords } from "@/hooks/use-medical-records"
 import { useEffect, useState } from "react"
-import { TrendingUp, TrendingDown, Minus } from "lucide-react"
 
 function TrendIndicator({ trend }: { trend: string }) {
   if (trend === "up") return <TrendingUp className="h-3.5 w-3.5 text-amber-500" />

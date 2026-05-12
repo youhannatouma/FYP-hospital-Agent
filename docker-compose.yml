@@ -19,6 +19,9 @@ services:
       retries: 10
     networks:
       - appnet
+  
+  redis:
+    image: redis:7-alpine
 
   backend:
     build: ./backend
@@ -31,6 +34,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       DATABASE_URL: "postgresql://postgres:1234567890@db:5432/FYP"
       DB_USER: "postgres"

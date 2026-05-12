@@ -2,7 +2,6 @@
 
 import { Bot, Heart, MessageCircle, Mic } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import ThreeAvatar from "../../ThreeAvatar"
 import { m } from "framer-motion"
 import { useRouter } from "next/navigation"
 
@@ -49,12 +48,6 @@ export function AIHealthAvatar() {
           </div>
         </div>
 
-        <div className="relative aspect-square max-w-[180px] mx-auto group-hover:scale-105 transition-transform duration-700">
-           <ThreeAvatar size={180} />
-           <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 glass-dark rounded-full border border-white/10 text-[10px] font-black uppercase tracking-widest whitespace-nowrap shadow-xl">
-             AI Assistant Ready
-           </div>
-        </div>
 
         <div className="rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 p-5 mt-2 inner-glow">
           <div className="flex items-center gap-2 mb-3">

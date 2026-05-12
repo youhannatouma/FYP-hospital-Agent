@@ -27,6 +27,29 @@ if not SECRET_KEY:
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
+# Encryption at rest
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+if ENVIRONMENT == "production" and not ENCRYPTION_KEY:
+    raise RuntimeError(
+        "Missing required environment variable: ENCRYPTION_KEY. "
+        "Generate with: python -c \"from cryptography.fernet import Fernet; "
+        "print(Fernet.generate_key().decode())\""
+    )
+
+# Redis configuration for distributed rate limiting
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", "false").lower() in {"true", "1", "yes"}
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# Password policy settings
+MIN_PASSWORD_LENGTH = int(os.getenv("MIN_PASSWORD_LENGTH", "12"))
+MAX_PASSWORD_LENGTH = int(os.getenv("MAX_PASSWORD_LENGTH", "128"))
+PASSWORD_EXPIRATION_DAYS = int(os.getenv("PASSWORD_EXPIRATION_DAYS", "0")) or None  # 0 = no expiration
+PASSWORD_HISTORY_COUNT = int(os.getenv("PASSWORD_HISTORY_COUNT", "5"))
+
+# Audit logging configuration
+AUDIT_LOG_RETENTION_DAYS = int(os.getenv("AUDIT_LOG_RETENTION_DAYS", "365"))
+AUDIT_LOG_ENABLED = os.getenv("AUDIT_LOG_ENABLED", "true").lower() in {"true", "1", "yes"}
+
 # CORS configuration with environment awareness
 def get_cors_origins():
     """Get CORS origins with production safety checks."""

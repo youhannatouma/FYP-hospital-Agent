@@ -7,7 +7,6 @@ import { ArrowRight, Activity } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/hooks/use-toast"
 import { useScrollAnimation } from "@/hooks/use-scroll-animation"
-import ThreeAvatar from "../ThreeAvatar"
 
 export function FooterSection() {
   const { ref: ctaRef, isVisible: ctaVisible } = useScrollAnimation(0.15)
