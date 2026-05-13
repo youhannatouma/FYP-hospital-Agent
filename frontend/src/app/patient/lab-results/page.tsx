@@ -27,6 +27,26 @@ import { cn } from "@/lib/utils"
 import { useMedicalRecords } from "@/hooks/use-medical-records"
 import { useEffect, useState } from "react"
 
+type LabResultItem = {
+  name: string
+  value: string
+  unit: string
+  range: string
+  trend: string
+  flag: string | null
+}
+
+type LabResultCard = {
+  id: string
+  testName: string
+  collectedDate: string
+  orderedBy: string
+  status: string
+  statusColor: string
+  icon: typeof CheckCircle2
+  results: LabResultItem[]
+}
+
 function TrendIndicator({ trend }: { trend: string }) {
   if (trend === "up") return <TrendingUp className="h-3.5 w-3.5 text-amber-500" />
   if (trend === "down") return <TrendingDown className="h-3.5 w-3.5 text-primary" />
@@ -37,19 +57,19 @@ export default function LabResultsPage() {
   const { toast } = useToast()
   const { records, loading: isLoading } = useMedicalRecords()
   
-  const [labResults, setLabResults] = useState([])
-  const [selectedReport, setSelectedReport] = useState<unknown | null>(null)
+  const [labResults, setLabResults] = useState<LabResultCard[]>([])
+  const [selectedReport, setSelectedReport] = useState<LabResultCard | null>(null)
   const [showDetail, setShowDetail] = useState(false)
 
   useEffect(() => {
     if (records) {
-      const filtered = records
-        .filter(r => r.record_type === "Lab Result")
-        .map(r => ({
+      const filtered: LabResultCard[] = records
+        .filter((r) => r.record_type === "Lab Result")
+        .map((r) => ({
           id: r.id,
           testName: r.title,
           collectedDate: r.date ? new Date(r.date).toLocaleDateString() : "TBD",
-          orderedBy: r.doctor_name || "Staff Physician",
+          orderedBy: r.doctor_id ? String(r.doctor_id) : "Staff Physician",
           status: "Verified",
           statusColor: "bg-emerald-500/10 text-emerald-500",
           icon: CheckCircle2,
@@ -82,7 +102,7 @@ export default function LabResultsPage() {
     })
   }
 
-  const handleViewReport = (report: unknown) => {
+  const handleViewReport = (report: LabResultCard) => {
     setSelectedReport(report)
     setShowDetail(true)
   }
@@ -175,7 +195,7 @@ export default function LabResultsPage() {
                       <span className="hidden md:block">Ref. Range</span>
                       <span className="hidden md:block">Trend</span>
                     </div>
-                    {lab.results.map((result, rIdx) => (
+                    {lab.results.map((result: LabResultItem, rIdx: number) => (
                       <div
                         key={rIdx}
                         className="grid grid-cols-2 md:grid-cols-5 gap-4 px-6 py-5 text-sm items-center border-t border-border/10 hover:bg-muted/30 transition-colors"
