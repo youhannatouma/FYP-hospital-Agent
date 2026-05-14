@@ -232,14 +232,7 @@ export function BookAppointmentDialog({
                           value={doc.id || doc.user_id}
                           className="rounded-xl font-bold py-3"
                         >
-                          <div className="flex flex-col text-left">
-                            <span className="leading-tight">
-                              Dr. {(doc as unknown).first_name} {(doc as unknown).last_name}
-                            </span>
-                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">
-                              {doc.specialty || "Medical Specialist"}
-                            </span>
-                          </div>
+                          {`Dr. ${(doc as unknown).first_name || ""} ${(doc as unknown).last_name || ""} - ${doc.specialty || "Specialist"}`}
                         </SelectItem>
                       ))
                     )}

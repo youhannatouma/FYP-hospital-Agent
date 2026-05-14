@@ -63,8 +63,7 @@ export default function PatientDashboardPage() {
                 Your health telemetry is synchronized. Summary for{" "}
                 <span className="text-foreground font-black underline decoration-primary/30 underline-offset-4">
                   {todayFormatted}
-                </span>
-                .
+                </span>.
               </p>
             </div>
           </div>
@@ -132,9 +131,11 @@ export default function PatientDashboardPage() {
           </section>
 
           {/* Utility Sections Staggered */}
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-            <MessagesSection />
-            <div className="flex flex-col gap-8">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
+            <div className="lg:col-span-2">
+              <MessagesSection />
+            </div>
+            <div className="lg:col-span-3 flex flex-col gap-8">
               <MedicalDocuments />
               <HealthEducation />
             </div>

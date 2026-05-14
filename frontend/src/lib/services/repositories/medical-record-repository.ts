@@ -11,22 +11,24 @@ import { ApiRequestHelper } from '../api-request-helper';
 
 export interface MedicalRecord {
   id: string;
-  record_id: string;
+  record_id?: string; // Some APIs return record_id
   patient_id: string;
   doctor_id: string | null;
+  doctor_name?: string;
+  patient_name?: string;
   record_type: string;
   title: string;
   description: string | null;
   diagnosis: string | null;
   treatment: string | null;
   clinical_notes: string | null;
-  vitals: Record<string, unknown> | null;
+  vitals: Record<string, any> | null;
   is_reviewed?: boolean;
   date: string;
   file_url: string | null;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, any>;
+  appointment_id?: string | null;
   created_at: string;
-  patient_name?: string;
 }
 
 export interface CreateMedicalRecordDto {

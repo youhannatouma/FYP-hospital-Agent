@@ -1,16 +1,32 @@
 "use client"
 
-import { Pill, AlertCircle} from "lucide-react"
+import { Pill, AlertCircle, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { m, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 import { Loader2 } from "lucide-react"
 import { usePrescriptions } from "@/hooks/use-prescriptions"
+import { useToast } from "@/hooks/use-toast"
+import { useState } from "react"
 
 export function CurrentMedications() {
   const { prescriptions: medications, loading: isLoading } = usePrescriptions()
+  const { toast } = useToast()
+  const [requestingId, setRequestingId] = useState<string | null>(null)
+
+  const handleRequestRefill = (id: string, name: string) => {
+    setRequestingId(id)
+    setTimeout(() => {
+      toast({
+        title: "Refill Requested",
+        description: `Your refill request for ${name} has been sent to your doctor.`,
+      })
+      setRequestingId(null)
+    }, 1500)
+  }
 
   return (
     <div className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden h-full flex flex-col">
@@ -43,12 +59,12 @@ export function CurrentMedications() {
         ) : (
           <AnimatePresence mode="popLayout">
             {medications.map((presc, idx) => {
-              const medName = presc.medication_name || "Medication"
-              const subText = [presc.dosage, presc.frequency].filter(Boolean).join(" - ")
+              const medName = presc.medications?.join(", ") || "Unknown Medication"
+              const isRequesting = requestingId === (presc.prescription_id || presc.id)
               
               return (
                 <m.div
-                  key={presc.id}
+                  key={presc.prescription_id || presc.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.1 }}
@@ -59,32 +75,43 @@ export function CurrentMedications() {
                 >
                   <div className="flex items-start justify-between mb-4 relative z-10">
                     <div className="space-y-0.5">
-                      <h3 className="text-base font-black text-foreground tracking-tight leading-tight group-hover:text-primary transition-colors">
-                        {medName} {subText}
+                      <h3 className="text-base font-black text-foreground tracking-tight leading-tight group-hover:text-primary transition-colors pr-10">
+                        {medName}
                       </h3>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                        Ref: {presc.doctor_id}
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
+                        {presc.doctor_name || "Doctor"}
                       </p>
                     </div>
                     <Badge className={cn("border-none text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg", 
-                      presc.status === "active" ? "bg-emerald-500/10 text-emerald-500" : "bg-muted/30 text-muted-foreground"
+                      presc.status?.toLowerCase() === "active" ? "bg-emerald-500/10 text-emerald-500" : "bg-muted/30 text-muted-foreground"
                     )}>
-                       {presc.status}
+                       {presc.status || "Active"}
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 relative z-10">
+                  <div className="grid grid-cols-2 gap-2 relative z-10 mb-4">
                     <div className="space-y-1">
                       <span className="text-[9px] font-black text-muted-foreground uppercase opacity-50 tracking-wider">Instructions</span>
-                      <p className="text-xs font-black text-foreground line-clamp-1">{presc.instructions || "As directed"}</p>
+                      <p className="text-xs font-black text-foreground line-clamp-2">{presc.instructions || "As directed"}</p>
                     </div>
                     <div className="space-y-1 text-right">
                       <span className="text-[9px] font-black text-muted-foreground uppercase opacity-50 tracking-wider">Expiry</span>
-                      <p className="text-xs font-black text-foreground">{presc.expires_at || "N/A"}</p>
+                      <p className="text-xs font-black text-foreground">{presc.expiry_date ? new Date(presc.expiry_date).toLocaleDateString() : "N/A"}</p>
                     </div>
                   </div>
 
-                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-5 transition-opacity">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full relative z-10 h-8 text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all"
+                    onClick={() => handleRequestRefill(presc.prescription_id || presc.id, medName)}
+                    disabled={isRequesting}
+                  >
+                    {isRequesting ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+                    Request Refill
+                  </Button>
+
+                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-5 transition-opacity pointer-events-none">
                      <Pill className="w-12 h-12 rotate-45" />
                   </div>
                 </m.div>

@@ -1,31 +1,39 @@
-"use client"
+"use client";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import * as React from "react"
-import { Calendar, Clock, CheckCircle, XCircle, DollarSign, TrendingUp } from "lucide-react"
-import { 
-  Bar, 
-  BarChart, 
-  CartesianGrid, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Line, 
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle,
+  DollarSign,
+  TrendingUp,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Line,
   LineChart,
-} from "recharts"
+} from "recharts";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart"
+} from "@/components/ui/chart";
 
 const chartConfig = {
   completed: {
@@ -40,42 +48,30 @@ const chartConfig = {
     label: "Bookings",
     color: "hsl(var(--primary))",
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
 
 export function AppointmentAnalytics() {
-  const [stats, setStats] = React.useState([
-    { title: "Total Booked", value: "1,248", change: "+15%", icon: Calendar, color: "text-blue-600", bg: "bg-blue-500/10" },
-    { title: "Completion Rate", value: "92%", change: "+2%", icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-    { title: "Avg. Wait Time", value: "12 min", change: "-10%", icon: Clock, color: "text-amber-600", bg: "bg-amber-500/10" },
-    { title: "Revenue", value: "$12,450", change: "+20%", icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },
-  ])
+  const [stats, setStats] = useState<any[]>([]);
+  const [appointmentStats, setAppointmentStats] = useState<any[]>([]);
+  const [peakHours, setPeakHours] = useState<any[]>([]);
+  const [cancellationReasons, setCancellationReasons] = useState<any[]>([]);
 
-  const [appointmentStats, setAppointmentStats] = React.useState([
-    { name: "Mon", completed: 45, cancelled: 5 },
-    { name: "Tue", completed: 52, cancelled: 8 },
-    { name: "Wed", completed: 48, cancelled: 4 },
-    { name: "Thu", completed: 61, cancelled: 10 },
-    { name: "Fri", completed: 55, cancelled: 7 },
-    { name: "Sat", completed: 32, cancelled: 3 },
-    { name: "Sun", completed: 25, cancelled: 2 },
-  ])
-
-  const [peakHours, setPeakHours] = React.useState([
-    { hour: "8AM", bookings: 12 },
-    { hour: "10AM", bookings: 45 },
-    { hour: "12PM", bookings: 30 },
-    { hour: "2PM", bookings: 38 },
-    { hour: "4PM", bookings: 52 },
-    { hour: "6PM", bookings: 25 },
-    { hour: "8PM", bookings: 10 },
-  ])
-
-  const [cancellationReasons, setCancellationReasons] = React.useState([
-    { reason: "Patient No-show", percentage: 45, count: 120 },
-    { reason: "Rescheduled", percentage: 30, count: 80 },
-    { reason: "Doctor Availability", percentage: 15, count: 40 },
-    { reason: "Other", percentage: 10, count: 26 },
-  ])
+  useEffect(() => {
+    const fetchAppointmentAnalytics = async () => {
+      try {
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/admin/appointments/analytics`,
+        );
+        setStats(response.data.stats || []);
+        setAppointmentStats(response.data.appointmentStats || []);
+        setPeakHours(response.data.peakHours || []);
+        setCancellationReasons(response.data.cancellationReasons || []);
+      } catch (error) {
+        console.error("Failed to fetch appointment analytics", error);
+      }
+    };
+    fetchAppointmentAnalytics();
+  }, []);
 
   // API Endpoints Suggestion:
   // GET: /admin/appointments/analytics -> Fetch stats, appointmentStats, peakHours, cancellationReasons
@@ -100,7 +96,10 @@ export function AppointmentAnalytics() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, i) => (
-          <Card key={i} className="border-border/50 bg-card/50 backdrop-blur-sm">
+          <Card
+            key={i}
+            className="border-border/50 bg-card/50 backdrop-blur-sm"
+          >
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <div className={`p-2 rounded-lg ${stat.bg}`}>
@@ -124,17 +123,32 @@ export function AppointmentAnalytics() {
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle>Appointment Completion</CardTitle>
-            <CardDescription>Completed vs. cancelled appointments this week</CardDescription>
+            <CardDescription>
+              Completed vs. cancelled appointments this week
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
               <BarChart data={appointmentStats}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
+                <XAxis
+                  dataKey="name"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                />
                 <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                 <Tooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="completed" fill="var(--color-completed)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="cancelled" fill="var(--color-cancelled)" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="completed"
+                  fill="var(--color-completed)"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="cancelled"
+                  fill="var(--color-cancelled)"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ChartContainer>
           </CardContent>
@@ -143,13 +157,20 @@ export function AppointmentAnalytics() {
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle>Peak Booking Hours</CardTitle>
-            <CardDescription>Volume of appointments by time of day</CardDescription>
+            <CardDescription>
+              Volume of appointments by time of day
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
               <LineChart data={peakHours}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="hour" tickLine={false} axisLine={false} tickMargin={8} />
+                <XAxis
+                  dataKey="hour"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                />
                 <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                 <Tooltip content={<ChartTooltipContent />} />
                 <Line
@@ -169,7 +190,9 @@ export function AppointmentAnalytics() {
       <Card className="border-border/50">
         <CardHeader>
           <CardTitle>Cancellation Reasons</CardTitle>
-          <CardDescription>Top reasons for appointment cancellations</CardDescription>
+          <CardDescription>
+            Top reasons for appointment cancellations
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -177,11 +200,13 @@ export function AppointmentAnalytics() {
               <div key={i} className="space-y-1">
                 <div className="flex justify-between text-sm font-medium">
                   <span>{item.reason}</span>
-                  <span className="text-muted-foreground">{item.count} ({item.percentage}%)</span>
+                  <span className="text-muted-foreground">
+                    {item.count} ({item.percentage}%)
+                  </span>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div 
-                    className="h-full bg-primary rounded-full transition-all" 
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
                     style={{ width: `${item.percentage}%` }}
                   />
                 </div>
@@ -191,5 +216,5 @@ export function AppointmentAnalytics() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
+import { m, AnimatePresence } from "framer-motion"
 import { getServiceContainer } from "@/lib/services/service-container"
 import type { Message } from "@/lib/services/repositories/message-repository"
 import { ComposeMessageDialog } from "@/components/patient/dialogs/compose-message-dialog"
@@ -126,101 +127,116 @@ export function MessagesSection({
               }}
             >
               <Plus className="h-4 w-4" />
-              New Message
+              New Session
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {isLoading ? (
-              [1, 2, 3].map((row) => (
-                <div
-                  key={row}
-                  className="rounded-2xl border border-border/50 p-5 animate-pulse bg-card/30"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="h-11 w-11 rounded-xl bg-muted" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-3 w-28 rounded bg-muted" />
-                      <div className="h-2 w-full rounded bg-muted" />
-                      <div className="h-2 w-3/4 rounded bg-muted" />
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : previewMessages.length === 0 ? (
-              <div className="rounded-2xl border border-border/50 bg-card/30 p-6 text-sm text-muted-foreground">
-                Your inbox is clear right now.
-              </div>
-            ) : (
-              previewMessages.map((message) => {
-                const senderName = message.sender_name || "Care team"
-                return (
-                  <button
-                    key={message.message_id}
-                    type="button"
-                    className={cn(
-                      "rounded-2xl border p-5 text-left transition-all hover:shadow-lg active:scale-98",
-                      !message.is_read
-                        ? "border-primary/20 bg-primary/[0.02]"
-                        : "border-border/50 bg-card/30"
-                    )}
-                    onClick={() => router.push("/patient/messages")}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-4">
+              {isLoading ? (
+                [1, 2].map((row) => (
+                  <div
+                    key={row}
+                    className="rounded-2xl border border-border/50 p-5 animate-pulse bg-card/30"
                   >
                     <div className="flex items-start gap-4">
-                      <Avatar className="h-11 w-11 shadow-sm border border-border/50">
-                        <AvatarFallback className="bg-muted font-bold text-sm">
-                          {getInitials(senderName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-sm font-black text-card-foreground truncate leading-tight">
-                            {senderName}
-                          </h4>
-                          <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap opacity-60">
-                            {formatMessageTime(message.created_at)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs font-semibold text-card-foreground line-clamp-1">
-                          {message.subject || "Secure message"}
-                        </p>
-                        <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2 leading-relaxed font-medium">
-                          {message.body}
-                        </p>
+                      <div className="h-11 w-11 rounded-xl bg-muted" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-28 rounded bg-muted" />
+                        <div className="h-2 w-full rounded bg-muted" />
                       </div>
                     </div>
-                  </button>
-                )
-              })
-            )}
-
-            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.03] p-5 relative overflow-hidden group/ai active:scale-98 cursor-pointer shadow-sm hover:shadow-lg transition-all duration-500">
-              <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20 shadow-lg">
-                  <Bot className="h-5 w-5 text-white" />
+                  </div>
+                ))
+              ) : previewMessages.length === 0 ? (
+                <div className="rounded-[2rem] border border-dashed border-border/50 bg-muted/20 p-12 text-center">
+                  <Mail className="h-8 w-8 text-muted-foreground/30 mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground font-medium">Your inbox is clear right now.</p>
                 </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-black text-card-foreground leading-tight group-hover/ai:text-amber-500 transition-colors">
-                    AI Assistant Available
-                  </h4>
-                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest opacity-70">
-                    On-demand support
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {previewMessages.map((message) => {
+                    const senderName = message.sender_name || "Care team"
+                    return (
+                      <m.button
+                        key={message.message_id}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ scale: 0.99 }}
+                        className={cn(
+                          "rounded-2xl border p-5 text-left transition-all hover:shadow-xl group relative overflow-hidden",
+                          !message.is_read
+                            ? "border-primary/20 bg-primary/[0.02] shadow-sm"
+                            : "border-border/30 bg-card hover:bg-muted/5"
+                        )}
+                        onClick={() => router.push("/patient/messages")}
+                      >
+                        {!message.is_read && (
+                          <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+                        )}
+                        <div className="flex items-start gap-4">
+                          <Avatar className="h-12 w-12 shadow-inner-glow border border-border/50">
+                            <AvatarFallback className="bg-gradient-to-br from-slate-100 to-slate-200 font-black text-xs text-slate-600">
+                              {getInitials(senderName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <h4 className="text-sm font-black text-foreground tracking-tight truncate group-hover:text-primary transition-colors">
+                                {senderName}
+                              </h4>
+                              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">
+                                {formatMessageTime(message.created_at)}
+                              </span>
+                            </div>
+                            <p className="text-xs font-bold text-foreground mb-1 line-clamp-1">
+                              {message.subject || "Secure communication"}
+                            </p>
+                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed font-medium">
+                              {message.body}
+                            </p>
+                          </div>
+                        </div>
+                      </m.button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="lg:col-span-1">
+              <div className="h-full rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.05] to-transparent p-6 relative overflow-hidden group/ai shadow-sm hover:shadow-xl transition-all duration-500">
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover/ai:scale-110 transition-transform duration-700">
+                   <Bot className="w-24 h-24 rotate-12 text-amber-500" />
+                </div>
+                
+                <div className="relative z-10 flex flex-col h-full">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20 shadow-lg mb-6">
+                    <Bot className="h-6 w-6 text-white" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="text-base font-black text-foreground leading-tight">
+                      Intelligent Care Assistant
+                    </h4>
+                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest opacity-80">
+                      Synchronized Analysis
+                    </p>
+                  </div>
+                  
+                  <p className="mt-4 text-xs text-muted-foreground leading-relaxed font-medium">
+                    Ask questions about care guidance, appointment prep, or review your latest health telemetry insights.
                   </p>
-                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed font-medium">
-                    Ask questions about care guidance, appointment prep, or what to discuss with your doctor.
-                  </p>
-                  <Button
-                    size="sm"
-                    className="mt-4 w-full bg-amber-500 text-white hover:bg-amber-600 font-black text-[9px] uppercase tracking-widest rounded-lg shadow-lg shadow-amber-500/10 active:scale-95 transition-all"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      router.push(aiAssistantPath)
-                    }}
-                  >
-                    <Sparkles className="mr-2 h-3.5 w-3.5" />
-                    Open Assistant
-                  </Button>
+                  
+                  <div className="mt-auto pt-8">
+                    <Button
+                      className="w-full bg-slate-900 text-white hover:bg-slate-800 font-black text-[10px] uppercase tracking-[0.15em] rounded-xl h-11 shadow-lg active:scale-95 transition-all gap-2"
+                      onClick={() => router.push(aiAssistantPath)}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                      Initialize Session
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

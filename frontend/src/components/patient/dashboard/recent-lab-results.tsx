@@ -1,7 +1,7 @@
 "use client"
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { FlaskConical, Download, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react"
+import { FlaskConical, Download, CheckCircle2, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -10,8 +10,9 @@ import { cn } from "@/lib/utils"
 
 import { useMedicalRecords } from "@/hooks/use-medical-records"
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
 import type { MedicalRecord } from "@/lib/services/repositories/medical-record-repository"
+import { LabAnalysisDialog } from "./dialogs/lab-analysis-dialog"
+import { toast } from "sonner"
 
 type LabValue = {
   label: string
@@ -28,11 +29,14 @@ type LabResultCard = {
   icon: typeof CheckCircle2
   values: LabValue[]
   premium: boolean
+  originalRecord: MedicalRecord
 }
 
 export function RecentLabResults() {
   const { records, loading: isLoading } = useMedicalRecords()
   const [labResults, setLabResults] = useState<LabResultCard[]>([])
+  const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   useEffect(() => {
     if (records) {
@@ -40,32 +44,74 @@ export function RecentLabResults() {
         .filter((r) => r.record_type === "Lab Result")
         .slice(0, 2)
         .map((r): LabResultCard => {
-          const metadata = (r.metadata ?? {}) as {
-            vitals?: Record<string, unknown>
-            diagnosis?: string
-          }
-          const vitals = metadata.vitals
-
+          const metadata = (r.vitals || r.metadata?.vitals || {}) as Record<string, unknown>
+          
           return {
-          id: r.id,
-          title: r.title,
-          collected: `Collected: ${r.date ? new Date(r.date).toLocaleDateString() : "TBD"}`,
-          status: "Verified",
-          statusColor: "bg-emerald-500/10 text-emerald-500",
-          icon: CheckCircle2,
-          values: vitals ? Object.entries(vitals).map(([label, value]) => ({
-            label,
-            value: String(value),
-            flag: false
-          })).slice(0, 4) : [
-            { label: "Result", value: metadata.diagnosis || "Normal", flag: false }
-          ],
-          premium: true,
+            id: r.id,
+            title: r.title || r.record_type,
+            collected: `Collected: ${r.date ? new Date(r.date).toLocaleDateString() : (r.created_at ? new Date(r.created_at).toLocaleDateString() : "TBD")}`,
+            status: "Verified",
+            statusColor: "bg-emerald-500/10 text-emerald-500",
+            icon: CheckCircle2,
+            values: Object.entries(metadata).map(([label, value]) => ({
+              label,
+              value: String(value),
+              flag: false
+            })).slice(0, 4),
+            premium: true,
+            originalRecord: r,
           }
         })
       setLabResults(filtered)
     }
   }, [records])
+
+  const handleDownloadReport = () => {
+    toast.success("Generating Diagnostic Report...", {
+      description: "Aggregating latest laboratory telemetry.",
+      icon: <Download className="h-4 w-4 text-orange-500" />,
+    })
+    
+    if (labResults.length === 0) {
+      toast.error("No Data", { description: "No lab results available to download." })
+      return
+    }
+
+    let reportText = "PATient DIAGNOSTIC REPORT\n";
+    reportText += `Generated: ${new Date().toLocaleString()}\n\n`;
+    
+    labResults.forEach(r => {
+      reportText += `--- ${r.title.toUpperCase()} ---\n`;
+      reportText += `${r.collected}\n`;
+      reportText += `Status: ${r.status}\n\n`;
+      
+      r.values.forEach(v => {
+        reportText += `${v.label}: ${v.value}\n`;
+      });
+      reportText += "\n";
+    });
+
+    const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Diagnostic_Report_${new Date().toISOString().split('T')[0]}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => {
+      toast.success("Report Exported", {
+        description: "Full diagnostic record is now available in your downloads.",
+        icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+      })
+    }, 1000)
+  }
+
+  const handleRetrieveAnalysis = (record: MedicalRecord) => {
+    setSelectedRecord(record)
+    setIsDialogOpen(true)
+  }
 
   return (
     <div className="premium-card rounded-[2.5rem] border-none shadow-premium bg-card overflow-hidden h-full flex flex-col">
@@ -79,9 +125,20 @@ export function RecentLabResults() {
                Diagnostics
             </h2>
           </div>
-          <Link href="/patient/lab-results" className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline underline-offset-4">
-            Full Archive
-          </Link>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadReport}
+              className="h-10 px-4 rounded-xl border-border/50 font-black text-[10px] uppercase tracking-widest hover:bg-muted/50 transition-all gap-2"
+            >
+              <Download className="h-3 w-3" />
+              Download Report
+            </Button>
+            <Link href="/patient/lab-results" className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline underline-offset-4">
+              Full Archive
+            </Link>
+          </div>
         </div>
       </div>
       
@@ -131,12 +188,10 @@ export function RecentLabResults() {
                       </span>
                       <p
                         className={cn(
-                          "flex items-center gap-1 text-sm font-black",
-                          val.flag ? "text-amber-500" : "text-foreground"
+                          "flex items-center gap-1 text-sm font-black text-foreground"
                         )}
                       >
                         {val.value}
-                        {val.flag && <span className="animate-bounce text-xs">&#x2191;</span>}
                       </p>
                     </div>
                   ))}
@@ -144,6 +199,7 @@ export function RecentLabResults() {
 
                 <Button
                   size="sm"
+                  onClick={() => handleRetrieveAnalysis(result.originalRecord)}
                   className="mt-6 h-10 w-full gap-2 rounded-xl border border-border/50 bg-background text-[10px] font-black uppercase tracking-widest text-foreground shadow-subtle transition-all hover:border-primary hover:bg-primary hover:text-white group-hover:scale-[1.02]"
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -160,6 +216,12 @@ export function RecentLabResults() {
           </p>
         </div>
       </div>
+
+      <LabAnalysisDialog 
+        open={isDialogOpen} 
+        onOpenChange={setIsDialogOpen} 
+        record={selectedRecord} 
+      />
     </div>
   )
 }

@@ -47,71 +47,35 @@ export default function AdminDashboard() {
   const { getToken } = useAuth()
   const { toast } = useToast()
   const [dynamicStats, setDynamicStats] = React.useState<DynamicStats | null>(null)
-  const [pendingApprovals, setPendingApprovals] = React.useState([
-    {
-      id: 1,
-      name: "Dr. Sarah Miller",
-      specialty: "Neurology",
-      experience: "8 Years",
-      appliedDate: "Feb 08, 2024",
-      status: "Pending"
-    },
-    {
-      id: 2,
-      name: "Dr. James Wilson",
-      specialty: "Pediatrics",
-      experience: "12 Years",
-      appliedDate: "Feb 07, 2024",
-      status: "Pending"
-    },
-    {
-      id: 3,
-      name: "Dr. Elena Popova",
-      specialty: "Radiology",
-      experience: "5 Years",
-      appliedDate: "Feb 06, 2024",
-      status: "Review"
-    }
+  const [pendingApprovals, setPendingApprovals] = React.useState<any[]>([])
+  const [topStats, setTopStats] = React.useState([
+    { value: "12,345", change: "+12%" },
+    { value: "1,234", change: "+5%" },
+    { value: "$123,456", change: "+8%" },
+    { value: "24", change: "+2%" }
   ])
 
-  const [topStats, setTopStats] = React.useState([
-    {
-      title: "Total Patients",
-      value: "2,845",
-      change: "+12.5%",
-      trend: "up",
-      icon: Users,
-      color: "text-blue-600",
-      bg: "bg-blue-500/10"
-    },
-    {
-      title: "Active Doctors",
-      value: "156",
-      change: "+4.2%",
-      trend: "up",
-      icon: UserCheck,
-      color: "text-emerald-600",
-      bg: "bg-emerald-500/10"
-    },
-    {
-      title: "Monthly Revenue",
-      value: "$45,280",
-      change: "+18.2%",
-      trend: "up",
-      icon: DollarSign,
-      color: "text-amber-600",
-      bg: "bg-amber-500/10"
-    },
-    {
-      title: "System Uptime",
-      value: "99.9%",
-      change: "+0.01%",
-      trend: "up",
-      icon: Activity,
-      color: "text-purple-600",
-      bg: "bg-purple-500/10"
-    },
-  ])
+  React.useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard`)
+        if (response.ok) {
+          const data = await response.json()
+          setPendingApprovals(data.pendingApprovals || [])
+          setTopStats(data.topStats || topStats)
+          setDynamicStats({
+            totalUsers: data.totalUsers,
+            activeUsers: data.activeUsers,
+            revenue: data.revenue,
+            appointmentsToday: data.appointmentsToday,
+          })
+        }
+      } catch (error) {
+        console.error("Failed to fetch admin data:", error)
+      }
+    }
+    fetchAdminData()
+  }, [])
 
   React.useEffect(() => {
     const fetchStats = async () => {
@@ -255,7 +219,7 @@ export default function AdminDashboard() {
                       <div key={doctor.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
                         <div className="flex items-center gap-4">
                           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                            {doctor.name.split(" ").map(n => n[0]).join("")}
+                            {doctor.name.split(" ").map((n: string) => n[0]).join("")}
                           </div>
                           <div>
                             <h4 className="font-bold text-foreground">{doctor.name}</h4>
@@ -313,14 +277,6 @@ export default function AdminDashboard() {
                   <Button className="w-full justify-between border-border" variant="outline" onClick={() => toast({ title: "Access Control", description: "Opening user roles and permissions manager..." })}>
                     Manage User Access
                     <ArrowUpRight className="h-4 w-4" />
-                  </Button>
-                  <Button className="w-full justify-between border-border" variant="outline" onClick={() => toast({ title: "Reports", description: "Generating quarterly revenue reports..." })}>
-                    Revenue Reports
-                    <ArrowUpRight className="h-4 w-4" />
-                  </Button>
-                  <Button className="w-full justify-between border-border" variant="outline" onClick={() => toast({ title: "Maintenance", description: "Scheduling automated server diagnostic..." })}>
-                    Server Maintenance
-                    <Clock className="h-4 w-4" />
                   </Button>
                   
                   <div className="mt-8 pt-6 border-t border-border">

@@ -11,16 +11,24 @@ import { ApiRequestHelper } from '../api-request-helper';
 
 export interface Prescription {
   id: string;
+  prescription_id?: string;
   patient_id: string;
   doctor_id: string;
-  medication_name: string;
-  dosage: string;
-  frequency: string;
-  duration: string | null;
+  doctor_name?: string;
+  medication_name?: string;
+  medications?: string[];
+  dosage?: string;
+  frequency?: string;
+  duration?: string | null;
   instructions: string | null;
-  status: 'active' | 'completed' | 'cancelled';
-  prescribed_at: string;
-  expires_at: string | null;
+  status: string;
+  prescribed_at?: string;
+  created_at?: string;
+  issue_date?: string;
+  expiry_date?: string | null;
+  expires_at?: string | null;
+  is_filled?: boolean;
+  medicine_name?: string;
 }
 
 export interface CreatePrescriptionDto {
