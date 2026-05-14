@@ -47,13 +47,13 @@ export default function ContactPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Department</label>
-                <select className="w-full h-14 bg-background border border-border rounded-2xl px-6 focus:border-primary outline-none">
-                  <option>General Inquiry</option>
-                  <option>Technical Support</option>
-                  <option>Institutional Sales</option>
-                  <option>Privacy Office</option>
-                </select>
+                <label htmlFor="department" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Department</label>
+                  <select id="department" name="department" aria-label="Department"className="w-full h-14 bg-background border border-border rounded-2xl px-6 focus:border-primary outline-none">
+                    <option>General Inquiry</option>
+                    <option>Technical Support</option>
+                    <option>Institutional Sales</option>
+                    <option>Privacy Office</option>
+                  </select>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Message</label>

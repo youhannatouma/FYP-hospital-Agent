@@ -155,7 +155,21 @@ export default function SettingsPage() {
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 {form.allergies.map((a) => (
-                  <Badge key={a} className="gap-1">{a}<button onClick={() => setForm({ ...form, allergies: form.allergies.filter((x) => x !== a) })}><X className="h-3 w-3" /></button></Badge>
+                  <Badge key={a} className="gap-1">{a}
+                    <button
+                      type="button"
+                      aria-label={`Remove allergy ${a}`}
+                      title={`Remove allergy ${a}`}
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          allergies: form.allergies.filter((x) => x !== a),
+                        })
+                      }
+                    >
+                    <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
                 ))}
               </div>
               <div className="flex gap-2">
@@ -175,7 +189,21 @@ export default function SettingsPage() {
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 {form.chronic_conditions.map((c) => (
-                  <Badge key={c} variant="secondary" className="gap-1">{c}<button onClick={() => setForm({ ...form, chronic_conditions: form.chronic_conditions.filter((x) => x !== c) })}><X className="h-3 w-3" /></button></Badge>
+                  <Badge key={c} variant="secondary" className="gap-1">{c}
+                    <button
+                      type="button"
+                      aria-label={`Remove condition ${c}`}
+                      title={`Remove condition ${c}`}
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          chronic_conditions: form.chronic_conditions.filter((x) => x !== c),
+                        })
+                      }
+                    >
+                    <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
                 ))}
               </div>
               <div className="flex gap-2">

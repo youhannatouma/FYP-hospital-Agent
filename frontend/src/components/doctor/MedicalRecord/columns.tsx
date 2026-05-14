@@ -28,6 +28,7 @@ export type MedicalRecord = {
   treatmentPlan?: string;
   notes?: string;
   nextAppointment?: string;
+  doctor_name?: string;
 };
 
 export const columns: ColumnDef<MedicalRecord>[] = [

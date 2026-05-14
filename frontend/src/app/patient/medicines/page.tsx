@@ -36,6 +36,22 @@ import { cn } from "@/lib/utils"
 import { usePrescriptions } from "@/hooks/use-prescriptions"
 import { useEffect } from "react"
 
+type MedicationCard = {
+  id: string
+  name: string
+  dosage: string
+  frequency: string
+  purpose: string
+  doctor: string
+  startDate: string
+  endDate: string
+  refillsLeft: number
+  progress: number
+  status: "active" | "completed" | "cancelled"
+  nextDose: string
+  accent: "primary" | "blue" | "emerald"
+}
+
 export default function MedicinesPage() {
   const { toast } = useToast()
   const { prescriptions, loading: isLoading } = usePrescriptions()
@@ -46,28 +62,30 @@ export default function MedicinesPage() {
   const [selectedPharmacy, setSelectedPharmacy] = useState<unknown | null>(null)
   const [showOrder, setShowOrder] = useState(false)
 
-  const [activePrescriptions, setActivePrescriptions] = useState([])
-  const [pastPrescriptions, setPastPrescriptions] = useState([])
+  const [activePrescriptions, setActivePrescriptions] = useState<MedicationCard[]>([])
+  const [pastPrescriptions, setPastPrescriptions] = useState<MedicationCard[]>([])
 
   useEffect(() => {
     if (prescriptions) {
-      const mapped = prescriptions.map(rx => ({
-        id: rx.id || rx.prescription_id,
-        name: rx.medicine_name,
-        dosage: rx.dosage,
-        frequency: rx.frequency,
+      const mapped: MedicationCard[] = prescriptions.map((rx) => ({
+        id: String(rx.id),
+        name: rx.medication_name,
+        dosage: rx.dosage ?? "Not specified",
+        frequency: rx.frequency ?? "Not specified",
         purpose: rx.instructions || "Therapeutic Protocol",
-        doctor: rx.doctor_name || "Staff Physician",
-        startDate: rx.created_at ? new Date(rx.created_at).toLocaleDateString() : "TBD",
+        doctor: rx.doctor_id ? String(rx.doctor_id) : "Staff Physician",
+        startDate: rx.prescribed_at
+        ? new Date(rx.prescribed_at).toLocaleDateString()
+        : "TBD",
         endDate: "Ongoing",
         refillsLeft: 5,
         progress: 100,
-        status: rx.status || "Active",
+        status: rx.status,
         nextDose: "Scheduled",
-        accent: rx.status === "Active" ? "primary" : "blue",
+        accent: rx.status === "active" ? "primary" : "blue",
       }))
-      setActivePrescriptions(mapped.filter(rx => rx.status === "Active"))
-      setPastPrescriptions(mapped.filter(rx => rx.status !== "Active"))
+      setActivePrescriptions(mapped.filter((rx) => rx.status === "active"))
+      setPastPrescriptions(mapped.filter((rx) => rx.status !== "active"))
     }
   }, [prescriptions])
 

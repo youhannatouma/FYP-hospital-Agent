@@ -5,8 +5,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
-from app.models import user, appointment, time_slot, message, chat, pharmacy, workflow_trace_event
+from app.models import user, appointment, time_slot, message, chat, pharmacy, workflow_trace_event, audit_log
 from app.routes import auth, users, appointments, doctors, payments, admin, medical_records, prescriptions, notifications, messages, assistant
+from app.config import CORS_ORIGINS, DEBUG_MODE, ENVIRONMENT
 from shared.gemini import log_assistant_llm_status_once
 
 log = logging.getLogger("hospital")
@@ -17,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 async def lifespan(app: FastAPI):
     """Startup / shutdown hooks."""
     # ── Create tables ──────────────────────────────────────────────────────
-    from app.models import user, appointment, time_slot, medical_record, prescription, notification, message, chat, pharmacy, workflow_trace_event
+    from app.models import user, appointment, time_slot, medical_record, prescription, notification, message, chat, pharmacy, workflow_trace_event, audit_log
     Base.metadata.create_all(bind=engine)
     log.info("Database tables ensured.")
 
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("Auto-seed skipped or failed: %s", e)
 
+    log.info(f"Starting application in {ENVIRONMENT} mode")
     log_assistant_llm_status_once()
 
     yield  # app is running
@@ -49,23 +51,15 @@ async def security_headers_middleware(request, call_next):
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=*, camera=*"
 
-    # Only enable HSTS when actually running over HTTPS.
-    if request.url.scheme == "https":
+    # Only enable HSTS when actually running over HTTPS or in production mode.
+    # In production, HSTS should always be enforced (requires HTTPS).
+    if request.url.scheme == "https" or (ENVIRONMENT == "production" and not DEBUG_MODE):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
     return response
 
-# CORS: allow known local dev origins by default.
-_cors_origins_env = os.getenv(
-    "CORS_ORIGINS",
-    ",".join(
-        [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-        ]
-    ),
-)
-cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+# CORS: use configured origins from config.py
+cors_origins = CORS_ORIGINS
 
 app.add_middleware(
     CORSMiddleware,

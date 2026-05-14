@@ -48,8 +48,14 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.40.0
 win32_setctime==1.2.0
+redis==5.0.1
+cryptography==46.0.5
+pycryptodome==3.19.0
+pip-audit==2.6.1
+safety>=3.0.0
 xxhash==3.6.0
 zstandard==0.25.0
 python-socketio>=5.10.0
 email-validator==2.2.0
 python-multipart==0.0.9
+bleach==6.1.0
