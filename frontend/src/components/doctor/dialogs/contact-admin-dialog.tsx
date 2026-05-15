@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState, useEffect } from "react"
-import { Phone, Mail, MessageSquare, Sparkles, ShieldCheck, Building2, Terminal } from "lucide-react"
+import { Phone, Mail, MessageSquare, ShieldCheck, Building2, Terminal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -25,8 +25,8 @@ import { m, AnimatePresence } from "framer-motion"
 import { getServiceContainer } from "@/lib/services/service-container"
 
 interface ContactAdminDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
 }
 
 export function ContactAdminDialog({ open, onOpenChange }: ContactAdminDialogProps) {
@@ -94,11 +94,11 @@ export function ContactAdminDialog({ open, onOpenChange }: ContactAdminDialogPro
       setDepartment("")
       setMessage("")
       setMethod("message")
-    } catch (error) {
+    } catch (error: any) {
       setIsSending(false)
       toast({
         title: "Error",
-        description: "Failed to dispatch communication.",
+        description: error?.message || "Failed to dispatch communication.",
         variant: "destructive"
       })
     }

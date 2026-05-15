@@ -8,8 +8,9 @@ REPO_ROOT = BACKEND_DIR.parent
 
 # Root .env is useful for Docker Compose substitutions; backend/.env should
 # win for host-run development because it can point at 127.0.0.1 instead of db.
+# Only override if we aren't already given a DATABASE_URL (useful for Docker/CI)
 load_dotenv(REPO_ROOT / ".env")
-load_dotenv(BACKEND_DIR / ".env", override=True)
+load_dotenv(BACKEND_DIR / ".env", override=os.getenv("DATABASE_URL") is None)
 
 # Environment detection (development, staging, production)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()

@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 export const useWebRTC = (roomId: string) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const pc = useRef<RTCPeerConnection | null>(null);
   const socket = useRef<Socket | null>(null);
 
@@ -11,13 +12,21 @@ export const useWebRTC = (roomId: string) => {
     if (!roomId) return;
 
     // 1. Initialize Socket.io
-    socket.current = io('http://localhost:8000', { path: '/ws/socket.io' });
+    // Note: path matches backend mount at /ws
+    socket.current = io('http://localhost:8000', { path: '/ws/' });
 
     // 2. Setup WebRTC
     const setupMedia = async () => {
+      if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+        const errStr = "WebRTC requires a secure context (HTTPS or localhost).";
+        console.error(errStr);
+        setMediaError(errStr);
+      }
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
+        setMediaError(null);
 
         pc.current = new RTCPeerConnection({
           iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -36,8 +45,24 @@ export const useWebRTC = (roomId: string) => {
             socket.current?.emit('signal', { room: roomId, candidate: event.candidate });
           }
         };
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to setup media:", err);
+        setMediaError(err.message || "Failed to access camera/microphone.");
+        
+        // Still setup peer connection so they can receive video even if they have no camera
+        pc.current = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+        pc.current.ontrack = (event) => {
+          if (event.streams[0]) {
+            setRemoteStream(event.streams[0]);
+          }
+        };
+        pc.current.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.current?.emit('signal', { room: roomId, candidate: event.candidate });
+          }
+        };
       }
     };
 
@@ -73,7 +98,6 @@ export const useWebRTC = (roomId: string) => {
 
     return () => {
       // ── SAFE CLEANUP ──────────────────────────────
-      // Use local variables or check refs directly to avoid closure stale state
       if (pc.current) {
         pc.current.close();
         pc.current = null;
@@ -82,7 +106,6 @@ export const useWebRTC = (roomId: string) => {
         socket.current.disconnect();
         socket.current = null;
       }
-      // Stop all tracks in the stream if it exists
       setLocalStream(prev => {
         if (prev) {
           prev.getTracks().forEach(track => track.stop());
@@ -97,7 +120,10 @@ export const useWebRTC = (roomId: string) => {
 
   const createOffer = async () => {
       if (!pc.current) return;
-      const offer = await pc.current.createOffer();
+      const offer = await pc.current.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
       await pc.current.setLocalDescription(offer);
       socket.current?.emit('signal', { room: roomId, offer });
   };
@@ -120,5 +146,5 @@ export const useWebRTC = (roomId: string) => {
       await pc.current.addIceCandidate(new RTCIceCandidate(candidate));
   };
 
-  return { localStream, remoteStream };
+  return { localStream, remoteStream, mediaError };
 };

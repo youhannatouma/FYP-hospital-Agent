@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@clerk/nextjs"
 import { getServiceContainer } from "@/lib/services/service-container"
 import type { Prescription } from "@/lib/services/repositories/prescription-repository"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, CheckCircle, Pill } from "lucide-react"
@@ -93,8 +93,8 @@ export default function PharmacistDashboard() {
                     <div className="p-4 rounded-2xl bg-muted/30 border border-border/50">
                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Medications</p>
                       <ul className="space-y-1">
-                        {p.medications?.map((m, idx) => (
-                          <li key={idx} className="text-sm font-bold text-foreground flex items-center gap-2">
+                        {p.medications?.map((m) => (
+                          <li key={m} className="text-sm font-bold text-foreground flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                             {m}
                           </li>
@@ -110,7 +110,7 @@ export default function PharmacistDashboard() {
 
                   <div className="flex flex-col justify-end gap-3 min-w-[200px]">
                     <Button 
-                      onClick={() => handleFulfill(p.prescription_id!)}
+                      onClick={() => handleFulfill(p.prescription_id)}
                       className="h-12 rounded-xl font-black text-xs uppercase tracking-widest shadow-premium"
                     >
                       <CheckCircle className="mr-2 h-4 w-4" />

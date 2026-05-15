@@ -40,9 +40,9 @@ import { MedicalRecord } from "./columns";
 
 // Simplified interface without generics
 interface DataTableProps {
-  columns: ColumnDef<MedicalRecord>[];
-  data: MedicalRecord[];
-  onAddRecord?: (record: Omit<MedicalRecord, "id">) => void;
+  readonly columns: ColumnDef<MedicalRecord>[];
+  readonly data: MedicalRecord[];
+  readonly onAddRecord?: (record: Omit<MedicalRecord, "id">) => void;
 }
 
 export function DataTable({

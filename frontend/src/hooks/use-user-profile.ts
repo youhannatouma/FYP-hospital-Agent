@@ -40,7 +40,7 @@ export function useUserProfile(): UseUserProfileReturn {
   );
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProfile = useCallback(async (isMounted: { current: boolean } = { current: true }) => {
+  const fetchProfile = useCallback(async (isMounted: { current: boolean }) => {
     if (!isSignedIn) {
       if (isMounted.current) setProfile(null);
       return;
@@ -89,7 +89,7 @@ export function useUserProfile(): UseUserProfileReturn {
     profile: formattedProfile,
     isLoading,
     error,
-    refetch: () => fetchProfile(),
+    refetch: () => fetchProfile({ current: true }),
     fullName: formattedProfile?.fullName ?? '',
     initials: formattedProfile?.initials ?? '?',
     displayRole: formattedProfile?.displayRole ?? 'User',

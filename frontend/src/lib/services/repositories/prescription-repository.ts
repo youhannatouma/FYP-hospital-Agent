@@ -54,7 +54,7 @@ export interface IPrescriptionRepository {
 }
 
 export class PrescriptionRepository implements IPrescriptionRepository {
-  constructor(private apiHelper: ApiRequestHelper) {}
+  constructor(private readonly apiHelper: ApiRequestHelper) {}
 
   async getMyPrescriptions(): Promise<Prescription[]> {
     return this.apiHelper.get<Prescription[]>('/prescriptions/my');

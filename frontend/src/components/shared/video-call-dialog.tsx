@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, 
-         MessageSquare, Users, Settings, Maximize2, Volume2 } from "lucide-react"
+         MessageSquare, Users, Settings, Maximize2, Volume2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
@@ -27,16 +27,16 @@ export function VideoCallDialog({
   const [callDuration, setCallDuration] = useState(0)
 
   // ── ADD: WebRTC hook ──────────────────────────────
-  const { localStream, remoteStream } = useWebRTC(open ? roomId : "")
+  const { localStream, remoteStream, mediaError } = useWebRTC(open ? roomId : "")
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
 
   // Attach streams to video elements
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
+    if (localVideoRef.current && localStream && !isVideoOff) {
       localVideoRef.current.srcObject = localStream
     }
-  }, [localStream])
+  }, [localStream, isVideoOff])
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
@@ -118,7 +118,12 @@ export function VideoCallDialog({
 
           {/* ── LOCAL VIDEO (picture-in-picture) ── */}
           <div className="absolute top-6 right-24 w-48 aspect-video rounded-xl bg-zinc-800 border-2 border-white/20 overflow-hidden shadow-2xl z-20">
-            {localStream && !isVideoOff ? (
+            {mediaError ? (
+              <div className="h-full w-full bg-zinc-900 flex flex-col items-center justify-center p-2 text-center text-white">
+                <AlertTriangle className="h-5 w-5 text-red-500 mb-1" />
+                <span className="text-[9px] font-medium leading-tight text-red-400">{mediaError}</span>
+              </div>
+            ) : localStream && !isVideoOff ? (
               // Real local camera
               <video
                 ref={localVideoRef}
