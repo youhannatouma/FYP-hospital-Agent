@@ -5,7 +5,8 @@ from fastapi import APIRouter
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 
 # Socket.io ASGI App
-sio_app = socketio.ASGIApp(sio)
+# Use empty path because we mount it under /ws in main.py
+sio_app = socketio.ASGIApp(sio, socketio_path='')
 
 @sio.event
 async def connect(sid, environ):

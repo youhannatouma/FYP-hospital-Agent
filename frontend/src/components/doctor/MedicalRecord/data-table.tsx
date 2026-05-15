@@ -40,9 +40,9 @@ import { MedicalRecord } from "./columns";
 
 // Simplified interface without generics
 interface DataTableProps {
-  columns: ColumnDef<MedicalRecord>[];
-  data: MedicalRecord[];
-  onAddRecord?: (record: Omit<MedicalRecord, "id">) => void;
+  readonly columns: ColumnDef<MedicalRecord>[];
+  readonly data: MedicalRecord[];
+  readonly onAddRecord?: (record: Omit<MedicalRecord, "id">) => void;
 }
 
 export function DataTable({
@@ -113,10 +113,10 @@ export function DataTable({
             <Input
               placeholder="Search patient records..."
               value={
-                (table.getColumn("name")?.getFilterValue() as string) ?? ""
+                (table.getColumn("patient_name")?.getFilterValue() as string) ?? ""
               }
               onChange={(event) =>
-                table.getColumn("name")?.setFilterValue(event.target.value)
+                table.getColumn("patient_name")?.setFilterValue(event.target.value)
               }
               className="pl-10 bg-background border-input text-foreground placeholder:text-muted-foreground"
             />
@@ -265,10 +265,10 @@ export function DataTable({
         onOpenChange={setDetailDialogOpen}
         onEdit={(record) => {
           setDetailDialogOpen(false);
-          toast({ title: "Edit Record", description: `Opening edit form for ${record.name}...` });
+          toast({ title: "Edit Record", description: `Opening edit form for ${record.patient_name || "patient"}...` });
         }}
         onDownload={(record) => {
-          toast({ title: "Download Started", description: `Downloading ${record.name}'s medical record...` });
+          toast({ title: "Download Started", description: `Downloading ${record.patient_name || "patient"}'s medical record...` });
         }}
       />
     </div>

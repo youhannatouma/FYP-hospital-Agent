@@ -35,7 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
 interface MedicalRecordFormProps {
-  onAddRecord: (record: Omit<MedicalRecord, "id">) => void;
+  readonly onAddRecord: (record: Omit<MedicalRecord, "id">) => void;
 }
 
 export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
@@ -76,27 +76,37 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
     }
 
     const newRecord: Omit<MedicalRecord, "id"> = {
-      name: formData.name,
-      patientId: formData.patientId,
-      lastVisit: format(lastVisitDate, "yyyy-MM-dd"),
+      patient_name: formData.name,
+      patient_id: formData.patientId,
+      date: format(lastVisitDate, "yyyy-MM-dd"),
       diagnosis: formData.diagnosis,
-      status: formData.status,
-      age: formData.age ? parseInt(formData.age) : undefined,
-      gender: formData.gender || undefined,
-      bloodType: formData.bloodType || undefined,
-      phone: formData.phone || undefined,
-      email: formData.email || undefined,
-      address: formData.address || undefined,
-      height: formData.height ? parseFloat(formData.height) : undefined,
-      weight: formData.weight ? parseFloat(formData.weight) : undefined,
-      bloodPressure: formData.bloodPressure || undefined,
-      heartRate: formData.heartRate ? parseInt(formData.heartRate) : undefined,
-      temperature: formData.temperature ? parseFloat(formData.temperature) : undefined,
-      medications: medications.length > 0 ? medications : undefined,
-      allergies: allergies.length > 0 ? allergies : undefined,
-      treatmentPlan: formData.treatmentPlan || undefined,
-      notes: formData.notes || undefined,
-      nextAppointment: nextAppointmentDate ? format(nextAppointmentDate, "yyyy-MM-dd") : undefined,
+      title: `Consultation - ${formData.diagnosis}`,
+      record_type: "Consultation",
+      doctor_id: null, // Will be set by backend
+      description: formData.notes || null,
+      clinical_notes: formData.treatmentPlan || null,
+      treatment: formData.treatmentPlan || null,
+      file_url: null,
+      vitals: {
+        age: formData.age ? Number.parseInt(formData.age, 10) : undefined,
+        gender: formData.gender || undefined,
+        blood_type: formData.bloodType || undefined,
+        phone: formData.phone || undefined,
+        email: formData.email || undefined,
+        address: formData.address || undefined,
+        height: formData.height ? Number.parseFloat(formData.height) : undefined,
+        weight: formData.weight ? Number.parseFloat(formData.weight) : undefined,
+        blood_pressure: formData.bloodPressure || undefined,
+        heart_rate: formData.heartRate ? Number.parseInt(formData.heartRate, 10) : undefined,
+        temperature: formData.temperature ? Number.parseFloat(formData.temperature) : undefined,
+      },
+      metadata: {
+        status: formData.status,
+        next_appointment: nextAppointmentDate ? format(nextAppointmentDate, "yyyy-MM-dd") : undefined,
+        medications: medications.length > 0 ? medications : undefined,
+        allergies: allergies.length > 0 ? allergies : undefined,
+      },
+      created_at: new Date().toISOString(),
     };
 
     onAddRecord(newRecord);
@@ -429,7 +439,7 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
                     <Input
                       value={currentMedication}
                       onChange={(e) => setCurrentMedication(e.target.value)}
-                      onKeyPress={(e) => {
+                      onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
                           addMedication();
@@ -449,9 +459,9 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
                   </div>
                   {medications.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {medications.map((med, index) => (
+                      {medications.map((med) => (
                         <div
-                          key={index}
+                          key={med}
                           className="flex items-center gap-1 bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 px-2 py-1 rounded-md text-sm"
                         >
                           {med}
@@ -475,7 +485,7 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
                     <Input
                       value={currentAllergy}
                       onChange={(e) => setCurrentAllergy(e.target.value)}
-                      onKeyPress={(e) => {
+                      onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
                           addAllergy();
@@ -495,9 +505,9 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
                   </div>
                   {allergies.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {allergies.map((allergy, index) => (
+                      {allergies.map((allergy) => (
                         <div
-                          key={index}
+                          key={allergy}
                           className="flex items-center gap-1 bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400 px-2 py-1 rounded-md text-sm"
                         >
                           {allergy}

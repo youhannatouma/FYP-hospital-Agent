@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 # ─── Seed Data ───────────────────────────────────────────────────────────────
 
 ADMIN = {
+    "clerk_id": "user_seed_admin",
     "email": "admin@hospital-care.com",
     "first_name": "Admin",
     "last_name": "System",
@@ -20,6 +21,7 @@ ADMIN = {
 
 DOCTORS = [
     {
+        "clerk_id": "user_seed_dr_ahmed",
         "email": "dr.ahmed.cardiology@gmail.com",
         "first_name": "Ahmed",
         "last_name": "Al-Rashid",
@@ -33,6 +35,7 @@ DOCTORS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_dr_fatima",
         "email": "dr.fatima.dermatology@gmail.com",
         "first_name": "Fatima",
         "last_name": "Hassan",
@@ -46,6 +49,7 @@ DOCTORS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_dr_omar",
         "email": "dr.omar.orthopedics@gmail.com",
         "first_name": "Omar",
         "last_name": "Khalil",
@@ -59,6 +63,7 @@ DOCTORS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_dr_sarah",
         "email": "dr.sarah.pediatrics@gmail.com",
         "first_name": "Sarah",
         "last_name": "Mansour",
@@ -72,6 +77,7 @@ DOCTORS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_dr_youssef",
         "email": "dr.youssef.neurology@gmail.com",
         "first_name": "Youssef",
         "last_name": "Nabil",
@@ -85,6 +91,7 @@ DOCTORS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_dr_layla",
         "email": "dr.layla.gynecology@gmail.com",
         "first_name": "Layla",
         "last_name": "Ibrahim",
@@ -98,6 +105,7 @@ DOCTORS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_dr_karim",
         "email": "dr.karim.surgery@gmail.com",
         "first_name": "Karim",
         "last_name": "Bakri",
@@ -111,6 +119,7 @@ DOCTORS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_dr_nadia",
         "email": "dr.nadia.internalmedicine@gmail.com",
         "first_name": "Nadia",
         "last_name": "El-Amin",
@@ -127,6 +136,7 @@ DOCTORS = [
 
 PATIENTS = [
     {
+        "clerk_id": "user_seed_sarah_johnson",
         "email": "sarah.johnson@email.com",
         "first_name": "Sarah",
         "last_name": "Johnson",
@@ -142,6 +152,7 @@ PATIENTS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_mohammed_ali",
         "email": "mohammed.ali@email.com",
         "first_name": "Mohammed",
         "last_name": "Ali",
@@ -157,6 +168,7 @@ PATIENTS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_emily_chen",
         "email": "emily.chen@email.com",
         "first_name": "Emily",
         "last_name": "Chen",
@@ -172,6 +184,7 @@ PATIENTS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_rashid_khan",
         "email": "rashid.khan@email.com",
         "first_name": "Rashid",
         "last_name": "Khan",
@@ -187,6 +200,7 @@ PATIENTS = [
         "status": "Active",
     },
     {
+        "clerk_id": "user_seed_anna_martinez",
         "email": "anna.martinez@email.com",
         "first_name": "Anna",
         "last_name": "Martinez",

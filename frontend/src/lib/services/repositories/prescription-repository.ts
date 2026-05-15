@@ -29,6 +29,7 @@ export interface Prescription {
   expires_at?: string | null;
   is_filled?: boolean;
   medicine_name?: string;
+  patient_name?: string;
 }
 
 export interface CreatePrescriptionDto {
@@ -53,7 +54,7 @@ export interface IPrescriptionRepository {
 }
 
 export class PrescriptionRepository implements IPrescriptionRepository {
-  constructor(private apiHelper: ApiRequestHelper) {}
+  constructor(private readonly apiHelper: ApiRequestHelper) {}
 
   async getMyPrescriptions(): Promise<Prescription[]> {
     return this.apiHelper.get<Prescription[]>('/prescriptions/my');

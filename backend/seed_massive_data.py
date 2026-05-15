@@ -43,6 +43,7 @@ def seed_massive_data():
                 continue
             
             doc = User(
+                clerk_id=f"user_seed_{email.split('@')[0]}",
                 email=email,
                 first_name=random.choice(FIRST_NAMES),
                 last_name=random.choice(LAST_NAMES),
@@ -74,6 +75,7 @@ def seed_massive_data():
                 continue
             
             pat = User(
+                clerk_id=f"user_seed_{email.split('@')[0]}",
                 email=email,
                 first_name=random.choice(FIRST_NAMES),
                 last_name=random.choice(LAST_NAMES),
@@ -91,8 +93,54 @@ def seed_massive_data():
             db.flush()
             patients.append(pat)
         print(f"[MassiveSeed] Generated/Linked {len(patients)} patients.")
+        
+        # 3. Generate 20 Pharmacists
+        pharmacists = []
+        for i in range(20):
+            email = f"pharmacist.{i}@hospital-care.com"
+            existing = db.query(User).filter(User.email == email).first()
+            if existing:
+                pharmacists.append(existing)
+                continue
+            
+            pharm = User(
+                clerk_id=f"user_seed_{email.split('@')[0]}",
+                email=email,
+                first_name=random.choice(FIRST_NAMES),
+                last_name=random.choice(LAST_NAMES),
+                role="pharmacist",
+                phone_number_plaintext=generate_phone(),
+                status="Active"
+            )
+            db.add(pharm)
+            db.flush()
+            pharmacists.append(pharm)
+        print(f"[MassiveSeed] Generated {len(pharmacists)} pharmacists.")
 
-        # 3. Generate Clinical History (Records, Appointments, Prescriptions)
+        # 4. Generate 20 Lab Techs
+        lab_techs = []
+        for i in range(20):
+            email = f"labtech.{i}@hospital-care.com"
+            existing = db.query(User).filter(User.email == email).first()
+            if existing:
+                lab_techs.append(existing)
+                continue
+            
+            tech = User(
+                clerk_id=f"user_seed_{email.split('@')[0]}",
+                email=email,
+                first_name=random.choice(FIRST_NAMES),
+                last_name=random.choice(LAST_NAMES),
+                role="lab",
+                phone_number_plaintext=generate_phone(),
+                status="Active"
+            )
+            db.add(tech)
+            db.flush()
+            lab_techs.append(tech)
+        print(f"[MassiveSeed] Generated {len(lab_techs)} lab techs.")
+
+        # 5. Generate Clinical History (Records, Appointments, Prescriptions)
         print("[MassiveSeed] Generating clinical history for all patients...")
         record_count = 0
         appt_count = 0
