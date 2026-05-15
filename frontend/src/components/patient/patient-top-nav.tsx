@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { useClerk } from "@clerk/nextjs"
 import { useUserProfile } from "@/hooks/use-user-profile"
@@ -23,6 +24,9 @@ export function PatientTopNav() {
   const { theme, setTheme } = useTheme()
   const { signOut } = useClerk()
   const { profile, isLoading, fullName, initials } = useUserProfile()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   const handleSignOut = () => signOut({ redirectUrl: "/sign-in" })
 
@@ -40,7 +44,7 @@ export function PatientTopNav() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        {/* Theme Toggle */}
+        {/* Theme Toggle — only render after mount to avoid hydration mismatch */}
         <Button
           variant="ghost"
           size="icon"
@@ -48,7 +52,7 @@ export function PatientTopNav() {
           className="text-muted-foreground hover:text-foreground"
           aria-label="Toggle theme"
         >
-          {theme === "dark" ? (
+          {mounted && theme === "dark" ? (
             <Sun className="h-4 w-4" />
           ) : (
             <Moon className="h-4 w-4" />

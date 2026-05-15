@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from uuid import UUID
+from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -16,18 +17,22 @@ class MedicalRecordSkill:
         patient_id: UUID,
         doctor_id: UUID,
         record_type: str,
-        diagnosis: str,
-        treatment: str,
-        clinical_notes: str | None = None,
-        appointment_id: UUID | None = None,
+        title: Optional[str] = None,
+        diagnosis: Optional[str] = None,
+        treatment: Optional[str] = None,
+        clinical_notes: Optional[str] = None,
+        vitals: Optional[dict] = None,
+        appointment_id: Optional[UUID] = None,
     ) -> MedicalRecord:
         record = MedicalRecord(
             patient_id=patient_id,
             doctor_id=doctor_id,
             record_type=record_type,
+            title=title,
             diagnosis=diagnosis,
             treatment=treatment,
             clinical_notes=clinical_notes,
+            vitals=vitals,
             appointment_id=appointment_id,
         )
         db.add(record)

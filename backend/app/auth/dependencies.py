@@ -238,7 +238,7 @@ def get_current_user(
                 email=email or f"user_{clerk_id}@hospital.com",
                 first_name=first_name,
                 last_name=last_name,
-                phone_number=phone_number,
+                phone_number_plaintext=phone_number,
                 role=role,
                 status="Active"
             )
@@ -273,8 +273,11 @@ def get_current_user(
         return user
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        detail = "Invalid token"
+        if os.getenv("ENVIRONMENT") != "production":
+            detail = f"Invalid token: {str(e)}"
+        raise HTTPException(status_code=401, detail=detail)
 
 
 def require_role(required_roles: str | list[str]):

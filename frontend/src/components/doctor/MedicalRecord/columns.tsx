@@ -1,42 +1,19 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Eye, Edit, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MedicalRecord } from "@/lib/services/repositories/medical-record-repository";
 
-export type MedicalRecord = {
-  id: string;
-  name: string;
-  patientId: string;
-  lastVisit: string;
-  diagnosis: string;
-  status: "Active" | "Follow-up" | "Recovered" | "Inactive";
-  // Optional detailed fields
-  age?: number;
-  gender?: string;
-  bloodType?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  height?: number; // in cm
-  weight?: number; // in kg
-  bloodPressure?: string;
-  heartRate?: number; // bpm
-  temperature?: number; // in °C
-  medications?: string[];
-  allergies?: string[];
-  treatmentPlan?: string;
-  notes?: string;
-  nextAppointment?: string;
-  doctor_name?: string;
-};
+export type { MedicalRecord };
 
 export const columns: ColumnDef<MedicalRecord>[] = [
   {
-    accessorKey: "name",
+    accessorKey: "patient_name",
     header: "Patient Name",
     cell: ({ row }) => {
-      const name = row.getValue("name") as string;
+      const name = row.getValue("patient_name") as string || "Unknown Patient";
       const initials = name
         .split(" ")
         .map((n) => n[0])
@@ -53,17 +30,19 @@ export const columns: ColumnDef<MedicalRecord>[] = [
     },
   },
   {
-    accessorKey: "patientId",
+    accessorKey: "patient_id",
     header: "Patient ID",
     cell: ({ row }) => (
-      <div className="text-muted-foreground">{row.getValue("patientId")}</div>
+      <div className="text-muted-foreground font-mono text-xs">{row.getValue("patient_id")}</div>
     ),
   },
   {
-    accessorKey: "lastVisit",
-    header: "Last Visit",
+    accessorKey: "created_at",
+    header: "Date",
     cell: ({ row }) => {
-      const date = new Date(row.getValue("lastVisit"));
+      const dateVal = row.getValue("created_at") as string;
+      if (!dateVal) return <div className="text-muted-foreground">N/A</div>;
+      const date = new Date(dateVal);
       const formatted = date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
@@ -77,43 +56,21 @@ export const columns: ColumnDef<MedicalRecord>[] = [
     header: "Diagnosis",
     cell: ({ row }) => (
       <div className="text-foreground font-medium">
-        {row.getValue("diagnosis")}
+        {row.getValue("diagnosis") || "Medical Consultation"}
       </div>
     ),
   },
   {
-    accessorKey: "status",
-    header: "Status",
+    accessorKey: "record_type",
+    header: "Type",
     cell: ({ row }) => {
-      const status = row.getValue("status") as string;
-
-      const statusConfig = {
-        Active: {
-          className:
-            "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
-        },
-        "Follow-up": {
-          className:
-            "bg-orange-500/10 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400",
-        },
-        Recovered: {
-          className: "bg-muted text-muted-foreground",
-        },
-        Inactive: {
-          className:
-            "bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive-foreground",
-        },
-      };
-
-      const config =
-        statusConfig[status as keyof typeof statusConfig] ||
-        statusConfig.Inactive;
+      const type = row.getValue("record_type") as string;
 
       return (
         <div
-          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors ${config.className}`}
+          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors bg-primary/10 text-primary`}
         >
-          {status}
+          {type}
         </div>
       );
     },

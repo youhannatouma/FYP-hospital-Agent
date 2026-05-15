@@ -12,7 +12,7 @@ class PaymentPayload(BaseModel):
     appointmentId: str
     method: str = "Card"
 
-@router.post("/")
+@router.post("")
 def process_payment(payload: PaymentPayload, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     if payload.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")

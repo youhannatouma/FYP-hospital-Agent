@@ -59,6 +59,7 @@ export function LogVitalsDialog({ open: controlledOpen, onOpenChange: setControl
       const recordData = {
         title: `Vitals Update - ${new Date().toLocaleDateString()}`,
         record_type: "Vitals",
+        date: new Date().toISOString(),
         description: "Patient self-reported vitals update.",
         vitals: {
           systolic: systolic ? parseInt(systolic) : undefined,

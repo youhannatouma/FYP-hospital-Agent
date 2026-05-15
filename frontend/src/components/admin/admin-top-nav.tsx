@@ -5,10 +5,14 @@ import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { UserButton } from "@clerk/nextjs"
 import { useTheme } from "next-themes"
+import { useState, useEffect } from "react"
 
 export function AdminTopNav() {
   const { theme, setTheme } = useTheme()
   const { toggleSidebar } = useSidebar()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   return (
     <header className="h-16 border-b border-sidebar-border bg-card/50 backdrop-blur-md flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
@@ -38,7 +42,7 @@ export function AdminTopNav() {
           className="text-muted-foreground hover:text-foreground"
           aria-label="Toggle theme"
         >
-          {theme === "dark" ? (
+          {mounted && theme === "dark" ? (
             <SunIcon className="h-4 w-4" />
           ) : (
             <MoonIcon className="h-4 w-4" />
