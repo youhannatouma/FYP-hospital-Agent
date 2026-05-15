@@ -82,12 +82,12 @@ export default function PharmacistDashboard() {
                       <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black tracking-widest uppercase">
                         Active
                       </Badge>
-                      <span className="text-xs text-muted-foreground font-bold">Issued: {p.issue_date || "N/A"}</span>
+                      <span className="text-xs text-muted-foreground font-bold">Issued: {p.issue_date}</span>
                     </div>
                     
                     <div>
                       <h3 className="text-xl font-black text-foreground">Patient: {p.patient_name || "Unknown"}</h3>
-                      <p className="text-sm text-muted-foreground font-medium">Prescribed by {p.doctor_name || "Medical Staff"}</p>
+                      <p className="text-sm text-muted-foreground font-medium">Prescribed by {p.doctor_name}</p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-muted/30 border border-border/50">
@@ -104,7 +104,7 @@ export default function PharmacistDashboard() {
 
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Instructions</p>
-                      <p className="text-sm font-medium text-foreground italic">{p.instructions || "Standard fulfillment protocols apply."}</p>
+                      <p className="text-sm font-medium text-foreground italic">{p.instructions}</p>
                     </div>
                   </div>
 
