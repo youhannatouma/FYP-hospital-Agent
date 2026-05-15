@@ -58,40 +58,65 @@ export default function MedicinesPage() {
   const { toast } = useToast();
   const { prescriptions, loading: isLoading } = usePrescriptions();
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPrescription, setSelectedPrescription] = useState<
-    any | null
-  >(null);
-  const [showRefill, setShowRefill] = useState(false);
-  const [selectedPharmacy, setSelectedPharmacy] = useState<any | null>(
-    null,
-  );
-  const [showOrder, setShowOrder] = useState(false);
-
-  const [activePrescriptions, setActivePrescriptions] = useState<MedicationCard[]>([]);
-  const [pastPrescriptions, setPastPrescriptions] = useState<MedicationCard[]>([]);
+<<<<<<< Updated upstream
+  const [activePrescriptions, setActivePrescriptions] = useState<MedicationCard[]>([])
+  const [pastPrescriptions, setPastPrescriptions] = useState<MedicationCard[]>([])
 
   useEffect(() => {
     if (prescriptions) {
       const mapped: MedicationCard[] = prescriptions.map((rx) => ({
-        id: String(rx.id || rx.prescription_id),
-        name: rx.medication_name || rx.medicine_name || "Unknown Medication",
+        id: String(rx.id),
+        name: rx.medication_name,
         dosage: rx.dosage ?? "Not specified",
         frequency: rx.frequency ?? "Not specified",
         purpose: rx.instructions || "Therapeutic Protocol",
-        doctor: rx.doctor_name || (rx.doctor_id ? String(rx.doctor_id) : "Staff Physician"),
-        startDate: rx.prescribed_at || rx.created_at
-          ? new Date(rx.prescribed_at || rx.created_at!).toLocaleDateString()
+        doctor: rx.doctor_id ? String(rx.doctor_id) : "Staff Physician",
+        startDate: rx.prescribed_at
+        ? new Date(rx.prescribed_at).toLocaleDateString()
+        : "TBD",
+=======
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPrescription, setSelectedPrescription] = useState<
+    unknown | null
+  >(null);
+  const [showRefill, setShowRefill] = useState(false);
+  const [selectedPharmacy, setSelectedPharmacy] = useState<unknown | null>(
+    null,
+  );
+  const [showOrder, setShowOrder] = useState(false);
+
+  const [activePrescriptions, setActivePrescriptions] = useState<any[]>([]);
+  const [pastPrescriptions, setPastPrescriptions] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (prescriptions) {
+      const mapped = prescriptions.map((rx) => ({
+        id: rx.id || rx.prescription_id,
+        name: rx.medicine_name,
+        dosage: rx.dosage,
+        frequency: rx.frequency,
+        purpose: rx.instructions || "Therapeutic Protocol",
+        doctor: rx.doctor_name || "Staff Physician",
+        startDate: rx.created_at
+          ? new Date(rx.created_at).toLocaleDateString()
           : "TBD",
+>>>>>>> Stashed changes
         endDate: "Ongoing",
         refillsLeft: 5,
         progress: 100,
-        status: (rx.status?.toLowerCase() === "active" ? "active" : "completed") as any,
+        status: rx.status,
         nextDose: "Scheduled",
-        accent: rx.status?.toLowerCase() === "active" ? "primary" : "blue",
+<<<<<<< Updated upstream
+        accent: rx.status === "active" ? "primary" : "blue",
       }))
       setActivePrescriptions(mapped.filter((rx) => rx.status === "active"))
       setPastPrescriptions(mapped.filter((rx) => rx.status !== "active"))
+=======
+        accent: rx.status === "Active" ? "primary" : "blue",
+      }));
+      setActivePrescriptions(mapped.filter((rx) => rx.status === "Active"));
+      setPastPrescriptions(mapped.filter((rx) => rx.status !== "Active"));
+>>>>>>> Stashed changes
     }
   }, [prescriptions]);
 

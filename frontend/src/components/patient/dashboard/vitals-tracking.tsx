@@ -2,7 +2,7 @@
 "use client"
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -51,11 +51,6 @@ export function VitalsTracking() {
   const [period, setPeriod] = useState("7d")
   const { profile } = useUserProfile()
   const { records } = useMedicalRecords()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
   
   const age = calculateAgeFromDob(profile?.date_of_birth)
   const hrBaseline = getHeartRateBaselineByAge(age)
@@ -212,48 +207,46 @@ export function VitalsTracking() {
            </div>
         </div>
 
-        <div className="h-72 w-full mt-4 min-h-[288px]">
-          {mounted && (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={vitalsData}>
-                <defs>
-                  <linearGradient id="colorSys" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/30" />
-                <XAxis
-                  dataKey="date"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 700 }}
-                />
-                <YAxis
-                  hide
-                />
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                <Area
-                  type="monotone"
-                  dataKey="systolic"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#colorSys)"
-                  name="Systolic"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="heartRate"
-                  stroke="hsl(var(--destructive))"
-                  strokeWidth={2}
-                  fillOpacity={0}
-                  strokeDasharray="5 5"
-                  name="Heart Rate"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
+        <div className="h-72 w-full mt-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={vitalsData}>
+              <defs>
+                <linearGradient id="colorSys" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/30" />
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 700 }}
+              />
+              <YAxis
+                hide
+              />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }} />
+              <Area
+                type="monotone"
+                dataKey="systolic"
+                stroke="hsl(var(--primary))"
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#colorSys)"
+                name="Systolic"
+              />
+              <Area
+                type="monotone"
+                dataKey="heartRate"
+                stroke="hsl(var(--destructive))"
+                strokeWidth={2}
+                fillOpacity={0}
+                strokeDasharray="5 5"
+                name="Heart Rate"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>

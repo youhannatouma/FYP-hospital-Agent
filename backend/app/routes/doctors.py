@@ -59,7 +59,7 @@ def get_recent_patients(
     except Exception as e:
         raise ErrorHandlingSkill.handle(e)
 
-@router.get("", response_model=List[dict])
+@router.get("/", response_model=List[dict])
 def list_doctors(
     specialty: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -68,13 +68,10 @@ def list_doctors(
     try:
         from app.auth.dependencies import clerk
 
-        # [PERFORMANCE FIX] Syncing all users from Clerk synchronously on every GET request 
-        # causes massive latency (slow loading). In production, this should be handled 
-        # via Clerk Webhooks or a background task. 
-        # try:
-        #     ClerkSyncSkill.sync_all_users(db, clerk, roles={"doctor"})
-        # except Exception as sync_error:
-        #     print(f"[DOCTORS] Clerk doctor sync skipped: {sync_error}")
+        try:
+            ClerkSyncSkill.sync_all_users(db, clerk, roles={"doctor"})
+        except Exception as sync_error:
+            print(f"[DOCTORS] Clerk doctor sync skipped: {sync_error}")
 
         query = db.query(User).filter(User.role == "doctor", User.status == "Active")
         if specialty:
@@ -88,11 +85,11 @@ def list_doctors(
                 "first_name": d.first_name,
                 "last_name": d.last_name,
                 "specialty": d.specialty,
-                "license_number": d.license_number_encrypted,
+                "license_number": d.license_number,
                 "years_of_experience": d.years_of_experience,
                 "qualifications": d.qualifications or [],
-                "clinic_address": d.clinic_address_encrypted,
-                "phone_number": d.phone_number_plaintext,
+                "clinic_address": d.clinic_address,
+                "phone_number": d.phone_number,
                 "status": d.status,
             })
         return result
@@ -118,11 +115,11 @@ def get_doctor(
             "first_name": doctor.first_name,
             "last_name": doctor.last_name,
             "specialty": doctor.specialty,
-            "license_number": doctor.license_number_encrypted,
+            "license_number": doctor.license_number,
             "years_of_experience": doctor.years_of_experience,
             "qualifications": doctor.qualifications or [],
-            "clinic_address": doctor.clinic_address_encrypted,
-            "phone_number": doctor.phone_number_plaintext,
+            "clinic_address": doctor.clinic_address,
+            "phone_number": doctor.phone_number,
             "status": doctor.status,
         }
     except Exception as e:
@@ -159,7 +156,7 @@ def get_slots(
     except Exception as e:
         raise ErrorHandlingSkill.handle(e)
 
-@router.post("")
+@router.post("/")
 def create_doctor(
     payload: DoctorCreate,
     db: Session = Depends(get_db),
@@ -178,7 +175,7 @@ def create_doctor(
             first_name=payload.name.split(' ')[0] if ' ' in payload.name else payload.name,
             last_name=payload.name.split(' ')[1] if ' ' in payload.name else "",
             specialty=payload.specialty,
-            license_number_encrypted=payload.license_number,
+            license_number=payload.license_number,
             status="Active"
         )
         db.add(new_user)

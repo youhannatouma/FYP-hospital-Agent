@@ -9,7 +9,7 @@ REPO_ROOT = BACKEND_DIR.parent
 # Root .env is useful for Docker Compose substitutions; backend/.env should
 # win for host-run development because it can point at 127.0.0.1 instead of db.
 load_dotenv(REPO_ROOT / ".env")
-load_dotenv(BACKEND_DIR / ".env", override=True)
+load_dotenv(BACKEND_DIR / ".env", override=False)
 
 # Environment detection (development, staging, production)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
@@ -62,11 +62,10 @@ def get_cors_origins():
             )
         return [o.strip() for o in cors_env.split(",") if o.strip()]
     else:
-        # Development: allow localhost and env overrides
-        cors_env = os.getenv("CORS_ORIGINS", "").strip()
-        defaults = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"]
-        if cors_env:
-            defaults.extend([o.strip() for o in cors_env.split(",") if o.strip()])
-        return list(set(defaults))
+        # Development: allow localhost
+        return [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
 
 CORS_ORIGINS = get_cors_origins() 

@@ -1,4 +1,3 @@
-# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Text, DateTime, ARRAY, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
@@ -16,7 +15,6 @@ class MedicalRecord(Base):
     appointment_id = Column(UUID(as_uuid=True), nullable=True) # Linked appointment
     
     record_type = Column(Text) # e.g., 'Consultation', 'Lab Result', 'Radiology'
-    title = Column(Text)       # Short descriptive title
     diagnosis = Column(Text)
     treatment = Column(Text)
     clinical_notes = Column(Text)

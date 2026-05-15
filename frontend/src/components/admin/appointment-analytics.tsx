@@ -57,26 +57,20 @@ export function AppointmentAnalytics() {
   const [cancellationReasons, setCancellationReasons] = useState<any[]>([]);
 
   useEffect(() => {
-    let isMounted = true;
     const fetchAppointmentAnalytics = async () => {
       try {
         const response = await axios.get(
           `${process.env.NEXT_PUBLIC_API_URL}/admin/appointments/analytics`,
         );
-        if (!isMounted) return;
         setStats(response.data.stats || []);
         setAppointmentStats(response.data.appointmentStats || []);
         setPeakHours(response.data.peakHours || []);
         setCancellationReasons(response.data.cancellationReasons || []);
       } catch (error) {
-        if (!isMounted) return;
         console.error("Failed to fetch appointment analytics", error);
       }
     };
     fetchAppointmentAnalytics();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   // API Endpoints Suggestion:

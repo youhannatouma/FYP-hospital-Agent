@@ -54,14 +54,14 @@ export function RecordDetailDialog({
           <div className="flex items-start justify-between">
             <div className="space-y-2">
               <DialogTitle className="text-2xl font-bold text-foreground">
-                {record.patient_name || "Unknown Patient"}
+                {record.name}
               </DialogTitle>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
-                  Patient ID: {record.patient_id}
+                  Patient ID: {record.patientId}
                 </span>
-                <Badge className="bg-primary/10 text-primary border-none">
-                  {record.record_type}
+                <Badge className={statusConfig[record.status]}>
+                  {record.status}
                 </Badge>
               </div>
             </div>
@@ -94,9 +94,12 @@ export function RecordDetailDialog({
                 Patient Information
               </h3>
               <div className="grid grid-cols-2 gap-4">
-                <InfoItem label="Doctor" value={record.doctor_name || "Self-recorded"} />
-                <InfoItem label="Type" value={record.record_type} />
-                <InfoItem label="Created" value={record.created_at ? formatDate(record.created_at) : "N/A"} />
+                <InfoItem label="Age" value={record.age?.toString()} />
+                <InfoItem label="Gender" value={record.gender} />
+                <InfoItem label="Blood Type" value={record.bloodType} />
+                <InfoItem label="Phone" value={record.phone} />
+                <InfoItem label="Email" value={record.email} />
+                <InfoItem label="Address" value={record.address} fullWidth />
               </div>
             </div>
 
@@ -108,19 +111,22 @@ export function RecordDetailDialog({
                 Vital Signs
               </h3>
               <div className="grid grid-cols-3 gap-4">
-                <InfoItem label="Systolic" value={record.vitals?.systolic?.toString()} />
-                <InfoItem label="Diastolic" value={record.vitals?.diastolic?.toString()} />
+                <InfoItem
+                  label="Height"
+                  value={record.height ? `${record.height} cm` : undefined}
+                />
+                <InfoItem
+                  label="Weight"
+                  value={record.weight ? `${record.weight} kg` : undefined}
+                />
+                <InfoItem label="Blood Pressure" value={record.bloodPressure} />
                 <InfoItem
                   label="Heart Rate"
-                  value={record.vitals?.heart_rate ? `${record.vitals.heart_rate} bpm` : undefined}
+                  value={record.heartRate ? `${record.heartRate} bpm` : undefined}
                 />
                 <InfoItem
                   label="Temperature"
-                  value={record.vitals?.temperature ? `${record.vitals.temperature}°C` : undefined}
-                />
-                 <InfoItem
-                  label="Oxygen"
-                  value={record.vitals?.oxygen ? `${record.vitals.oxygen}%` : undefined}
+                  value={record.temperature ? `${record.temperature}°C` : undefined}
                 />
               </div>
             </div>
@@ -137,16 +143,54 @@ export function RecordDetailDialog({
                   <label className="text-sm font-medium text-muted-foreground">
                     Diagnosis
                   </label>
-                  <p className="text-foreground mt-1">{record.diagnosis || "No diagnosis provided"}</p>
+                  <p className="text-foreground mt-1">{record.diagnosis}</p>
                 </div>
 
-                {record.treatment && (
+                {record.medications && record.medications.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Current Medications
+                    </label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {record.medications.map((med, index) => (
+                        <Badge
+                          key={index}
+                          variant="secondary"
+                          className="bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
+                        >
+                          {med}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {record.allergies && record.allergies.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Known Allergies
+                    </label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {record.allergies.map((allergy, index) => (
+                        <Badge
+                          key={index}
+                          variant="secondary"
+                          className="bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400"
+                        >
+                          {allergy}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {record.treatmentPlan && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">
                       Treatment Plan
                     </label>
                     <p className="text-foreground mt-1 whitespace-pre-line">
-                      {record.treatment}
+                      {record.treatmentPlan}
                     </p>
                   </div>
                 )}
@@ -155,20 +199,33 @@ export function RecordDetailDialog({
 
             <Separator className="bg-border" />
 
-            {/* Notes */}
+            {/* Notes & Appointments */}
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-3">
-                Clinical Notes
+                Notes & Appointments
               </h3>
               <div className="space-y-4">
-                {record.clinical_notes && (
+                <div className="grid grid-cols-2 gap-4">
+                  <InfoItem
+                    label="Last Visit"
+                    value={formatDate(record.lastVisit)}
+                  />
+                  <InfoItem
+                    label="Next Appointment"
+                    value={record.nextAppointment ? formatDate(record.nextAppointment) : undefined}
+                  />
+                </div>
+
+                {record.notes && (
                   <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Additional Notes
+                    </label>
                     <p className="text-foreground mt-1 whitespace-pre-line bg-muted/30 p-3 rounded-lg">
-                      {record.clinical_notes}
+                      {record.notes}
                     </p>
                   </div>
                 )}
-                {!record.clinical_notes && <p className="text-muted-foreground italic">No clinical notes available.</p>}
               </div>
             </div>
           </div>

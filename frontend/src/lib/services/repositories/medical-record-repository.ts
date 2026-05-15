@@ -47,7 +47,6 @@ export interface IMedicalRecordRepository {
   getRecordById(id: string): Promise<MedicalRecord>;
   createRecord(data: CreateMedicalRecordDto): Promise<MedicalRecord>;
   deleteRecord(id: string): Promise<void>;
-  getPendingLabOrders(): Promise<MedicalRecord[]>;
 }
 
 export class MedicalRecordRepository implements IMedicalRecordRepository {
@@ -71,10 +70,6 @@ export class MedicalRecordRepository implements IMedicalRecordRepository {
 
   async deleteRecord(id: string): Promise<void> {
     await this.apiHelper.delete(`/medical-records/${id}`);
-  }
-
-  async getPendingLabOrders(): Promise<MedicalRecord[]> {
-    return this.apiHelper.get<MedicalRecord[]>('/medical-records/lab/pending');
   }
 }
 

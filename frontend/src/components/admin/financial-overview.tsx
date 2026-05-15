@@ -55,26 +55,20 @@ export function FinancialOverview() {
   const [outstandingPayments, setOutstandingPayments] = useState<any[]>([]);
 
   useEffect(() => {
-    let isMounted = true;
     const fetchFinancialOverview = async () => {
       try {
         const response = await axios.get(
           `${process.env.NEXT_PUBLIC_API_URL}/admin/finance/overview`
         );
-        if (!isMounted) return;
         setStats(response.data.stats || []);
         setDoctorEarnings(response.data.doctorEarnings || []);
         setRevenueBySource(response.data.revenueBySource || []);
         setOutstandingPayments(response.data.outstandingPayments || []);
       } catch (error) {
-        if (!isMounted) return;
         console.error("Failed to fetch financial overview", error);
       }
     };
     fetchFinancialOverview();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
  

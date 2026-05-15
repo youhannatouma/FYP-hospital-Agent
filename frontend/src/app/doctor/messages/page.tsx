@@ -107,26 +107,22 @@ export default function DoctorMessagesPage() {
   const [composeOpen, setComposeOpen] = React.useState(false)
   const [replyRecipientId, setReplyRecipientId] = React.useState("")
 
-  const loadMessages = React.useCallback(async (isMounted = { current: true }) => {
+  const loadMessages = React.useCallback(async () => {
     try {
       setIsLoading(true)
       const container = getServiceContainer()
       const data = await container.message.getMessages()
-      if (isMounted.current) setMessages(data)
+      setMessages(data)
     } catch (error) {
       console.error("[DoctorMessagesPage] Failed to load messages:", error)
-      if (isMounted.current) setMessages([])
+      setMessages([])
     } finally {
-      if (isMounted.current) setIsLoading(false)
+      setIsLoading(false)
     }
   }, [])
 
   React.useEffect(() => {
-    const isMounted = { current: true }
-    loadMessages(isMounted)
-    return () => {
-      isMounted.current = false
-    }
+    loadMessages()
   }, [loadMessages])
 
   const handleOpenMessage = React.useCallback(
