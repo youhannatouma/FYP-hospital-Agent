@@ -459,7 +459,7 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
                   </div>
                   {medications.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {medications.map((med) => (
+                      {medications.map((med, index) => (
                         <div
                           key={med}
                           className="flex items-center gap-1 bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 px-2 py-1 rounded-md text-sm"
@@ -468,6 +468,7 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
                           <button
                             type="button"
                             onClick={() => removeMedication(index)}
+                            title={`Remove ${med}`}
                             className="hover:bg-blue-500/20 rounded-full p-0.5"
                           >
                             <X className="h-3 w-3" />
@@ -505,7 +506,7 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
                   </div>
                   {allergies.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {allergies.map((allergy) => (
+                      {allergies.map((allergy, index) => (
                         <div
                           key={allergy}
                           className="flex items-center gap-1 bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400 px-2 py-1 rounded-md text-sm"
@@ -514,6 +515,7 @@ export function MedicalRecordForm({ onAddRecord }: MedicalRecordFormProps) {
                           <button
                             type="button"
                             onClick={() => removeAllergy(index)}
+                            title={`Remove ${allergy}`}
                             className="hover:bg-red-500/20 rounded-full p-0.5"
                           >
                             <X className="h-3 w-3" />

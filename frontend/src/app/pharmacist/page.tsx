@@ -109,8 +109,13 @@ export default function PharmacistDashboard() {
                   </div>
 
                   <div className="flex flex-col justify-end gap-3 min-w-[200px]">
-                    <Button 
-                      onClick={() => handleFulfill(p.prescription_id)}
+                    <Button
+                      disabled={!p.prescription_id}
+                      onClick={() => {
+                        if (p.prescription_id) {
+                          handleFulfill(p.prescription_id)
+                        }
+                      }}
                       className="h-12 rounded-xl font-black text-xs uppercase tracking-widest shadow-premium"
                     >
                       <CheckCircle className="mr-2 h-4 w-4" />

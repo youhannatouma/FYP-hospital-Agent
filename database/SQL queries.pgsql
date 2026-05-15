@@ -382,3 +382,5 @@ ADD COLUMN password_hash TEXT;
 
 ALTER TABLE usr
 ADD COLUMN status TEXT;
+
+ALTER TABLE medical_record ADD COLUMN title TEXT;
