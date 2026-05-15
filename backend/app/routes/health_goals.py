@@ -27,7 +27,7 @@ class HealthGoalUpdate(BaseModel):
     progress_percentage: Optional[int] = None
     status: Optional[str] = None
 
-@router.post("/", response_model=dict)
+@router.post("", response_model=dict)
 def create_goal(
     payload: HealthGoalCreate,
     db: Annotated[Session, Depends(get_db)],
@@ -52,7 +52,7 @@ def create_goal(
         db.rollback()
         raise ErrorHandlingSkill.handle(e)
 
-@router.get("/", response_model=List[dict])
+@router.get("", response_model=List[dict])
 def get_my_goals(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(require_role("patient"))]

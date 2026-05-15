@@ -48,6 +48,8 @@ export interface IPrescriptionRepository {
   getPrescriptionById(id: string): Promise<Prescription>;
   createPrescription(data: CreatePrescriptionDto): Promise<Prescription>;
   cancelPrescription(id: string): Promise<void>;
+  getAllPrescriptions(): Promise<Prescription[]>;
+  fulfillPrescription(id: string): Promise<void>;
 }
 
 export class PrescriptionRepository implements IPrescriptionRepository {
@@ -82,6 +84,14 @@ export class PrescriptionRepository implements IPrescriptionRepository {
 
   async cancelPrescription(id: string): Promise<void> {
     await this.apiHelper.patch(`/prescriptions/${id}/cancel`, {});
+  }
+
+  async getAllPrescriptions(): Promise<Prescription[]> {
+    return this.apiHelper.get<Prescription[]>('/prescriptions/all');
+  }
+
+  async fulfillPrescription(id: string): Promise<void> {
+    await this.apiHelper.patch(`/prescriptions/${id}/fulfill`, {});
   }
 }
 

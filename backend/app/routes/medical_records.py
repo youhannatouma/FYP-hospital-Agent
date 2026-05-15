@@ -22,11 +22,11 @@ class MedicalRecordCreate(BaseModel):
     appointment_id: Optional[str] = None
     vitals: Optional[dict] = None
 
-@router.post("/")
+@router.post("")
 def create_medical_record(
     payload: MedicalRecordCreate,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(require_role("doctor"))]
+    user: Annotated[User, Depends(require_role(["doctor", "lab"]))]
 ):
     try:
         record = MedicalRecordSkill.create_record(
@@ -93,6 +93,38 @@ def get_my_records(
         return result
     except Exception as e:
         raise ErrorHandlingSkill.handle(e)
+
+@router.get("/lab/pending")
+def get_pending_lab_orders(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role(["lab", "admin"]))]
+):
+    """List all pending lab orders for technicians to process."""
+    try:
+        from app.models.medical_record import MedicalRecord
+        records = db.query(MedicalRecord).filter(
+            MedicalRecord.record_type == "Lab Order",
+            MedicalRecord.deleted_at == None
+        ).order_by(MedicalRecord.created_at.desc()).all()
+        
+        result = []
+        for r in records:
+            patient = db.query(User).filter(User.user_id == r.patient_id).first()
+            doctor = db.query(User).filter(User.user_id == r.doctor_id).first()
+            result.append({
+                "record_id": str(r.record_id),
+                "patient_id": str(r.patient_id),
+                "patient_name": f"{patient.first_name} {patient.last_name}" if patient else "Patient",
+                "doctor_name": f"Dr. {doctor.first_name} {doctor.last_name}" if doctor else "Doctor",
+                "record_type": r.record_type,
+                "title": r.title,
+                "clinical_notes": r.clinical_notes,
+                "date": r.created_at.isoformat() if r.created_at else None
+            })
+        return result
+    except Exception as e:
+        raise ErrorHandlingSkill.handle(e)
+
 
 
 @router.get("/patient/{patient_id}")

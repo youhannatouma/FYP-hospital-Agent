@@ -88,11 +88,11 @@ def list_doctors(
                 "first_name": d.first_name,
                 "last_name": d.last_name,
                 "specialty": d.specialty,
-                "license_number": d.license_number,
+                "license_number": d.license_number_encrypted,
                 "years_of_experience": d.years_of_experience,
                 "qualifications": d.qualifications or [],
-                "clinic_address": d.clinic_address,
-                "phone_number": d.phone_number,
+                "clinic_address": d.clinic_address_encrypted,
+                "phone_number": d.phone_number_plaintext,
                 "status": d.status,
             })
         return result
@@ -118,11 +118,11 @@ def get_doctor(
             "first_name": doctor.first_name,
             "last_name": doctor.last_name,
             "specialty": doctor.specialty,
-            "license_number": doctor.license_number,
+            "license_number": doctor.license_number_encrypted,
             "years_of_experience": doctor.years_of_experience,
             "qualifications": doctor.qualifications or [],
-            "clinic_address": doctor.clinic_address,
-            "phone_number": doctor.phone_number,
+            "clinic_address": doctor.clinic_address_encrypted,
+            "phone_number": doctor.phone_number_plaintext,
             "status": doctor.status,
         }
     except Exception as e:
@@ -178,7 +178,7 @@ def create_doctor(
             first_name=payload.name.split(' ')[0] if ' ' in payload.name else payload.name,
             last_name=payload.name.split(' ')[1] if ' ' in payload.name else "",
             specialty=payload.specialty,
-            license_number=payload.license_number,
+            license_number_encrypted=payload.license_number,
             status="Active"
         )
         db.add(new_user)

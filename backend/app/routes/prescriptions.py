@@ -19,7 +19,7 @@ class PrescriptionCreate(BaseModel):
     record_id: str = None
     days_valid: int = 30
 
-@router.post("/")
+@router.post("")
 def create_prescription(
     payload: PrescriptionCreate,
     db: Annotated[Session, Depends(get_db)],
@@ -70,6 +70,61 @@ def get_my_prescriptions(
         return result
     except Exception as e:
         raise ErrorHandlingSkill.handle(e)
+
+@router.get("/all")
+def get_all_prescriptions(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role(["pharmacist", "admin"]))]
+):
+    """List all active prescriptions for pharmacists to process."""
+    try:
+        from app.models.prescription import Prescription
+        prescriptions = db.query(Prescription).filter(
+            Prescription.is_filled == False,
+            Prescription.deleted_at == None
+        ).all()
+        
+        result = []
+        for p in prescriptions:
+            patient = db.query(User).filter(User.user_id == p.patient_id).first()
+            doctor = db.query(User).filter(User.user_id == p.doctor_id).first()
+            result.append({
+                "prescription_id": str(p.prescription_id),
+                "patient_name": f"{patient.first_name} {patient.last_name}" if patient else "Patient",
+                "doctor_name": f"Dr. {doctor.first_name} {doctor.last_name}" if doctor else "Doctor",
+                "medications": p.medications,
+                "instructions": p.instructions,
+                "issue_date": p.issue_date.isoformat() if hasattr(p, 'issue_date') and p.issue_date else (p.created_at.isoformat() if p.created_at else None),
+                "expiry_date": p.expiry_date.isoformat() if p.expiry_date else None,
+                "status": p.status,
+                "is_filled": p.is_filled
+            })
+        return result
+    except Exception as e:
+        raise ErrorHandlingSkill.handle(e)
+
+@router.patch("/{prescription_id}/fulfill")
+def fulfill_prescription(
+    prescription_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_role(["pharmacist", "admin"]))]
+):
+    """Mark a prescription as filled by a pharmacist."""
+    try:
+        from app.models.prescription import Prescription
+        p = db.query(Prescription).filter(Prescription.prescription_id == UUID(prescription_id)).first()
+        if not p:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Prescription not found")
+        
+        p.is_filled = True
+        p.status = "Fulfilled"
+        db.commit()
+        return {"status": "Fulfilled", "prescription_id": prescription_id}
+    except Exception as e:
+        db.rollback()
+        raise ErrorHandlingSkill.handle(e)
+
 
 @router.delete("/{prescription_id}")
 def delete_prescription(

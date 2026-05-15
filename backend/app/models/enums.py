@@ -6,6 +6,8 @@ class UserRole(str, enum.Enum):
     admin = "admin"
     doctor = "doctor"
     patient = "patient"
+    pharmacist = "pharmacist"
+    lab = "lab"
 
 # Appointment status
 class AppointmentStatus(str, enum.Enum):

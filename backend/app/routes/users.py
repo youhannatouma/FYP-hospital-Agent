@@ -22,13 +22,13 @@ def get_my_profile(
         "last_name": user.last_name,
         "role": user.role,
         "status": user.status,
-        "phone_number": user.phone_number,
+        "phone_number": user.phone_number_plaintext,
         # Doctor-specific
         "specialty": user.specialty,
-        "license_number": user.license_number,
+        "license_number": user.license_number_encrypted,
         "years_of_experience": user.years_of_experience,
         "qualifications": user.qualifications or [],
-        "clinic_address": user.clinic_address,
+        "clinic_address": user.clinic_address_encrypted,
         # Patient-specific
         "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
         "gender": user.gender,
@@ -36,7 +36,7 @@ def get_my_profile(
         "blood_type": user.blood_type,
         "allergies": user.allergies or [],
         "chronic_conditions": user.chronic_conditions or [],
-        "emergency_contact": user.emergency_contact,
+        "emergency_contact": user.emergency_contact_encrypted,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 
@@ -60,7 +60,7 @@ def update_my_profile(
             "first_name": user.first_name,
             "last_name": user.last_name,
             "email": user.email,
-            "phone_number": user.phone_number,
+            "phone_number": user.phone_number_plaintext,
         }
     }
 
@@ -252,7 +252,7 @@ def seed_my_account(
         "seeded": True,
     }
 
-@router.get("/")
+@router.get("")
 def get_users(
     db: Annotated[Session, Depends(get_db)], 
     user: Annotated[User, Depends(require_role(["admin", "doctor"]))]
