@@ -53,7 +53,7 @@ export default function LabDashboard() {
         diagnosis: diagnosis,
         description: notes,
         date: new Date().toISOString(),
-        appointment_id: selectedOrder.appointment_id || undefined
+        appointment_id: selectedOrder.appointment_id ? String(selectedOrder.appointment_id) : undefined
       })
       
       toast.success("Lab results uploaded successfully")

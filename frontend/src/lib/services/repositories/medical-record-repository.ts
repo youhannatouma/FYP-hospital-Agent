@@ -35,6 +35,8 @@ export interface CreateMedicalRecordDto {
   record_type: string;
   title: string;
   description?: string;
+  diagnosis?: string;
+  clinical_notes?: string;
   date: string;
   file_url?: string;
   patient_id?: string;

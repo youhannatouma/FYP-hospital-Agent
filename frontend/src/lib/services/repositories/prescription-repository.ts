@@ -29,6 +29,7 @@ export interface Prescription {
   expires_at?: string | null;
   is_filled?: boolean;
   medicine_name?: string;
+  patient_name?: string;
 }
 
 export interface CreatePrescriptionDto {
