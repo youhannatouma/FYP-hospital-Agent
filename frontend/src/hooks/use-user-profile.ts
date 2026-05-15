@@ -40,40 +40,47 @@ export function useUserProfile(): UseUserProfileReturn {
   );
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (isMounted: { current: boolean } = { current: true }) => {
     if (!isSignedIn) {
-      setProfile(null);
+      if (isMounted.current) setProfile(null);
       return;
     }
 
     try {
-      setIsLoading(true);
-      setError(null);
+      if (isMounted.current) setIsLoading(true);
+      if (isMounted.current) setError(null);
       
-      // Use dependency-injected repository
       const container = getServiceContainer();
       const user = await container.user.getCurrentUser();
       
-      profileCache = user;
-      setProfile(user);
-    } catch (err: unknown) {
+      if (isMounted.current) {
+        profileCache = user;
+        setProfile(user);
+      }
+    } catch (err: any) {
       console.error("[useUserProfile] Failed to fetch profile:", err);
       const details = classifyHttpError(err);
-      if (details.kind === "network_unreachable") {
-        setError("Could not reach backend API. Ensure backend is running at http://localhost:8000.");
-      } else {
-        setError(err?.response?.data?.message || "Could not load profile");
+      if (isMounted.current) {
+        if (details.kind === "network_unreachable") {
+          setError("Could not reach backend API. Ensure backend is running at http://localhost:8000.");
+        } else {
+          setError(err?.response?.data?.message || "Could not load profile");
+        }
+        setProfile(null);
       }
-      setProfile(null);
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) setIsLoading(false);
     }
   }, [isSignedIn]);
 
   useEffect(() => {
+    const isMounted = { current: true };
     if (isSignedIn && !profileCache) {
-      fetchProfile();
+      fetchProfile(isMounted);
     }
+    return () => {
+      isMounted.current = false;
+    };
   }, [isSignedIn, fetchProfile]);
 
   const formattedProfile = formatUserProfile(profile);
@@ -82,8 +89,7 @@ export function useUserProfile(): UseUserProfileReturn {
     profile: formattedProfile,
     isLoading,
     error,
-    refetch: fetchProfile,
-    // Convenience accessors derived from FormattedUserProfile
+    refetch: () => fetchProfile(),
     fullName: formattedProfile?.fullName ?? '',
     initials: formattedProfile?.initials ?? '?',
     displayRole: formattedProfile?.displayRole ?? 'User',

@@ -77,21 +77,11 @@ export function HealthEducation() {
                 {resource.description}
               </p>
               <ArticleViewerDialog 
-                article={{
-                  title: resource.title,
-                  category: "Health Education",
-                  readTime: "5 min read",
-                  content: `This is a comprehensive guide on ${resource.title}. \n\n${resource.description}\n\nTo manage this effectively, consider adopting a routine that aligns with your daily health goals. Consult your physician before making any major lifestyle changes.`
-                }}
-              >
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-0 text-xs text-primary"
-                >
-                  {resource.action}
-                </Button>
-              </ArticleViewerDialog>
+                title={resource.title}
+                description={resource.description}
+                icon={resource.icon}
+                iconBg={resource.iconBg}
+              />
             </CardContent>
           </Card>
         ))}

@@ -7,18 +7,20 @@ export function useHealthGoals() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchGoals = useCallback(async () => {
+  const fetchGoals = useCallback(async (isMounted: { current: boolean } = { current: true }) => {
     try {
-      setLoading(true)
+      if (isMounted.current) setLoading(true)
       const container = getServiceContainer()
       const data = await container.healthGoal.getMyGoals()
-      setGoals(data)
-      setError(null)
+      if (isMounted.current) {
+        setGoals(data)
+        setError(null)
+      }
     } catch (err) {
       console.error("[useHealthGoals] Failed to fetch goals:", err)
-      setError("Failed to load health goals")
+      if (isMounted.current) setError("Failed to load health goals")
     } finally {
-      setLoading(false)
+      if (isMounted.current) setLoading(false)
     }
   }, [])
 
@@ -56,14 +58,18 @@ export function useHealthGoals() {
   }
 
   useEffect(() => {
-    fetchGoals()
+    const isMounted = { current: true }
+    fetchGoals(isMounted)
+    return () => {
+      isMounted.current = false
+    }
   }, [fetchGoals])
 
   return {
     goals,
     loading,
     error,
-    refresh: fetchGoals,
+    refresh: () => fetchGoals(),
     addGoal,
     updateGoal,
     deleteGoal

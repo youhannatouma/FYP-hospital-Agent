@@ -73,9 +73,7 @@ export const useWebRTC = (roomId: string) => {
 
     return () => {
       // ── SAFE CLEANUP ──────────────────────────────
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
+      // Use local variables or check refs directly to avoid closure stale state
       if (pc.current) {
         pc.current.close();
         pc.current = null;
@@ -84,6 +82,14 @@ export const useWebRTC = (roomId: string) => {
         socket.current.disconnect();
         socket.current = null;
       }
+      // Stop all tracks in the stream if it exists
+      setLocalStream(prev => {
+        if (prev) {
+          prev.getTracks().forEach(track => track.stop());
+        }
+        return null;
+      });
+      setRemoteStream(null);
       // ──────────────────────────────────────────────
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

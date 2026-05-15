@@ -59,7 +59,7 @@ def get_recent_patients(
     except Exception as e:
         raise ErrorHandlingSkill.handle(e)
 
-@router.get("/", response_model=List[dict])
+@router.get("", response_model=List[dict])
 def list_doctors(
     specialty: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -68,10 +68,13 @@ def list_doctors(
     try:
         from app.auth.dependencies import clerk
 
-        try:
-            ClerkSyncSkill.sync_all_users(db, clerk, roles={"doctor"})
-        except Exception as sync_error:
-            print(f"[DOCTORS] Clerk doctor sync skipped: {sync_error}")
+        # [PERFORMANCE FIX] Syncing all users from Clerk synchronously on every GET request 
+        # causes massive latency (slow loading). In production, this should be handled 
+        # via Clerk Webhooks or a background task. 
+        # try:
+        #     ClerkSyncSkill.sync_all_users(db, clerk, roles={"doctor"})
+        # except Exception as sync_error:
+        #     print(f"[DOCTORS] Clerk doctor sync skipped: {sync_error}")
 
         query = db.query(User).filter(User.role == "doctor", User.status == "Active")
         if specialty:
@@ -156,7 +159,7 @@ def get_slots(
     except Exception as e:
         raise ErrorHandlingSkill.handle(e)
 
-@router.post("/")
+@router.post("")
 def create_doctor(
     payload: DoctorCreate,
     db: Session = Depends(get_db),

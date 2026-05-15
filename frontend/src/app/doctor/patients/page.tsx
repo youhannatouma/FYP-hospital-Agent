@@ -46,11 +46,14 @@ export default function DoctorPatientsPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
     const fetchPatients = async () => {
       try {
         const container = getServiceContainer()
         const users = await container.user.getAllUsers()
         
+        if (!isMounted) return
+
         const patientData = (users as ApiUser[])
           .filter((u) => u.role === 'patient')
           .map((p): Patient => ({
@@ -62,12 +65,14 @@ export default function DoctorPatientsPage() {
           }))
         setPatients(patientData)
       } catch (error) {
+        if (!isMounted) return
         console.error("Failed to fetch patients:", error)
       } finally {
-        setIsLoading(false)
+        if (isMounted) setIsLoading(false)
       }
     }
     fetchPatients()
+    return () => { isMounted = false }
   }, [])
 
   const stats = [

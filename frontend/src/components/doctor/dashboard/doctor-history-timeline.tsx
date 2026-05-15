@@ -204,11 +204,12 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
   const [entryDiagnosis, setEntryDiagnosis] = useState("");
   const [entryDetails, setEntryDetails] = useState("");
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (isMounted: { current: boolean } = { current: true }) => {
     try {
-      setIsLoading(true);
+      if (isMounted.current) setIsLoading(true);
       const container = getServiceContainer();
       const data = await container.medicalRecord.getMyRecords();
+      if (!isMounted.current) return;
       const mapped: TimelineItem[] = (data as TimelineApiRecord[]).map((r) => {
         const type =
           r.record_type?.toLowerCase() === "lab result"
@@ -235,16 +236,20 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
           annotations: [],
         };
       });
-      setItems(mapped);
+      if (isMounted.current) setItems(mapped);
     } catch (error) {
       console.error("Failed to fetch doctor timeline:", error);
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchItems();
+    const isMounted = { current: true };
+    fetchItems(isMounted);
+    return () => {
+      isMounted.current = false;
+    };
   }, [fetchItems]);
 
   const selectedPatient = useMemo(() => {

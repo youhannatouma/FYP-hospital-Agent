@@ -52,20 +52,26 @@ export function HealthTrends() {
   const [regionalPatterns, setRegionalPatterns] = useState<any[]>([]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchHealthTrends = async () => {
       try {
         const response = await axios.get(
           `${process.env.NEXT_PUBLIC_API_URL}/admin/health/trends`,
         );
+        if (!isMounted) return;
         setStats(response.data.stats || []);
         setSymptomSearches(response.data.symptomSearches || []);
         setOutbreakIndicators(response.data.outbreakIndicators || []);
         setRegionalPatterns(response.data.regionalPatterns || []);
       } catch (error) {
+        if (!isMounted) return;
         console.error("Failed to fetch health trends", error);
       }
     };
     fetchHealthTrends();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

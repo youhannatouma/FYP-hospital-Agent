@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FolderOpen, Download, MoreVertical, Plus, Search, FileText, FlaskConical, CheckCircle2, Loader2 } from "lucide-react"
+import { m } from "framer-motion"
 
 import { useMedicalRecords } from "@/hooks/use-medical-records"
 import { toast } from "sonner"

@@ -207,7 +207,7 @@ export function VitalsTracking() {
            </div>
         </div>
 
-        <div className="h-72 w-full mt-4">
+        <div className="h-72 w-full mt-4 min-h-[288px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={vitalsData}>
               <defs>
