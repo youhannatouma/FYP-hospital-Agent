@@ -204,14 +204,15 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
   const [entryDiagnosis, setEntryDiagnosis] = useState("");
   const [entryDetails, setEntryDetails] = useState("");
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (isMounted: { current: boolean } = { current: true }) => {
     try {
-      setIsLoading(true);
+      if (isMounted.current) setIsLoading(true);
       const container = getServiceContainer();
       const data = await container.medicalRecord.getMyRecords();
+      if (!isMounted.current) return;
       const mapped: TimelineItem[] = (data as TimelineApiRecord[]).map((r) => {
         const type =
-          r.record_type?.toLowerCase() === "lab result"
+          r.record_type?.toLowerCase().includes("lab")
             ? "lab"
             : r.record_type?.toLowerCase() === "medication"
               ? "medication"
@@ -228,23 +229,27 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
           status: r.is_reviewed ? "Reviewed" : "Needs Review",
           statusColor: r.is_reviewed ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700",
           dotColor: r.is_reviewed ? "bg-emerald-500" : "bg-amber-500",
-          icon: r.record_type?.toLowerCase() === "lab result" ? FileText : r.record_type?.toLowerCase() === "medication" ? Pill : Stethoscope,
+          icon: r.record_type?.toLowerCase().includes("lab") ? FileText : r.record_type?.toLowerCase() === "medication" ? Pill : Stethoscope,
           needsReview: !r.is_reviewed,
           flagged: false,
           extra: [{ label: r.record_type || "General", type: "info" }],
           annotations: [],
         };
       });
-      setItems(mapped);
+      if (isMounted.current) setItems(mapped);
     } catch (error) {
       console.error("Failed to fetch doctor timeline:", error);
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchItems();
+    const isMounted = { current: true };
+    fetchItems(isMounted);
+    return () => {
+      isMounted.current = false;
+    };
   }, [fetchItems]);
 
   const selectedPatient = useMemo(() => {
@@ -336,7 +341,7 @@ export function DoctorMedicalTimeline({ onViewPatient, onViewRecord }: DoctorMed
         })[0] as { appointment_id?: string } | undefined;
       await container.medicalRecord.createRecord({
         patient_id: selectedPatient.id,
-        record_type: "Lab Result",
+        record_type: "Lab Order",
         title: `Lab Order: ${labPanel.trim()}`,
         description: labNotes || "Lab order requested by treating doctor.",
         date: new Date().toISOString().split("T")[0],

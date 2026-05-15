@@ -1,8 +1,16 @@
 "use client"
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import * as React from "react"
-import { DollarSign, TrendingUp, CreditCard, Banknote, ShoppingCart, AlertCircle } from "lucide-react"
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  DollarSign,
+  TrendingUp,
+  CreditCard,
+  Banknote,
+  ShoppingCart,
+  AlertCircle,
+} from "lucide-react";
 import { 
   Bar, 
   BarChart, 
@@ -41,54 +49,35 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function FinancialOverview() {
-  const [stats, setStats] = React.useState([
-    { title: "Total Revenue", value: "$60,000", change: "+12.5%", icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },
-    { title: "Avg. Transaction", value: "$48.50", change: "+5%", icon: CreditCard, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { title: "Company Comm.", value: "$12,450", change: "+18%", icon: Banknote, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { title: "Pharmacy Sales", value: "$8,240", change: "+4.2%", icon: ShoppingCart, color: "text-orange-500", bg: "bg-orange-500/10" },
-  ])
+  const [stats, setStats] = useState<any[]>([]);
+  const [doctorEarnings, setDoctorEarnings] = useState<any[]>([]);
+  const [revenueBySource, setRevenueBySource] = useState<any[]>([]);
+  const [outstandingPayments, setOutstandingPayments] = useState<any[]>([]);
 
-  const [doctorEarnings, setDoctorEarnings] = React.useState([
-    { name: "Mon", revenue: 4500, expenses: 3200 },
-    { name: "Tue", revenue: 5200, expenses: 3500 },
-    { name: "Wed", revenue: 4800, expenses: 3100 },
-    { name: "Thu", revenue: 6100, expenses: 4000 },
-    { name: "Fri", revenue: 5500, expenses: 3800 },
-    { name: "Sat", revenue: 3200, expenses: 2200 },
-    { name: "Sun", revenue: 2500, expenses: 1800 },
-  ])
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFinancialOverview = async () => {
+      try {
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/admin/finance/overview`
+        );
+        if (!isMounted) return;
+        setStats(response.data.stats || []);
+        setDoctorEarnings(response.data.doctorEarnings || []);
+        setRevenueBySource(response.data.revenueBySource || []);
+        setOutstandingPayments(response.data.outstandingPayments || []);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error("Failed to fetch financial overview", error);
+      }
+    };
+    fetchFinancialOverview();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
-  const [revenueBySource, setRevenueBySource] = React.useState([
-    { name: "Appointments", value: 35000, color: "hsl(var(--primary))" },
-    { name: "Subscriptions", value: 12000, color: "hsl(var(--blue-500))" },
-    { name: "Pharmacy Sale", value: 8000, color: "hsl(var(--orange-500))" },
-    { name: "Consultations", value: 5000, color: "hsl(var(--purple-500))" },
-  ])
-
-  const [outstandingPayments, setOutstandingPayments] = React.useState([
-    { id: "TX-1045", amount: "$150", status: "Due in 2 days", entity: "PharmaPlus" },
-    { id: "TX-1048", amount: "$45", status: "Overdue", entity: "HealthCare Lab" },
-  ])
-
-  // API Endpoints Suggestion:
-  // GET: /admin/finance/overview -> Fetch stats, doctorEarnings, revenueBySource, outstandingPayments
-  /*
-    useEffect(() => {
-      const fetchFinancialOverview = async () => {
-        try {
-          const response = await apiClient.get('/admin/finance/overview');
-          // setStats(response.data.stats);
-          // setDoctorEarnings(response.data.doctorEarnings);
-          // setRevenueBySource(response.data.revenueBySource);
-          // setOutstandingPayments(response.data.outstandingPayments);
-        } catch (error) {
-          console.error('Failed to fetch financial overview', error);
-        }
-      };
-      fetchFinancialOverview();
-    }, []);
-  */
-
+ 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

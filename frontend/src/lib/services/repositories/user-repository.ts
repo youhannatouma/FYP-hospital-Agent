@@ -79,7 +79,10 @@ let userRepositoryInstance: IUserRepository | null = null;
 
 export function getUserRepository(apiHelper?: ApiRequestHelper): IUserRepository {
   if (!userRepositoryInstance) {
-    userRepositoryInstance = new UserRepository(apiHelper || getApiRequestHelper());
+    const { getApiRequestHelper } = require('../api-request-helper');
+    userRepositoryInstance = new UserRepository(
+      apiHelper || getApiRequestHelper()
+    );
   }
   return userRepositoryInstance;
 }

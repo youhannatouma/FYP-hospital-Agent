@@ -14,20 +14,22 @@ class MessageSkill:
         body: str,
         subject: Optional[str] = None
     ) -> Message:
-        # Validate receiver exists
-        receiver = db.query(User).filter(User.user_id == receiver_id).first()
-        ValidationSkill.ensure_exists(receiver, "Receiver")
+        from app.skills.transaction_skill import TransactionSkill
+        
+        with TransactionSkill.run_transaction(db):
+            # Validate receiver exists
+            receiver = db.query(User).filter(User.user_id == receiver_id).first()
+            ValidationSkill.ensure_exists(receiver, "Receiver")
 
-        msg = Message(
-            sender_id=sender_id,
-            receiver_id=receiver_id,
-            subject=subject,
-            body=body
-        )
-        db.add(msg)
-        db.commit()
-        db.refresh(msg)
-        return msg
+            msg = Message(
+                sender_id=sender_id,
+                receiver_id=receiver_id,
+                subject=subject,
+                body=body
+            )
+            db.add(msg)
+            # No need for manual commit/refresh, handled by TransactionSkill
+            return msg
 
     @staticmethod
     def get_messages_for_user(db: Session, user_id: UUID) -> List[Message]:

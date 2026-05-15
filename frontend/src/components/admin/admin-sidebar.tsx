@@ -41,10 +41,6 @@ import { useUser, SignOutButton } from "@clerk/nextjs"
 const adminNavItems = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { label: "User Management", href: "/admin/users", icon: Users },
-  { label: "Configuration", href: "/admin/configuration", icon: Settings },
-  { label: "Knowledge Base", href: "/admin/knowledge", icon: BookOpen },
-  { label: "Support & Comms", href: "/admin/support", icon: MessageSquare },
-  { label: "Compliance", href: "/admin/compliance", icon: ShieldAlert },
   { label: "Pharmacy Hub", href: "/admin/pharmacy", icon: Pipette },
 ]
 

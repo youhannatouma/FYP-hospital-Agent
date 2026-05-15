@@ -11,6 +11,7 @@ import { useAuth } from "@clerk/nextjs"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { calculateAgeFromDob, getHeartRateBaselineByAge, midpoint } from "@/lib/health/heart-rate"
 import { classifyHttpError } from "@/lib/network/http-error"
+import { useMedicalRecords } from "@/hooks/use-medical-records"
 
 type PatientStats = {
   upcoming_appointments?: number;
@@ -48,20 +49,36 @@ export function StatCards() {
 
   const age = calculateAgeFromDob(profile?.date_of_birth);
   const hrBaseline = getHeartRateBaselineByAge(age);
-  const hrValue = midpoint(hrBaseline.min, hrBaseline.max);
+  const { records } = useMedicalRecords();
+
+  const latestHeartRate = (() => {
+    if (!records || records.length === 0) return null;
+    const sorted = [...records]
+      .filter(r => r.vitals && (r.vitals.heart_rate || r.vitals.hr))
+      .sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+    
+    if (sorted.length > 0) {
+      const v = sorted[0].vitals as Record<string, unknown>;
+      return v.heart_rate || v.hr;
+    }
+    return null;
+  })();
+
+  const hrValue = latestHeartRate || midpoint(hrBaseline.min, hrBaseline.max);
+  const isRealHr = !!latestHeartRate;
 
   const statsItems = [
     {
       icon: Heart,
       value: `${hrValue} bpm`,
       label: "Heart Rate",
-      status: hrBaseline.label,
-      statusColor: "text-emerald-500",
+      status: isRealHr ? "LATEST VITAL" : hrBaseline.label,
+      statusColor: isRealHr ? "text-primary" : "text-emerald-500",
       iconBg: "bg-rose-500/10",
       iconColor: "text-rose-500",
-      updated: `${hrBaseline.min}-${hrBaseline.max} bpm`,
+      updated: isRealHr ? "Real-time" : `${hrBaseline.min}-${hrBaseline.max} bpm`,
       primary: true,
-      description: "Estimated resting baseline from your age band.",
+      description: isRealHr ? "Most recent recorded resting heart rate." : "Estimated resting baseline from your age band.",
     },
     {
       icon: Droplets,

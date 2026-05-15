@@ -6,10 +6,10 @@
  * Follows: Dependency Inversion Principle (DIP) — user info via useUserProfile service layer
  */
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { m, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { CalendarPlus, Phone, Sparkles, ArrowRight } from "lucide-react"
+import { CalendarPlus, Phone, Sparkles, ArrowRight, Database, CheckCircle2, Loader2 } from "lucide-react"
 import { StatCards } from "@/components/patient/dashboard/stat-cards"
 import { MedicalHistoryTimeline } from "@/components/patient/dashboard/medical-history-timeline"
 import { AIHealthAvatar } from "@/components/patient/dashboard/ai-health-avatar"
@@ -26,10 +26,14 @@ import { MedicalDocuments } from "@/components/patient/dashboard/medical-documen
 import { BookAppointmentDialog } from "@/components/patient/dialogs/book-appointment-dialog"
 import { ContactDoctorDialog } from "@/components/patient/dialogs/contact-doctor-dialog"
 import { useUserProfile } from "@/hooks/use-user-profile"
+import { getServiceContainer } from "@/lib/services/service-container"
+import { useMedicalRecords } from "@/hooks/use-medical-records"
 
 export default function PatientDashboardPage() {
   const [showBookAppointment, setShowBookAppointment] = useState(false)
   const [showContactDoctor, setShowContactDoctor] = useState(false)
+  const [seedLoading, setSeedLoading] = useState(false)
+  const [seedDone, setSeedDone] = useState(false)
 
   // Use service layer profile — not direct Clerk hook (DIP)
   const { profile } = useUserProfile()
@@ -39,6 +43,25 @@ export default function PatientDashboardPage() {
     day: "numeric",
     year: "numeric",
   })
+
+  // Check if account is empty and banner should show
+  const { records, loading: recordsLoading, refetch } = useMedicalRecords()
+  const showSeedBanner = !recordsLoading && records.length === 0 && !seedDone
+
+  const handleSeedAccount = useCallback(async () => {
+    setSeedLoading(true)
+    try {
+      const container = getServiceContainer()
+      await container.api.post("/users/seed-my-account", {})
+      setSeedDone(true)
+      // Refresh all dashboard data
+      await refetch()
+    } catch (err) {
+      console.error("[SeedBanner] Failed to seed account:", err)
+    } finally {
+      setSeedLoading(false)
+    }
+  }, [refetch])
 
   return (
     <AnimatePresence mode="wait">
@@ -63,8 +86,7 @@ export default function PatientDashboardPage() {
                 Your health telemetry is synchronized. Summary for{" "}
                 <span className="text-foreground font-black underline decoration-primary/30 underline-offset-4">
                   {todayFormatted}
-                </span>
-                .
+                </span>.
               </p>
             </div>
           </div>
@@ -88,6 +110,54 @@ export default function PatientDashboardPage() {
             </Button>
           </div>
         </div>
+
+        {/* Smart Seed Banner — only shown to new accounts with no data */}
+        <AnimatePresence>
+          {showSeedBanner && (
+            <m.div
+              initial={{ opacity: 0, y: -10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 p-6 shadow-premium"
+            >
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 shadow-inner-glow">
+                  <Database className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black uppercase tracking-widest text-primary mb-1">New Account Detected</p>
+                  <h3 className="text-xl font-black text-foreground">Your dashboard is empty</h3>
+                  <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+                    Populate your account with realistic clinical history — medical records, appointments, prescriptions, and health goals — to see the full dashboard experience.
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  className="h-12 px-8 rounded-2xl bg-primary text-white hover:bg-primary/90 font-black text-xs uppercase tracking-widest shadow-glow shrink-0 gap-3 disabled:opacity-60"
+                  onClick={handleSeedAccount}
+                  disabled={seedLoading}
+                >
+                  {seedLoading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Seeding...</>
+                  ) : (
+                    <><Sparkles className="h-4 w-4" /> Seed My Account</>
+                  )}
+                </Button>
+              </div>
+            </m.div>
+          )}
+          {seedDone && (
+            <m.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-3 text-emerald-500"
+            >
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              <span className="text-sm font-black uppercase tracking-widest">Account seeded — refreshing dashboard...</span>
+            </m.div>
+          )}
+        </AnimatePresence>
 
         {/* Core Metrics Staggered */}
         <div className="space-y-12">
@@ -132,9 +202,11 @@ export default function PatientDashboardPage() {
           </section>
 
           {/* Utility Sections Staggered */}
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-            <MessagesSection />
-            <div className="flex flex-col gap-8">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
+            <div className="lg:col-span-2">
+              <MessagesSection />
+            </div>
+            <div className="lg:col-span-3 flex flex-col gap-8">
               <MedicalDocuments />
               <HealthEducation />
             </div>

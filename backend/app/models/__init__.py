@@ -13,3 +13,4 @@ from .langgraph_checkpoint import (
 	LangGraphCheckpointWrite,
 )
 from .workflow_trace_event import WorkflowTraceEvent
+from .health_goal import HealthGoal

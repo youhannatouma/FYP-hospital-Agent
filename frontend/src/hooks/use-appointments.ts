@@ -18,35 +18,43 @@ export function useMyAppointments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAppointments = useCallback(async () => {
+  const fetchAppointments = useCallback(async (isMounted: { current: boolean }) => {
     if (!isLoaded || !isSignedIn) {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (isMounted.current) setLoading(true);
     try {
       const container = getServiceContainer();
       const data = await container.appointment.getMyAppointments();
-      setAppointments(data || []);
-      setError(null);
-    } catch (err: unknown) {
-      setError(err.message || "Failed to fetch appointments");
-      setAppointments([]);
+      if (isMounted.current) {
+        setAppointments(data || []);
+        setError(null);
+      }
+    } catch (err: any) {
+      if (isMounted.current) {
+        setError(err.message || "Failed to fetch appointments");
+        setAppointments([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
-    fetchAppointments();
+    const isMounted = { current: true };
+    fetchAppointments(isMounted);
+    return () => {
+      isMounted.current = false;
+    };
   }, [fetchAppointments]);
 
   return {
     appointments,
     loading,
     error,
-    refetch: fetchAppointments,
+    refetch: () => fetchAppointments({ current: true }),
   };
 }
 
@@ -60,34 +68,42 @@ export function useDoctorAppointments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAppointments = useCallback(async () => {
+  const fetchAppointments = useCallback(async (isMounted: { current: boolean }) => {
     if (!isLoaded || !isSignedIn) {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (isMounted.current) setLoading(true);
     try {
       const container = getServiceContainer();
       const data = await container.appointment.getDoctorAppointments();
-      setAppointments(data || []);
-      setError(null);
-    } catch (err: unknown) {
-      setError(err.message || "Failed to fetch appointments");
-      setAppointments([]);
+      if (isMounted.current) {
+        setAppointments(data || []);
+        setError(null);
+      }
+    } catch (err: any) {
+      if (isMounted.current) {
+        setError(err.message || "Failed to fetch appointments");
+        setAppointments([]);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
-    fetchAppointments();
+    const isMounted = { current: true };
+    fetchAppointments(isMounted);
+    return () => {
+      isMounted.current = false;
+    };
   }, [fetchAppointments]);
 
   return {
     appointments,
     loading,
     error,
-    refetch: fetchAppointments,
+    refetch: () => fetchAppointments({ current: true }),
   };
 }

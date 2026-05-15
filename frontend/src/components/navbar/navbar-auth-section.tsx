@@ -6,6 +6,7 @@
 
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ClerkLoaded,
@@ -27,7 +28,21 @@ export function NavbarAuthSection({
   showOnDesktop = true,
   className = "",
 }: NavbarAuthSectionProps) {
+  const [isMounted, setIsMounted] = useState(false);
   const { user } = useUser();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return (
+      <div className={`flex items-center gap-2 ${showOnDesktop ? "hidden lg:flex" : ""} ${className}`}>
+        <div className="h-10 w-24 bg-muted animate-pulse rounded-md" />
+      </div>
+    );
+  }
+
   const role = user?.publicMetadata?.role as string | undefined;
 
   // Dynamically resolve dashboard route based on user role

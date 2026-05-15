@@ -6,8 +6,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Heart, Apple, Dumbbell, Pill } from "lucide-react"
 import Link from "next/link"
+import { ArticleViewerDialog } from "./dialogs/article-viewer-dialog"
+import { useHealthGoals } from "@/hooks/use-health-goals"
 
 export function HealthEducation() {
+  const { goals } = useHealthGoals()
   const [resources, setResources] = React.useState([
     {
       id: 1,
@@ -60,7 +63,7 @@ export function HealthEducation() {
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {resources.map((resource) => (
-          <Card key={resource.id} className="border border-border bg-card shadow-sm">
+          <Card key={resource.id} className="border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div
                 className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${resource.iconBg}`}
@@ -73,13 +76,12 @@ export function HealthEducation() {
               <p className="mb-3 text-xs text-muted-foreground leading-relaxed">
                 {resource.description}
               </p>
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-xs text-primary"
-              >
-                {resource.action}
-              </Button>
+              <ArticleViewerDialog 
+                title={resource.title}
+                description={resource.description}
+                icon={resource.icon}
+                iconBg={resource.iconBg}
+              />
             </CardContent>
           </Card>
         ))}

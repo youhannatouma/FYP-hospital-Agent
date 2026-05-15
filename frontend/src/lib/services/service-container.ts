@@ -17,6 +17,7 @@ import { IMedicalRecordRepository, getMedicalRecordRepository } from './reposito
 import { IPrescriptionRepository, getPrescriptionRepository } from './repositories/prescription-repository';
 import { IMessageRepository, getMessageRepository } from './repositories/message-repository';
 import { IAiRepository, getAiRepository } from './repositories/ai-repository';
+import { IHealthGoalRepository, getHealthGoalRepository } from './repositories/health-goal-repository';
 
 export interface ServiceContainer {
   auth: IAuthService;
@@ -31,6 +32,7 @@ export interface ServiceContainer {
   prescription: IPrescriptionRepository;
   message: IMessageRepository;
   ai: IAiRepository;
+  healthGoal: IHealthGoalRepository;
 }
 
 class DefaultServiceContainer implements ServiceContainer {
@@ -46,6 +48,7 @@ class DefaultServiceContainer implements ServiceContainer {
   prescription: IPrescriptionRepository;
   message: IMessageRepository;
   ai: IAiRepository;
+  healthGoal: IHealthGoalRepository;
 
   constructor() {
     // Initialize services in dependency order
@@ -63,6 +66,7 @@ class DefaultServiceContainer implements ServiceContainer {
     this.prescription = getPrescriptionRepository(this.api);
     this.message = getMessageRepository(this.api);
     this.ai = getAiRepository(this.httpClient);
+    this.healthGoal = getHealthGoalRepository(this.api);
   }
 }
 
