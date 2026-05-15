@@ -42,7 +42,7 @@ ADMIN = {
     "first_name": "Admin",
     "last_name": "System",
     "role": "admin",
-    "phone_number_plaintext": "+971-50-000-0001",
+    "phone_number": "+971-50-000-0001",
     "status": "Active",
 }
 
@@ -53,11 +53,11 @@ DOCTORS = [
         "last_name": "Al-Rashid",
         "role": "doctor",
         "specialty": "Cardiology",
-        "license_number_encrypted": "MD-CARD-2024-001",
+        "license_number": "MD-CARD-2024-001",
         "years_of_experience": 15,
         "qualifications": ["MD", "FACC", "Board Certified Cardiologist"],
-        "clinic_address_encrypted": "Downtown Medical Center, Building A, Floor 3",
-        "phone_number_plaintext": "+971-50-100-0001",
+        "clinic_address": "Downtown Medical Center, Building A, Floor 3",
+        "phone_number": "+971-50-100-0001",
         "status": "Active",
     },
     {
@@ -66,11 +66,11 @@ DOCTORS = [
         "last_name": "Hassan",
         "role": "doctor",
         "specialty": "Dermatology",
-        "license_number_encrypted": "MD-DERM-2024-002",
+        "license_number": "MD-DERM-2024-002",
         "years_of_experience": 10,
         "qualifications": ["MD", "Board Certified Dermatologist", "Fellow AAD"],
-        "clinic_address_encrypted": "SkinCare Clinic, Sheikh Zayed Road, Suite 501",
-        "phone_number_plaintext": "+971-50-100-0002",
+        "clinic_address": "SkinCare Clinic, Sheikh Zayed Road, Suite 501",
+        "phone_number": "+971-50-100-0002",
         "status": "Active",
     },
     {
@@ -79,11 +79,11 @@ DOCTORS = [
         "last_name": "Khalil",
         "role": "doctor",
         "specialty": "Orthopedics",
-        "license_number_encrypted": "MD-ORTH-2024-003",
+        "license_number": "MD-ORTH-2024-003",
         "years_of_experience": 12,
         "qualifications": ["MD", "MS Orthopedics", "Fellow AAOS"],
-        "clinic_address_encrypted": "Bone & Joint Center, JBR Walk, Level 2",
-        "phone_number_plaintext": "+971-50-100-0003",
+        "clinic_address": "Bone & Joint Center, JBR Walk, Level 2",
+        "phone_number": "+971-50-100-0003",
         "status": "Active",
     },
     {
@@ -92,11 +92,11 @@ DOCTORS = [
         "last_name": "Mansour",
         "role": "doctor",
         "specialty": "Pediatrics",
-        "license_number_encrypted": "MD-PEDS-2024-004",
+        "license_number": "MD-PEDS-2024-004",
         "years_of_experience": 8,
         "qualifications": ["MD", "Board Certified Pediatrician", "FAAP"],
-        "clinic_address_encrypted": "Children's Health Pavilion, Marina Mall, Floor 1",
-        "phone_number_plaintext": "+971-50-100-0004",
+        "clinic_address": "Children's Health Pavilion, Marina Mall, Floor 1",
+        "phone_number": "+971-50-100-0004",
         "status": "Active",
     },
     {
@@ -105,11 +105,11 @@ DOCTORS = [
         "last_name": "Nabil",
         "role": "doctor",
         "specialty": "Neurology",
-        "license_number_encrypted": "MD-NEUR-2024-005",
+        "license_number": "MD-NEUR-2024-005",
         "years_of_experience": 18,
         "qualifications": ["MD", "PhD Neuroscience", "Board Certified Neurologist"],
-        "clinic_address_encrypted": "Brain & Spine Institute, Healthcare City, Tower B",
-        "phone_number_plaintext": "+971-50-100-0005",
+        "clinic_address": "Brain & Spine Institute, Healthcare City, Tower B",
+        "phone_number": "+971-50-100-0005",
         "status": "Active",
     },
     {
@@ -118,11 +118,11 @@ DOCTORS = [
         "last_name": "Ibrahim",
         "role": "doctor",
         "specialty": "Gynecology",
-        "license_number_encrypted": "MD-GYNO-2024-006",
+        "license_number": "MD-GYNO-2024-006",
         "years_of_experience": 14,
         "qualifications": ["MD", "MRCOG", "Board Certified OB/GYN"],
-        "clinic_address_encrypted": "Women's Health Center, Al Wasl Road, Suite 302",
-        "phone_number_plaintext": "+971-50-100-0006",
+        "clinic_address": "Women's Health Center, Al Wasl Road, Suite 302",
+        "phone_number": "+971-50-100-0006",
         "status": "Active",
     },
     {
@@ -131,11 +131,11 @@ DOCTORS = [
         "last_name": "Bakri",
         "role": "doctor",
         "specialty": "General Surgery",
-        "license_number_encrypted": "MD-SURG-2024-007",
+        "license_number": "MD-SURG-2024-007",
         "years_of_experience": 20,
         "qualifications": ["MD", "FRCS", "Fellow ACS"],
-        "clinic_address_encrypted": "Surgical Excellence Center, Jumeirah, Building 7",
-        "phone_number_plaintext": "+971-50-100-0007",
+        "clinic_address": "Surgical Excellence Center, Jumeirah, Building 7",
+        "phone_number": "+971-50-100-0007",
         "status": "Active",
     },
     {
@@ -144,11 +144,11 @@ DOCTORS = [
         "last_name": "El-Amin",
         "role": "doctor",
         "specialty": "Internal Medicine",
-        "license_number_encrypted": "MD-INTM-2024-008",
+        "license_number": "MD-INTM-2024-008",
         "years_of_experience": 11,
         "qualifications": ["MD", "Board Certified Internist", "FACP"],
-        "clinic_address_encrypted": "General Medicine Clinic, Business Bay, Level 4",
-        "phone_number_plaintext": "+971-50-100-0008",
+        "clinic_address": "General Medicine Clinic, Business Bay, Level 4",
+        "phone_number": "+971-50-100-0008",
         "status": "Active",
     },
 ]
@@ -159,14 +159,14 @@ PATIENTS = [
         "first_name": "Sarah",
         "last_name": "Johnson",
         "role": "patient",
-        "phone_number_plaintext": "+971-55-123-4567",
+        "phone_number": "+971-55-123-4567",
         "date_of_birth": date(1990, 3, 15),
         "gender": "Female",
         "blood_type": "O+",
         "address": "456 Elm Street, Apt 12, Dubai Marina",
         "allergies": ["Penicillin", "Sulfa Drugs"],
         "chronic_conditions": ["Hypertension"],
-        "emergency_contact_encrypted": "John Johnson (+971-55-987-6543)",
+        "emergency_contact": "John Johnson (+971-55-987-6543)",
         "status": "Active",
     },
     {
@@ -174,14 +174,14 @@ PATIENTS = [
         "first_name": "Mohammed",
         "last_name": "Ali",
         "role": "patient",
-        "phone_number_plaintext": "+971-55-234-5678",
+        "phone_number": "+971-55-234-5678",
         "date_of_birth": date(1985, 7, 22),
         "gender": "Male",
         "blood_type": "A+",
         "address": "789 Palm Avenue, JBR, Dubai",
         "allergies": ["Aspirin"],
         "chronic_conditions": ["Type 2 Diabetes"],
-        "emergency_contact_encrypted": "Aisha Ali (+971-55-876-5432)",
+        "emergency_contact": "Aisha Ali (+971-55-876-5432)",
         "status": "Active",
     },
     {
@@ -189,14 +189,14 @@ PATIENTS = [
         "first_name": "Emily",
         "last_name": "Chen",
         "role": "patient",
-        "phone_number_plaintext": "+971-55-345-6789",
+        "phone_number": "+971-55-345-6789",
         "date_of_birth": date(1995, 11, 8),
         "gender": "Female",
         "blood_type": "B+",
         "address": "321 Marina Walk, Tower C, Floor 15",
         "allergies": [],
         "chronic_conditions": [],
-        "emergency_contact_encrypted": "David Chen (+971-55-765-4321)",
+        "emergency_contact": "David Chen (+971-55-765-4321)",
         "status": "Active",
     },
     {
@@ -204,14 +204,14 @@ PATIENTS = [
         "first_name": "Rashid",
         "last_name": "Khan",
         "role": "patient",
-        "phone_number_plaintext": "+971-55-456-7890",
+        "phone_number": "+971-55-456-7890",
         "date_of_birth": date(1978, 1, 30),
         "gender": "Male",
         "blood_type": "AB-",
         "address": "654 Business Bay Blvd, Suite 2201",
         "allergies": ["Latex", "Ibuprofen"],
         "chronic_conditions": ["Asthma", "Hyperlipidemia"],
-        "emergency_contact_encrypted": "Fatima Khan (+971-55-654-3210)",
+        "emergency_contact": "Fatima Khan (+971-55-654-3210)",
         "status": "Active",
     },
     {
@@ -219,38 +219,16 @@ PATIENTS = [
         "first_name": "Anna",
         "last_name": "Martinez",
         "role": "patient",
-        "phone_number_plaintext": "+971-55-567-8901",
+        "phone_number": "+971-55-567-8901",
         "date_of_birth": date(2000, 5, 17),
         "gender": "Female",
         "blood_type": "O-",
         "address": "111 Al Wasl Road, Villa 45",
         "allergies": [],
         "chronic_conditions": [],
-        "emergency_contact_encrypted": "Carlos Martinez (+971-55-543-2109)",
+        "emergency_contact": "Carlos Martinez (+971-55-543-2109)",
         "status": "Active",
     },
-]
-
-PHARMACISTS = [
-    {
-        "email": "pharmacist.main@hospital-care.com",
-        "first_name": "John",
-        "last_name": "Pharmacist",
-        "role": "pharmacist",
-        "phone_number_plaintext": "+971-50-300-0001",
-        "status": "Active",
-    }
-]
-
-LAB_TECHS = [
-    {
-        "email": "lab.tech.main@hospital-care.com",
-        "first_name": "Alice",
-        "last_name": "Labtech",
-        "role": "lab",
-        "phone_number_plaintext": "+971-50-400-0001",
-        "status": "Active",
-    }
 ]
 
 MEDICATION_CATALOG = [
@@ -373,9 +351,11 @@ def seed_database():
         # Check if data already exists
         existing_doctors = db.query(User).filter(User.role == "doctor").count()
         if existing_doctors >= 8:
-            print("[Seed] Database has doctors (found %d). Continuing to ensure all roles exist..." % existing_doctors)
-        else:
-            print("[Seed] Seeding database with real data...")
+            print("[Seed] Database already seeded (found %d doctors). Skipping." % existing_doctors)
+            db.commit()
+            return
+
+        print("[Seed] Seeding database with real data...")
 
         # ── Admin ──────────────────────────────────────────────────────────────
         admin_exists = db.query(User).filter(User.email == ADMIN["email"]).first()
@@ -413,22 +393,6 @@ def seed_database():
             db.flush()
             patient_records.append(patient)
             print("[Seed]   + Patient: %s %s" % (pat_data["first_name"], pat_data["last_name"]))
-
-        # ── Pharmacists ────────────────────────────────────────────────────────
-        for pharm_data in PHARMACISTS:
-            existing = db.query(User).filter(User.email == pharm_data["email"]).first()
-            if not existing:
-                user = User(**pharm_data)
-                db.add(user)
-                print("[Seed]   + Pharmacist: %s" % pharm_data["email"])
-
-        # ── Lab Techs ──────────────────────────────────────────────────────────
-        for lab_data in LAB_TECHS:
-            existing = db.query(User).filter(User.email == lab_data["email"]).first()
-            if not existing:
-                user = User(**lab_data)
-                db.add(user)
-                print("[Seed]   + Lab Tech: %s" % lab_data["email"])
 
         # ── Time Slots ─────────────────────────────────────────────────────────
         # Generate Mon–Fri, 9 AM–5 PM, 30-min slots for the next 14 days
@@ -523,34 +487,7 @@ def seed_database():
                     created_at=past_date
                 )
                 db.add(presc)
-                
-                # Create a Lab Order for this record
-                lab_order = MedicalRecord(
-                    patient_id=first_patient.user_id,
-                    doctor_id=doc.user_id,
-                    appointment_id=appt.appointment_id,
-                    record_type="Lab Order",
-                    title="Comprehensive Blood Panel",
-                    clinical_notes="Requested CBC, Lipid Profile, and HbA1c.",
-                    created_at=past_date
-                )
-                db.add(lab_order)
-                db.flush()
-                
-                # Create a Lab Result for this order
-                lab_result = MedicalRecord(
-                    patient_id=first_patient.user_id,
-                    doctor_id=doc.user_id,
-                    appointment_id=appt.appointment_id,
-                    record_type="Lab Result",
-                    title="Lab Results: Blood Panel",
-                    diagnosis="Normal range for all parameters except Vitamin D",
-                    clinical_notes="Vitamin D level is low (18 ng/mL). Other parameters are within normal limits.",
-                    created_at=past_date + timedelta(days=2)
-                )
-                db.add(lab_result)
-
-                print("[Seed]     * Record & Lab created: Dr %s (%s)" % (doc.last_name, doc.specialty))
+                print("[Seed]     * Record created: Dr %s (%s)" % (doc.last_name, doc.specialty))
 
             # 2. Create FUTURE appointments (Scheduled)
             # Use the 4th and 5th doctors for future

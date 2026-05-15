@@ -10,7 +10,7 @@ from app.skills.notification_skill import NotificationSkill
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
-@router.get("")
+@router.get("/")
 def get_notifications(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)]

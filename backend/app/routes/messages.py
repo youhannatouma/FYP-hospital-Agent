@@ -12,7 +12,7 @@ from app.skills.error_handling_skill import ErrorHandlingSkill
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
 
-@router.post("", response_model=MessageResponse)
+@router.post("/", response_model=MessageResponse)
 def send_message(
     payload: MessageCreate,
     db: Annotated[Session, Depends(get_db)],

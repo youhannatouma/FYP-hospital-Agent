@@ -26,7 +26,6 @@ import { MedicalRecord } from "./columns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { getServiceContainer } from "@/lib/services/service-container";
 
 interface CreateRecordDialogProps {
   open: boolean;
@@ -83,46 +82,18 @@ export function CreateRecordDialog({
     }
   }, [open, record, reset]);
 
-  const onSubmit = async (data: Partial<MedicalRecord>) => {
+  const onSubmit = (data: Partial<MedicalRecord>) => {
     setIsSubmitting(true);
-    try {
-      const container = getServiceContainer();
-      
-      // Map form data to DTO
-      const dto = {
-        patient_id: data.patient_id || data.patientId, // support both for now
-        record_type: data.record_type || "Consultation",
-        title: data.title || `Consultation: ${data.diagnosis}`,
-        diagnosis: data.diagnosis,
-        treatment: data.treatment || data.treatmentPlan,
-        clinical_notes: data.clinical_notes || data.notes,
-        vitals: {
-          systolic: data.vitals?.systolic || data.bloodPressure?.split('/')[0],
-          diastolic: data.vitals?.diastolic || data.bloodPressure?.split('/')[1],
-          heart_rate: data.vitals?.heart_rate || data.heartRate,
-          temperature: data.vitals?.temperature || data.temperature,
-        }
-      };
-
-      const newRecord = await container.medicalRecord.createRecord(dto);
-      
+    // Simulate API call
+    setTimeout(() => {
+      setIsSubmitting(false);
       toast({
         title: isEditing ? "Record Updated" : "Record Created",
-        description: `Medical record for ${newRecord.patient_name || "the patient"} has been saved successfully.`,
+        description: `Medical record for ${data.name} has been ${isEditing ? "updated" : "created"} successfully.`,
       });
-      
-      onSuccess?.(newRecord);
+      onSuccess?.(data);
       onOpenChange(false);
-    } catch (error: any) {
-      console.error("Failed to save record:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save medical record. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    }, 1000);
   };
 
   return (

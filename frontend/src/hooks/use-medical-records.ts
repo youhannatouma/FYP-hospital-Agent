@@ -27,27 +27,23 @@ export function useMedicalRecords(): UseMedicalRecordsReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRecords = useCallback(async (isMounted: { current: boolean }) => {
+  const fetchRecords = useCallback(async () => {
     if (!isLoaded || !isSignedIn) {
-      if (isMounted.current) setLoading(false);
+      setLoading(false);
       return;
     }
 
-    if (isMounted.current) setLoading(true);
+    setLoading(true);
     try {
       const container = getServiceContainer();
       const data = await container.medicalRecord.getMyRecords();
-      if (isMounted.current) {
-        setRecords(data || []);
-        setError(null);
-      }
-    } catch (err: any) {
-      if (isMounted.current) {
-        setError(err?.message || "Failed to fetch medical records");
-        setRecords([]);
-      }
+      setRecords(data || []);
+      setError(null);
+    } catch (err: unknown) {
+      setError(err?.message || "Failed to fetch medical records");
+      setRecords([]);
     } finally {
-      if (isMounted.current) setLoading(false);
+      setLoading(false);
     }
   }, [isLoaded, isSignedIn]);
 
@@ -62,7 +58,7 @@ export function useMedicalRecords(): UseMedicalRecordsReturn {
         const newRecord = await container.medicalRecord.createRecord(data);
         setRecords((prev) => [newRecord, ...prev]);
         return newRecord;
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("[useMedicalRecords] Failed to create record:", err);
         return null;
       }
@@ -71,18 +67,14 @@ export function useMedicalRecords(): UseMedicalRecordsReturn {
   );
 
   useEffect(() => {
-    const isMounted = { current: true };
-    fetchRecords(isMounted);
-    return () => {
-      isMounted.current = false;
-    };
+    fetchRecords();
   }, [fetchRecords]);
 
   return {
     records,
     loading,
     error,
-    refetch: () => fetchRecords({ current: true }),
+    refetch: fetchRecords,
     createRecord,
   };
 }
@@ -96,33 +88,25 @@ export function usePatientRecords(patientId: string | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRecords = useCallback(async (isMounted: { current: boolean }) => {
+  const fetchRecords = useCallback(async () => {
     if (!patientId) return;
-    if (isMounted.current) setLoading(true);
+    setLoading(true);
     try {
       const container = getServiceContainer();
       const data = await container.medicalRecord.getRecordsByPatient(patientId);
-      if (isMounted.current) {
-        setRecords(data || []);
-        setError(null);
-      }
-    } catch (err: any) {
-      if (isMounted.current) {
-        setError(err?.message || "Failed to fetch patient records");
-        setRecords([]);
-      }
+      setRecords(data || []);
+      setError(null);
+    } catch (err: unknown) {
+      setError(err?.message || "Failed to fetch patient records");
+      setRecords([]);
     } finally {
-      if (isMounted.current) setLoading(false);
+      setLoading(false);
     }
   }, [patientId]);
 
   useEffect(() => {
-    const isMounted = { current: true };
-    fetchRecords(isMounted);
-    return () => {
-      isMounted.current = false;
-    };
+    fetchRecords();
   }, [fetchRecords]);
 
-  return { records, loading, error, refetch: () => fetchRecords({ current: true }) };
+  return { records, loading, error, refetch: fetchRecords };
 }

@@ -58,18 +58,15 @@ export function UserMetrics() {
   const [stats, setStats] = useState<any[]>([]);
 
   useEffect(() => {
-    let isMounted = true;
     const fetchUserMetrics = async () => {
       try {
         const metricsResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/users/metrics`);
-        if (!isMounted) return;
         setRegistrations(metricsResponse.data.registrations);
         setGrowth(metricsResponse.data.growth);
         setActivity(metricsResponse.data.activity);
         setDemographics(metricsResponse.data.demographics);
 
         const statsResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/users/stats`);
-        if (!isMounted) return;
         setStats([
           { title: "Total Users", value: statsResponse.data.total_users, change: statsResponse.data.total_users_change, icon: Users, color: "text-blue-600", bg: "bg-blue-500/10" },
           { title: "New Patients", value: statsResponse.data.new_patients, change: statsResponse.data.new_patients_change, icon: UserPlus, color: "text-emerald-600", bg: "bg-emerald-500/10" },
@@ -77,14 +74,10 @@ export function UserMetrics() {
           { title: "Churn Rate", value: statsResponse.data.churn_rate, change: statsResponse.data.churn_rate_change, icon: UserMinus, color: "text-destructive", bg: "bg-destructive/10" },
         ]);
       } catch (error) {
-        if (!isMounted) return;
         console.error("Failed to fetch user metrics", error);
       }
     };
     fetchUserMetrics();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   return (

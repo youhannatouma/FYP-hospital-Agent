@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import Annotated, List, Optional
+from typing import Annotated, List
 
 from app.auth.dependencies import get_current_user, require_role
 from app.database import get_db
@@ -15,18 +15,16 @@ router = APIRouter(prefix="/medical-records", tags=["Medical Records"])
 class MedicalRecordCreate(BaseModel):
     patient_id: str
     record_type: str
-    title: Optional[str] = None
-    diagnosis: Optional[str] = None
-    treatment: Optional[str] = None
-    clinical_notes: Optional[str] = None
-    appointment_id: Optional[str] = None
-    vitals: Optional[dict] = None
+    diagnosis: str
+    treatment: str
+    clinical_notes: str = None
+    appointment_id: str = None
 
-@router.post("")
+@router.post("/")
 def create_medical_record(
     payload: MedicalRecordCreate,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(require_role(["doctor", "lab"]))]
+    user: Annotated[User, Depends(require_role("doctor"))]
 ):
     try:
         record = MedicalRecordSkill.create_record(
@@ -35,11 +33,9 @@ def create_medical_record(
             patient_id=UUID(payload.patient_id),
             doctor_id=user.user_id,
             record_type=payload.record_type,
-            title=payload.title,
             diagnosis=payload.diagnosis,
             treatment=payload.treatment,
             clinical_notes=payload.clinical_notes,
-            vitals=payload.vitals,
             appointment_id=UUID(payload.appointment_id) if payload.appointment_id else None
         )
         return {"record_id": str(record.record_id), "status": "Created"}
@@ -72,96 +68,17 @@ def get_my_records(
             doctor = db.query(User).filter(User.user_id == r.doctor_id).first()
             patient = db.query(User).filter(User.user_id == r.patient_id).first()
             result.append({
-                "id": str(r.record_id),
                 "record_id": str(r.record_id),
                 "patient_id": str(r.patient_id),
                 "doctor_id": str(r.doctor_id),
                 "doctor_name": f"{doctor.first_name} {doctor.last_name}" if doctor else "Unknown",
                 "patient_name": f"{patient.first_name} {patient.last_name}" if patient else "Unknown",
                 "record_type": r.record_type,
-                "title": r.title or r.diagnosis or r.record_type or "Medical Record",
-                "description": r.clinical_notes,
                 "diagnosis": r.diagnosis,
                 "treatment": r.treatment,
                 "clinical_notes": r.clinical_notes,
-                "vitals": r.vitals,
                 "appointment_id": str(r.appointment_id) if r.appointment_id else None,
-                "date": r.created_at.isoformat() if r.created_at else None,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-                "file_url": None,
-            })
-        return result
-    except Exception as e:
-        raise ErrorHandlingSkill.handle(e)
-
-@router.get("/lab/pending")
-def get_pending_lab_orders(
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(require_role(["lab", "admin"]))]
-):
-    """List all pending lab orders for technicians to process."""
-    try:
-        from app.models.medical_record import MedicalRecord
-        records = db.query(MedicalRecord).filter(
-            MedicalRecord.record_type == "Lab Order",
-            MedicalRecord.deleted_at == None
-        ).order_by(MedicalRecord.created_at.desc()).all()
-        
-        result = []
-        for r in records:
-            patient = db.query(User).filter(User.user_id == r.patient_id).first()
-            doctor = db.query(User).filter(User.user_id == r.doctor_id).first()
-            result.append({
-                "record_id": str(r.record_id),
-                "patient_id": str(r.patient_id),
-                "patient_name": f"{patient.first_name} {patient.last_name}" if patient else "Patient",
-                "doctor_name": f"Dr. {doctor.first_name} {doctor.last_name}" if doctor else "Doctor",
-                "record_type": r.record_type,
-                "title": r.title,
-                "clinical_notes": r.clinical_notes,
-                "date": r.created_at.isoformat() if r.created_at else None
-            })
-        return result
-    except Exception as e:
-        raise ErrorHandlingSkill.handle(e)
-
-
-
-@router.get("/patient/{patient_id}")
-def get_patient_records(
-    patient_id: str,
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[User, Depends(require_role(["doctor", "admin"]))]
-):
-    """Doctor/Admin: get all records for a specific patient."""
-    try:
-        from app.models.medical_record import MedicalRecord
-        records = db.query(MedicalRecord).filter(
-            MedicalRecord.patient_id == UUID(patient_id),
-            MedicalRecord.deleted_at == None
-        ).order_by(MedicalRecord.created_at.desc()).all()
-        result = []
-        for r in records:
-            doctor = db.query(User).filter(User.user_id == r.doctor_id).first()
-            patient = db.query(User).filter(User.user_id == r.patient_id).first()
-            result.append({
-                "id": str(r.record_id),
-                "record_id": str(r.record_id),
-                "patient_id": str(r.patient_id),
-                "doctor_id": str(r.doctor_id),
-                "doctor_name": f"{doctor.first_name} {doctor.last_name}" if doctor else "Unknown",
-                "patient_name": f"{patient.first_name} {patient.last_name}" if patient else "Unknown",
-                "record_type": r.record_type,
-                "title": r.title or r.diagnosis or r.record_type or "Medical Record",
-                "description": r.clinical_notes,
-                "diagnosis": r.diagnosis,
-                "treatment": r.treatment,
-                "clinical_notes": r.clinical_notes,
-                "vitals": r.vitals,
-                "appointment_id": str(r.appointment_id) if r.appointment_id else None,
-                "date": r.created_at.isoformat() if r.created_at else None,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-                "file_url": None,
+                "created_at": r.created_at.isoformat() if r.created_at else None
             })
         return result
     except Exception as e:

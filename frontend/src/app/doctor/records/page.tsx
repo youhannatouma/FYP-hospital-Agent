@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { Plus, Search, Eye, Edit, Download, Loader2 } from "lucide-react"
+import React from "react"
+import { Plus, Search, Eye, Edit, Download } from "lucide-react"
 import { m } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,7 +19,9 @@ import { toast } from "@/hooks/use-toast"
 import { RecordDetailDialog } from "@/components/doctor/MedicalRecord/record-detail-dialog"
 import { MedicalRecord } from "@/components/doctor/MedicalRecord/columns"
 import { CreateRecordDialog } from "@/components/doctor/MedicalRecord/create-record-dialog"
+import { useState, useEffect } from "react"
 import { getServiceContainer } from "@/lib/services/service-container"
+import { Loader2 } from "lucide-react"
 
 export default function MedicalRecordsPage() {
   const [search, setSearch] = useState("")
@@ -30,26 +32,54 @@ export default function MedicalRecordsPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    let isMounted = true
     const fetchRecords = async () => {
       try {
         const container = getServiceContainer()
         const data = await container.medicalRecord.getMyRecords()
-        
-        if (!isMounted) return
-
         if (Array.isArray(data)) {
-          setRecords(data)
+          const mappedRecords = data.map((r) => {
+            const item = r as unknown as Record<string, unknown>
+            const id = (item.record_id as string) || (item.id as string) || ""
+            const patientId = (item.patient_id as string) || (item.patientId as string) || "Unknown"
+            const patientName = (item.patient_name as string) || (item.name as string) || "Unknown Patient"
+            const createdAt = (item.created_at as string) || (item.lastVisit as string)
+            const diagnosis = (item.diagnosis as string) || "Medical Record"
+            const treatment = (item.treatment as string) || (item.treatmentPlan as string) || ""
+            const notes = (item.clinical_notes as string) || (item.notes as string) || ""
+            return {
+              id,
+              patientId,
+              name: patientName,
+              lastVisit: createdAt ? new Date(createdAt).toLocaleDateString() : 'Unknown',
+              diagnosis,
+              status: "Active",
+              age: 0,
+              gender: "Unknown",
+              bloodType: "Unknown",
+              phone: "Unknown",
+              email: "Unknown",
+              address: "Unknown",
+              height: 0,
+              weight: 0,
+              bloodPressure: "Unknown",
+              heartRate: 0,
+              temperature: 0,
+              medications: [],
+              allergies: [],
+              treatmentPlan: treatment,
+              notes,
+              nextAppointment: ""
+            }
+          }) as MedicalRecord[]
+          setRecords(mappedRecords)
         }
       } catch (error) {
-        if (!isMounted) return
         console.error("Failed to fetch medical records:", error)
       } finally {
-        if (isMounted) setIsLoading(false)
+        setIsLoading(false)
       }
     }
     fetchRecords()
-    return () => { isMounted = false }
   }, [])
 
   const handleAddRecord = () => {
@@ -71,12 +101,12 @@ export default function MedicalRecordsPage() {
   const handleDownloadRecord = (record: MedicalRecord) => {
     toast({
       title: "Preparing Download",
-      description: `Generating a secure PDF package for ${record.patient_name || "the patient"}'s history.`,
+      description: `Generating a secure PDF package for ${record.name}'s history.`,
     })
     setTimeout(() => {
       toast({
         title: "Download Complete",
-        description: `Medical record for ${record.patient_name || "the patient"} has been downloaded.`,
+        description: `Medical record for ${record.name} has been downloaded.`,
       })
     }, 2000)
   }
@@ -84,17 +114,22 @@ export default function MedicalRecordsPage() {
   const handleCreateSuccess = (data: Partial<MedicalRecord>) => {
     if (selectedRecord) {
       // Edit
-      setRecords(prev => prev.map(r => r.id === selectedRecord.id ? { ...r, ...data } as MedicalRecord : r))
+      setRecords(prev => prev.map(r => r.id === selectedRecord.id ? { ...r, ...data } : r))
     } else {
       // Add
-      setRecords(prev => [data as MedicalRecord, ...prev])
+      const newRecord: MedicalRecord = {
+        ...data as MedicalRecord,
+        id: Math.random().toString(36).substr(2, 9),
+        lastVisit: new Date().toISOString().split('T')[0],
+      }
+      setRecords(prev => [newRecord, ...prev])
     }
   }
 
   const filtered = records.filter(
     (r) =>
-      (r.patient_name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (r.diagnosis || "").toLowerCase().includes(search.toLowerCase())
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      r.diagnosis.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -160,17 +195,17 @@ export default function MedicalRecordsPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
-                        {(record.patient_name || "UP").split(" ").map((n) => n[0]).join("")}
+                        {record.name.split(" ").map((n) => n[0]).join("")}
                       </div>
-                      <span className="font-medium text-foreground">{record.patient_name || "Unknown Patient"}</span>
+                      <span className="font-medium text-foreground">{record.name}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">{record.patient_id}</TableCell>
-                  <TableCell className="text-muted-foreground">{record.created_at ? new Date(record.created_at).toLocaleDateString() : "N/A"}</TableCell>
-                  <TableCell className="text-foreground">{record.diagnosis || "Consultation"}</TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-xs">{record.patientId}</TableCell>
+                  <TableCell className="text-muted-foreground">{record.lastVisit}</TableCell>
+                  <TableCell className="text-foreground">{record.diagnosis}</TableCell>
                   <TableCell>
-                    <Badge className={`border-0 bg-primary/10 text-primary`}>
-                      {record.record_type}
+                    <Badge className={`border-0 bg-emerald-500/10 text-emerald-500`}>
+                      {record.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
