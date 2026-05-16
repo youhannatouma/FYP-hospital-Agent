@@ -106,6 +106,42 @@ def _extract_profile_candidates(message: str) -> dict[str, Any]:
         allergies = [a for a in candidates if a and len(a) < 80]
         if allergies:
             out["allergies"] = sorted(set(allergies), key=lambda x: x.lower())
+    elif re.search(r"\b(?:no allergies|not allergic to anything|none for allergies)\b", lowered):
+        out["allergies"] = []
+
+    condition_match = re.search(
+        r"\b(?:chronic conditions?|conditions?|medical conditions?)\s*(?:are|is|:)?\s*(.+)",
+        text,
+        re.IGNORECASE,
+    )
+    if condition_match:
+        raw = re.split(r"[.?!]", condition_match.group(1))[0].strip()
+        if raw.lower() in {"none", "no", "none currently", "no chronic conditions"}:
+            out["chronic_conditions"] = []
+        else:
+            candidates = [c.strip(" -") for c in re.split(r",| and ", raw, flags=re.IGNORECASE)]
+            conditions = [c for c in candidates if c and len(c) < 80]
+            if conditions:
+                out["chronic_conditions"] = sorted(set(conditions), key=lambda x: x.lower())
+    elif re.search(r"\b(?:no chronic conditions|no conditions|none currently)\b", lowered):
+        out["chronic_conditions"] = []
+
+    meds_match = re.search(
+        r"\b(?:current medications?|medications?|medicines?|supplements?)\s*(?:are|is|:|include)?\s*(.+)",
+        text,
+        re.IGNORECASE,
+    )
+    if meds_match:
+        raw = re.split(r"[.?!]", meds_match.group(1))[0].strip()
+        if raw.lower() in {"none", "no", "none currently", "not taking any", "no medications"}:
+            out["current_medications"] = []
+        else:
+            candidates = [m.strip(" -") for m in re.split(r",| and ", raw, flags=re.IGNORECASE)]
+            medications = [m for m in candidates if m and len(m) < 120]
+            if medications:
+                out["current_medications"] = sorted(set(medications), key=lambda x: x.lower())
+    elif re.search(r"\b(?:not taking any medications|no medications|no medicine|no supplements)\b", lowered):
+        out["current_medications"] = []
 
     return out
 
@@ -133,6 +169,41 @@ def _find_latest_pending_profile_update(db: Session, thread_id: UUID) -> dict[st
             if isinstance(pending, dict):
                 return pending
     return None
+
+
+def _find_latest_pending_profile_message(db: Session, thread_id: UUID) -> ChatMessage | None:
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.thread_id == thread_id, ChatMessage.role == "assistant")
+        .order_by(ChatMessage.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    for row in rows:
+        metadata = row.message_metadata or {}
+        if metadata.get("profile_update_state") == "pending_confirmation" and metadata.get("profile_update_pending"):
+            return row
+    return None
+
+
+def _merge_profile_updates(base: dict[str, Any] | None, new: dict[str, Any] | None) -> dict[str, Any]:
+    merged: dict[str, Any] = dict(base or {})
+    for key, value in (new or {}).items():
+        if key in {"allergies", "chronic_conditions", "current_medications"} and isinstance(value, list):
+            merged[key] = [str(item).strip() for item in value if str(item).strip()]
+        elif value not in (None, ""):
+            merged[key] = value
+    return merged
+
+
+def _format_profile_update_summary(pending: dict[str, Any]) -> str:
+    parts = [
+        f"Date of birth: {pending.get('date_of_birth', 'not provided')}",
+        f"allergies: {', '.join(pending.get('allergies', [])) if isinstance(pending.get('allergies'), list) else 'not provided'}",
+        f"chronic conditions: {', '.join(pending.get('chronic_conditions', [])) if isinstance(pending.get('chronic_conditions'), list) else 'not provided'}",
+        f"current medications: {', '.join(pending.get('current_medications', [])) if isinstance(pending.get('current_medications'), list) else 'not provided'}",
+    ]
+    return "; ".join(parts)
 
 
 def _extract_ui_source(metadata: dict[str, Any] | None) -> str:
@@ -458,18 +529,28 @@ async def stream_thread_reply(
 
         try:
             candidate_profile_update = _extract_profile_candidates(payload.message)
+            pending_message = _find_latest_pending_profile_message(db, thread.thread_id)
+            pending_metadata = (pending_message.message_metadata or {}) if pending_message else {}
+            pending_profile_update = (
+                pending_metadata.get("profile_update_pending")
+                if isinstance(pending_metadata.get("profile_update_pending"), dict)
+                else None
+            )
+
             if candidate_profile_update and not _is_confirmation_message(payload.message):
+                merged_update = _merge_profile_updates(pending_profile_update, candidate_profile_update)
                 confirmation_text = (
                     "I captured profile details from your message. "
-                    f"Date of birth: {candidate_profile_update.get('date_of_birth', 'not provided')}; "
-                    f"allergies: {', '.join(candidate_profile_update.get('allergies', [])) or 'not provided'}. "
+                    f"{_format_profile_update_summary(merged_update)}. "
                     "Reply with 'confirm' to save these details to your profile."
                 )
                 assistant_text = confirmation_text
                 assistant_metadata = {
                     "status": "complete",
                     "profile_update_state": "pending_confirmation",
-                    "profile_update_pending": candidate_profile_update,
+                    "profile_update_pending": merged_update,
+                    "profile_update_required_for_otc": bool(pending_metadata.get("profile_update_required_for_otc")),
+                    "profile_update_resume_message": pending_metadata.get("profile_update_resume_message"),
                 }
                 yield f"data: {json.dumps({'type': 'delta', 'content': confirmation_text})}\n\n"
             elif _is_confirmation_message(payload.message):
@@ -482,19 +563,73 @@ async def stream_thread_reply(
                             pass
                     if isinstance(pending.get("allergies"), list):
                         user.allergies = [str(a) for a in pending["allergies"] if str(a).strip()]
+                    if isinstance(pending.get("chronic_conditions"), list):
+                        user.chronic_conditions = [str(c) for c in pending["chronic_conditions"] if str(c).strip()]
+                    if isinstance(pending.get("current_medications"), list):
+                        user.current_medications = [str(m) for m in pending["current_medications"] if str(m).strip()]
                     db.commit()
                     assistant_text = (
-                        "Confirmed. I saved your date of birth and allergies to your patient profile."
+                        "Confirmed. I saved your health safety details to your patient profile."
                     )
+                    pending_resume_message = None
+                    pending_message = _find_latest_pending_profile_message(db, thread.thread_id)
+                    if pending_message:
+                        metadata = pending_message.message_metadata or {}
+                        value = metadata.get("profile_update_resume_message")
+                        if value:
+                            pending_resume_message = str(value)
                     assistant_metadata = {
                         "status": "complete",
                         "profile_update_state": "applied",
                         "profile_update_applied": {
                             "date_of_birth": pending.get("date_of_birth"),
                             "allergies": pending.get("allergies", []),
+                            "chronic_conditions": pending.get("chronic_conditions", []),
+                            "current_medications": pending.get("current_medications", []),
                         },
                     }
                     yield f"data: {json.dumps({'type': 'delta', 'content': assistant_text})}\n\n"
+                    if pending_resume_message:
+                        assistant_text += "\n\n"
+                        async for chunk in stream_assistant_response(
+                            user=user,
+                            thread_id=str(thread.thread_id),
+                            message=pending_resume_message,
+                            recent_messages=[
+                                {"role": msg.role, "content": msg.content}
+                                for msg in reversed(
+                                    db.query(ChatMessage)
+                                    .filter(ChatMessage.thread_id == thread.thread_id)
+                                    .order_by(ChatMessage.created_at.desc())
+                                    .limit(10)
+                                    .all()
+                                )
+                                if msg.content
+                            ],
+                            assistant_context={
+                                "mode": payload.mode,
+                                "metadata": payload.metadata or {},
+                            },
+                        ):
+                            if chunk.get("type") == "delta":
+                                delta = chunk.get("content", "")
+                                if delta:
+                                    chunk_count += 1
+                                    assistant_text += delta
+                                    yield f"data: {json.dumps({'type': 'delta', 'content': delta})}\n\n"
+                            elif chunk.get("type") == "complete":
+                                resume_response = chunk.get("response", {}) or {}
+                                assistant_metadata = {
+                                    **resume_response,
+                                    "status": "complete",
+                                    "profile_update_state": "applied",
+                                    "profile_update_applied": {
+                                        "date_of_birth": pending.get("date_of_birth"),
+                                        "allergies": pending.get("allergies", []),
+                                        "chronic_conditions": pending.get("chronic_conditions", []),
+                                        "current_medications": pending.get("current_medications", []),
+                                    },
+                                }
 
             if not assistant_text:
                 recent_messages = (
@@ -533,6 +668,16 @@ async def stream_thread_reply(
                             yield f"data: {json.dumps({'type': 'delta', 'content': delta})}\n\n"
                     elif chunk.get("type") == "complete":
                         assistant_metadata = chunk.get("response", {}) or {}
+                if assistant_metadata.get("metadata", {}).get("medication_readiness_required"):
+                    missing_fields = assistant_metadata.get("metadata", {}).get("medication_readiness_missing_fields") or []
+                    assistant_metadata = {
+                        **assistant_metadata,
+                        "profile_update_state": "pending_confirmation",
+                        "profile_update_pending": {},
+                        "profile_update_required_for_otc": True,
+                        "profile_update_required_fields": missing_fields,
+                        "profile_update_resume_message": payload.message,
+                    }
         except Exception as exc:
             error_message = str(exc)
             error_code = "assistant_stream_error"

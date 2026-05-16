@@ -240,7 +240,7 @@ def get_user_profile(user_id: str) -> dict[str, Any]:
 
     row = _query_one(_DB,
         """SELECT first_name, last_name, date_of_birth,
-                  allergies, chronic_conditions
+                  allergies, chronic_conditions, current_medications
            FROM usr WHERE user_id = %s AND deleted_at IS NULL""", (user_id,))
 
     if not row:
@@ -254,7 +254,9 @@ def get_user_profile(user_id: str) -> dict[str, Any]:
              AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)""",
         (user_id,),
     )
-    current_meds = [m for r in meds for m in (r.get("medications") or [])]
+    prescribed_meds = [m for r in meds for m in (r.get("medications") or [])]
+    reported_meds = [m for m in (row.get("current_medications") or []) if isinstance(m, str) and m.strip()]
+    current_meds = list(dict.fromkeys([*reported_meds, *prescribed_meds]))
 
     age = None
     dob = row.get("date_of_birth")
@@ -545,8 +547,8 @@ def medication_pipeline(
     raw = query_and_rank_drugs(symptom, limit=limit)
     if not raw:
         return {**_err, "response":
-                f"No medications found for '{symptom}'. "
-                "Consult a healthcare provider."}
+                f"I could not find an over-the-counter medication match for '{symptom}'. "
+                "Please consult a healthcare provider if symptoms are worsening or persistent."}
 
     safety = llm_safety_check(raw, user_profile=user_profile, user_id=user_id)
     top = pick_top_candidates(safety)
@@ -554,9 +556,8 @@ def medication_pipeline(
     if top:
         answer = generate_medication_response(symptom, top, original_drugs=raw)
     else:
-        answer = (f"Medications were found for '{symptom}' but none are currently "
-                  "available or safe for your profile. "
-                  "Please consult a healthcare provider.")
+        answer = (f"I found medication candidates for '{symptom}', but none appear safe or available for your profile right now. "
+                  "Please consult a healthcare provider or pharmacist before taking anything new.")
     return {"drugs_found": len(raw), "safe": safety.get("safe", []),
             "flagged": safety.get("flagged", []),
             "top_candidates": top, "response": answer}

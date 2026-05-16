@@ -57,14 +57,22 @@ export function useUserProfile(): UseUserProfileReturn {
         profileCache = user;
         setProfile(user);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[useUserProfile] Failed to fetch profile:", err);
       const details = classifyHttpError(err);
+      const errorResponseMessage =
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        typeof (err as { response?: unknown }).response === "object" &&
+        (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : null;
       if (isMounted.current) {
         if (details.kind === "network_unreachable") {
           setError("Could not reach backend API. Ensure backend is running at http://localhost:8000.");
         } else {
-          setError(err?.response?.data?.message || "Could not load profile");
+          setError(errorResponseMessage || "Could not load profile");
         }
         setProfile(null);
       }
@@ -163,6 +171,7 @@ export function usePatientProfile() {
     bloodType: profile.blood_type,
     allergies: profile.allergies,
     chronicConditions: profile.chronic_conditions,
+    currentMedications: profile.current_medications,
     emergencyContact: profile.emergency_contact,
     isLoading,
     error,

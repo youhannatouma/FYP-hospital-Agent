@@ -90,6 +90,8 @@ class AssistantChatState(TypedDict, total=False):
     intent_confidence: float
     intent_source: IntentSource
     clarification_required: bool
+    medication_readiness_required: bool
+    medication_readiness_missing_fields: list[str]
 
     medication_result: dict[str, Any] | None
     doctor_result: dict[str, Any] | None
@@ -120,7 +122,61 @@ def _build_user_profile(user: User) -> dict[str, Any]:
         "gender": user.gender,
         "allergies": user.allergies or [],
         "chronic_conditions": user.chronic_conditions or [],
+        "current_medications": user.current_medications or [],
     }
+
+
+_OTC_KEYWORDS = {
+    "otc", "over the counter", "over-the-counter", "nonprescription",
+    "non-prescription", "without a prescription",
+}
+
+
+def _is_otc_request(message: str) -> bool:
+    lowered = (message or "").lower()
+    if any(token in lowered for token in _OTC_KEYWORDS):
+        return True
+    medication_phrases = (
+        "what can i take", "what should i take", "can i take",
+        "recommend a medicine", "recommend a medication", "pain relief",
+        "cold medicine", "allergy medicine", "headache medicine",
+    )
+    return any(phrase in lowered for phrase in medication_phrases)
+
+
+def _missing_otc_profile_fields(patient: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    if patient.get("age") is None:
+        missing.append("date_of_birth")
+    if not isinstance(patient.get("allergies"), list) or len(patient.get("allergies") or []) == 0:
+        missing.append("allergies")
+    if not isinstance(patient.get("chronic_conditions"), list) or len(patient.get("chronic_conditions") or []) == 0:
+        missing.append("chronic_conditions")
+    if not isinstance(patient.get("current_medications"), list) or len(patient.get("current_medications") or []) == 0:
+        missing.append("current_medications")
+    return missing
+
+
+def _readiness_prompt_for_missing_fields(missing_fields: list[str]) -> str:
+    labels = {
+        "date_of_birth": "your date of birth",
+        "allergies": "any medication or food allergies",
+        "chronic_conditions": "any chronic conditions you have",
+        "current_medications": "any medications or supplements you currently take",
+    }
+    needed = [labels[field] for field in missing_fields if field in labels]
+    if not needed:
+        return "I need a few more safety details before I can suggest an OTC medication."
+    if len(needed) == 1:
+        needed_text = needed[0]
+    elif len(needed) == 2:
+        needed_text = f"{needed[0]} and {needed[1]}"
+    else:
+        needed_text = ", ".join(needed[:-1]) + f", and {needed[-1]}"
+    return (
+        "Before I suggest an over-the-counter medication, I need "
+        f"{needed_text}. Reply with those details, and I can personalize the recommendation."
+    )
 
 
 def _actor_role_from_context(context: dict[str, Any] | None) -> str | None:
@@ -254,13 +310,13 @@ def _detect_intents(message: str) -> DetectedIntents:
     medication_keywords = {
         "medication", "medicine", "drug", "prescription", "dose", "dosage",
         "pill", "tablet", "capsule", "pharmacy", "pharmacist", "take",
-        "recommend", "relief", "treat", "safe to take",
+        "recommend", "relief", "treat", "safe to take", "otc", "over the counter",
     }
     symptom_keywords = {
         "headache", "migraine", "fever", "pain", "cough", "cold", "flu",
         "sore throat", "runny nose", "allergy", "allergies", "rash",
         "heartburn", "acid reflux", "indigestion", "diarrhea", "vomiting",
-        "nausea", "stomach ache", "toothache", "muscle ache",
+        "nausea", "stomach ache", "toothache", "muscle ache", "symptom", "symptoms", "check symptoms",
     }
     appointment_keywords = {"appointment", "schedule", "book", "doctor", "visit", "clinic"}
     health_guidance_keywords = {
@@ -274,7 +330,7 @@ def _detect_intents(message: str) -> DetectedIntents:
     asks_for_help = bool(re.search(r"\b(what|which|can|should|help|need|recommend)\b", lowered))
     has_appointment = any(k in lowered for k in appointment_keywords)
     has_medication = has_medication_keyword or (has_symptom_keyword and asks_for_help)
-    has_general_health = has_health_guidance_keyword and asks_for_help
+    has_general_health = (has_health_guidance_keyword and asks_for_help) or "check symptoms" in lowered
     combined = has_appointment and has_medication
 
     route: AssistantRoute
@@ -354,8 +410,42 @@ def _recent_user_topic(recent_messages: list[dict[str, str]]) -> str:
     return user_msgs[-1] if user_msgs else ""
 
 
+def _recent_user_topic_before_current(recent_messages: list[dict[str, str]], current_message: str) -> str:
+    current_normalized = " ".join((current_message or "").split()).strip().lower()
+    user_msgs = [
+        str(m.get("content") or "").strip()
+        for m in recent_messages
+        if str(m.get("role") or "") == "user" and str(m.get("content") or "").strip()
+    ]
+    for content in reversed(user_msgs):
+        normalized = " ".join(content.split()).strip().lower()
+        if normalized != current_normalized:
+            return content
+    return ""
+
+
+def _resolve_clarification_reply(message: str, actor_role: str) -> AssistantRoute | None:
+    lowered = (message or "").strip().lower()
+    if actor_role == "doctor":
+        if any(token in lowered for token in ("schedule", "calendar", "appointments", "patients today")):
+            return "doctor_schedule"
+        if any(token in lowered for token in ("patient context", "medication", "clinical", "decision support")):
+            return "doctor_medication_decision_support"
+        if any(token in lowered for token in ("general", "workflow", "guidance")):
+            return "doctor_general"
+        return None
+
+    if any(token in lowered for token in ("doctor", "find doctor", "doctor search", "search")):
+        return "appointment_only"
+    if any(token in lowered for token in ("guidance", "lifestyle", "symptom", "symptoms", "check symptoms")):
+        return "general_health"
+    if any(token in lowered for token in ("medication", "medicine", "otc", "over the counter")):
+        return "medication_only"
+    return None
+
+
 def _clarification_message() -> str:
-    return "Do you want help with doctor search or lifestyle guidance for this topic?"
+    return "Do you want help with doctor search, symptom guidance, or medication guidance for this topic?"
 
 
 def _clarification_message_for_role(actor_role: str) -> str:
@@ -419,6 +509,8 @@ def _patient_summary(patient: dict[str, Any]) -> str:
         parts.append("allergies: " + ", ".join(str(a) for a in patient["allergies"]))
     if patient.get("chronic_conditions"):
         parts.append("conditions: " + ", ".join(str(c) for c in patient["chronic_conditions"]))
+    if patient.get("current_medications"):
+        parts.append("current medications: " + ", ".join(str(m) for m in patient["current_medications"]))
     return "; ".join(parts) or "Unknown patient"
 
 
@@ -606,11 +698,16 @@ async def classify_intent_node(state: AssistantChatState) -> AssistantChatState:
     confidence = float(base.get("confidence") or 0.0)
     source: IntentSource = "message_only"
     clarification_required = False
+    explicit_clarification_route = _resolve_clarification_reply(message, actor_role)
+    if explicit_clarification_route is not None:
+        route = explicit_clarification_route
+        confidence = max(confidence, 0.9)
+        source = "clarified"
 
     short_followup = _is_short_followup(message)
     if confidence < 0.7 and (confidence >= 0.4 or short_followup):
         recent_messages = list(state.get("recent_messages") or [])
-        recent_topic = _recent_user_topic(recent_messages)
+        recent_topic = _recent_user_topic_before_current(recent_messages, message)
         context_text = "\n".join(
             part for part in (recent_topic, str(state.get("memory_context") or "")) if part
         ).strip()
@@ -629,12 +726,29 @@ async def classify_intent_node(state: AssistantChatState) -> AssistantChatState:
     intents["route"] = route
     intents["confidence"] = confidence
     intents["source"] = source
+    patient_profile = dict(state.get("patient_profile") or {})
+    medication_readiness_required = False
+    medication_readiness_missing_fields: list[str] = []
+    if (
+        actor_role != "doctor"
+        and not clarification_required
+        and route in {"medication_only", "combined"}
+        and _is_otc_request(message)
+    ):
+        medication_readiness_missing_fields = _missing_otc_profile_fields(patient_profile)
+        if medication_readiness_missing_fields:
+            medication_readiness_required = True
+            route = "general_health" if route == "medication_only" else "appointment_only"
+            intents["route"] = route
+
     result = {
         "intents": intents,
         "intent": route,
         "intent_confidence": confidence,
         "intent_source": source,
         "clarification_required": clarification_required,
+        "medication_readiness_required": medication_readiness_required,
+        "medication_readiness_missing_fields": medication_readiness_missing_fields,
     }
     if run_id:
         emit_workflow_trace_event(
@@ -652,6 +766,7 @@ async def classify_intent_node(state: AssistantChatState) -> AssistantChatState:
                 "intent_confidence": round(confidence, 4),
                 "intent_source": source,
                 "clarification_required": clarification_required,
+                "medication_readiness_required": medication_readiness_required,
             },
         )
         emit_workflow_trace_event(
@@ -929,6 +1044,12 @@ async def general_chat_node(state: AssistantChatState) -> AssistantChatState:
             )
         return output
 
+    if state.get("medication_readiness_required"):
+        missing_fields = list(state.get("medication_readiness_missing_fields") or [])
+        return {
+            "general_response": _readiness_prompt_for_missing_fields(missing_fields),
+        }
+
     patient = dict(state.get("patient_profile") or {})
     actor_role = str(state.get("actor_role") or "").lower()
     role_line = (
@@ -1016,6 +1137,8 @@ async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
                 "intent_source": str(state.get("intent_source") or "message_only"),
                 "repeat_guard_triggered": False,
                 "clarification_required": bool(state.get("clarification_required") or False),
+                "medication_readiness_required": bool(state.get("medication_readiness_required") or False),
+                "medication_readiness_missing_fields": list(state.get("medication_readiness_missing_fields") or []),
                 **metadata_extra,
             },
         }
@@ -1061,6 +1184,8 @@ async def synthesis_node(state: AssistantChatState) -> AssistantChatState:
         "intent_source": str(state.get("intent_source") or "message_only"),
         "repeat_guard_triggered": False,
         "clarification_required": bool(state.get("clarification_required") or False),
+        "medication_readiness_required": bool(state.get("medication_readiness_required") or False),
+        "medication_readiness_missing_fields": list(state.get("medication_readiness_missing_fields") or []),
         "actor_role": str(state.get("actor_role") or ""),
     }
 

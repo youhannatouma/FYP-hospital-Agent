@@ -613,6 +613,9 @@ export default function PatientOnboarding() {
                         <Pill className="h-5 w-5 text-teal-500" /> Current
                         Medications
                       </CardTitle>
+                      <CardDescription>
+                        Saved here so the assistant can screen OTC suggestions more safely.
+                      </CardDescription>
                     </div>
                     <Button
                       variant="outline"
@@ -726,6 +729,9 @@ export default function PatientOnboarding() {
                         address: addressParts.length ? addressParts.join(", ") : null,
                         emergency_contact: emergencyParts.length ? emergencyParts.join(" - ") : null,
                         chronic_conditions: formData.chronicDiseases || [],
+                        current_medications: formData.medications
+                          .map((med) => [med.name, med.dosage, med.freq].map((value) => value.trim()).filter(Boolean).join(" - "))
+                          .filter(Boolean),
                         allergies: [
                           ...(formData.allergies?.drug || []),
                           ...(formData.allergies?.food || []),
@@ -745,7 +751,7 @@ export default function PatientOnboarding() {
 
                       if (!profileRes.ok) {
                         if (profileRes.status === 401 || profileRes.status === 403) {
-                          router.push("/auth/sign-in?redirect_url=/onboarding/patient");
+                          router.push("/sign-in?redirect_url=/onboarding/patient");
                           return;
                         }
                         const profileErr = await profileRes.json().catch(() => ({}));

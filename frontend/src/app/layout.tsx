@@ -44,17 +44,9 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <AnimationProvider>
-              <React.Suspense
-                fallback={
-                  <div className="flex min-h-screen items-center justify-center bg-background">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-                  </div>
-                }
-              >
-                <div className="relative flex min-h-screen flex-col">
-                  {children}
-                </div>
-              </React.Suspense>
+              <div className="relative flex min-h-screen flex-col">
+                {children}
+              </div>
               <Toaster />
             </AnimationProvider>
           </ThemeProvider>

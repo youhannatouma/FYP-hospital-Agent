@@ -4,6 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from app.database import Base, engine
 from app.models import user, appointment, time_slot, message, chat, pharmacy, workflow_trace_event, audit_log, health_goal
 from app.routes import auth, users, appointments, doctors, payments, admin, medical_records, prescriptions, notifications, messages, assistant, health_goals
@@ -20,6 +21,8 @@ async def lifespan(app: FastAPI):
     # ── Create tables ──────────────────────────────────────────────────────
     from app.models import user, appointment, time_slot, medical_record, prescription, notification, message, chat, pharmacy, workflow_trace_event, audit_log, health_goal
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE IF EXISTS usr ADD COLUMN IF NOT EXISTS current_medications TEXT[]"))
     log.info("Database tables ensured.")
 
     # ── Auto-seed if empty ─────────────────────────────────────────────────

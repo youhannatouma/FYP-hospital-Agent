@@ -15,14 +15,21 @@ interface IntroOverlayProps {
 export function IntroOverlay({ onFinish }: IntroOverlayProps) {
   const controls = useAnimation();
   const exitingRef = useRef(false);
+  const readyRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
+    let frameId = 0;
     // Safety fallback: ensure the intro always finishes after a maximum duration
     const FALLBACK_MS = 4200;
     const fallback = setTimeout(() => {
       if (!exitingRef.current) {
         exitingRef.current = true;
+        if (!readyRef.current) {
+          if (mounted) onFinish();
+          return;
+        }
+
         controls
           .start("exit")
           .then(() => {
@@ -52,10 +59,15 @@ export function IntroOverlay({ onFinish }: IntroOverlayProps) {
       }
     }
 
-    run();
+    frameId = window.requestAnimationFrame(() => {
+      readyRef.current = true;
+      void run();
+    });
 
     return () => {
       mounted = false;
+      readyRef.current = false;
+      window.cancelAnimationFrame(frameId);
       clearTimeout(fallback);
     };
   }, [controls, onFinish]);
@@ -65,6 +77,12 @@ export function IntroOverlay({ onFinish }: IntroOverlayProps) {
     const handleSkip = () => {
       if (exitingRef.current) return;
       exitingRef.current = true;
+
+      if (!readyRef.current) {
+        onFinish();
+        return;
+      }
+
       controls
         .start("exit")
         .then(() => onFinish())

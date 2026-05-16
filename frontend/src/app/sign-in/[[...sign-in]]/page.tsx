@@ -67,7 +67,7 @@ export default async function SignInPage() {
             path="/sign-in"
             routing="path"
             signUpUrl="/sign-up"
-            forceRedirectUrl="/onboarding"
+            fallbackRedirectUrl="/onboarding"
             appearance={{
               elements: {
                 formButtonPrimary: "bg-primary hover:bg-primary/90 text-sm font-bold h-11 rounded-xl shadow-lg shadow-primary/20",

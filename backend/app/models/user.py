@@ -58,6 +58,7 @@ class User(Base):
     blood_type = Column(Text)                    # for patients - sensitive medical info
     allergies = Column(ARRAY(Text))              # for patients - sensitive medical info
     chronic_conditions = Column(ARRAY(Text))     # for patients - sensitive medical info
+    current_medications = Column(ARRAY(Text))    # patient self-reported active meds for OTC safety checks
     emergency_contact_encrypted = Column(Text, nullable=True, name="emergency_contact")  # Encrypted PII
 
     # Account state used by admins (Active, Suspended, Pending, etc.)

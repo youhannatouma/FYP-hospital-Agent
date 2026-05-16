@@ -36,6 +36,7 @@ def get_my_profile(
         "blood_type": user.blood_type,
         "allergies": user.allergies or [],
         "chronic_conditions": user.chronic_conditions or [],
+        "current_medications": user.current_medications or [],
         "emergency_contact": user.emergency_contact_encrypted,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }

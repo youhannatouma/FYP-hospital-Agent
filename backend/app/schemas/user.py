@@ -45,6 +45,7 @@ class UserProfileUpdate(BaseModel):
     blood_type: Optional[str] = Field(None, max_length=10)
     allergies: Optional[List[str]] = None
     chronic_conditions: Optional[List[str]] = None
+    current_medications: Optional[List[str]] = None
     emergency_contact: Optional[str] = Field(None, max_length=100)
     # Doctor fields
     specialty: Optional[str] = Field(None, max_length=100)

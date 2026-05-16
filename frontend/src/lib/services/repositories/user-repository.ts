@@ -6,7 +6,7 @@
  * Follows: Repository Pattern
  */
 
-import { ApiRequestHelper } from '../api-request-helper';
+import { ApiRequestHelper, getApiRequestHelper } from '../api-request-helper';
 
 export interface UserProfile {
   user_id: string;
@@ -30,6 +30,7 @@ export interface UserProfile {
   blood_type: string | null;
   allergies: string[];
   chronic_conditions: string[];
+  current_medications: string[];
   emergency_contact: string | null;
   created_at: string | null;
 }
@@ -79,7 +80,6 @@ let userRepositoryInstance: IUserRepository | null = null;
 
 export function getUserRepository(apiHelper?: ApiRequestHelper): IUserRepository {
   if (!userRepositoryInstance) {
-    const { getApiRequestHelper } = require('../api-request-helper');
     userRepositoryInstance = new UserRepository(
       apiHelper || getApiRequestHelper()
     );

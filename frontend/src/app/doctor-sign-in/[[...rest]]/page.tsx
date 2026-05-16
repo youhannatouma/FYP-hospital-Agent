@@ -76,7 +76,7 @@ export default async function DoctorSignInPage() {
             path="/doctor-sign-in"
             routing="path"
             signUpUrl="/sign-up"
-            forceRedirectUrl="/doctor"
+            fallbackRedirectUrl="/doctor"
             appearance={{
               elements: {
                 formButtonPrimary:

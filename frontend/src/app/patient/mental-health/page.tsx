@@ -117,7 +117,7 @@ export default function MentalHealthPage() {
   useEffect(() => {
     if (!isLoaded) return
     if (!isSignedIn) {
-      router.replace("/auth/sign-in?redirect_url=/patient/mental-health")
+      router.replace("/sign-in?redirect_url=/patient/mental-health")
     }
   }, [isLoaded, isSignedIn, router])
 

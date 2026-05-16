@@ -95,7 +95,7 @@ export default async function SignUpPage() {
                 footerActionLink: "text-primary hover:text-primary/80 font-bold",
               }
             }}
-            forceRedirectUrl="/onboarding"
+            fallbackRedirectUrl="/onboarding"
           />
         </div>
       </div>

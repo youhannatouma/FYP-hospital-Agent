@@ -53,10 +53,10 @@ const suggestedQuestions = [
 ]
 
 const quickActions = [
-  { label: "Find Doctor", icon: Stethoscope },
-  { label: "Check Symptoms", icon: Search },
-  { label: "Medication Info", icon: Pill },
-  { label: "Book Visit", icon: CalendarPlus },
+  { label: "Find Doctor", icon: Stethoscope, prompt: "Help me find the right doctor for my symptoms." },
+  { label: "Check Symptoms", icon: Search, prompt: "Help me check my symptoms and understand what might help." },
+  { label: "Medication Info", icon: Pill, prompt: "Help me with medication guidance and safety information." },
+  { label: "Book Visit", icon: CalendarPlus, prompt: "Help me book a doctor visit." },
 ]
 
 function mapAssistantError(code: string | undefined, fallback: string): string {
@@ -374,7 +374,7 @@ export default function PatientAIAssistantPage() {
                   variant="outline"
                   size="sm"
                   className="gap-1 border-primary/30 text-xs text-primary hover:bg-primary/10"
-                  onClick={() => sendMessage(`I need help with: ${action.label}`)}
+                  onClick={() => sendMessage(action.prompt)}
                   disabled={isStreaming}
                 >
                   <action.icon className="h-3 w-3" />

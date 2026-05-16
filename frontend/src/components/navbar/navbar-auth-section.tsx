@@ -6,14 +6,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   ClerkLoaded,
   ClerkLoading,
   SignedIn,
   SignedOut,
-  SignInButton,
   UserButton,
   useUser,
 } from "@clerk/nextjs";
@@ -28,12 +27,12 @@ export function NavbarAuthSection({
   showOnDesktop = true,
   className = "",
 }: NavbarAuthSectionProps) {
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const { user } = useUser();
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   if (!isMounted) {
     return (
@@ -58,11 +57,11 @@ export function NavbarAuthSection({
       <ClerkLoading />
       <ClerkLoaded>
         <SignedOut>
-          <SignInButton mode="modal">
-            <Button variant="ghost" className="text-foreground font-bold">
+          <Button asChild variant="ghost" className="text-foreground font-bold">
+            <Link href="/sign-in">
               Sign In
-            </Button>
-          </SignInButton>
+            </Link>
+          </Button>
           <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-6">
             <Link href="/sign-up">
               Get Started

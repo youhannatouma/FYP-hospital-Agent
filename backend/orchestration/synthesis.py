@@ -57,13 +57,14 @@ def _get_llm() -> ChatGoogleGenerativeAI:
 # ── Prompt templates ────────────────────────────────────────────────────
 
 _MEDICATION_ONLY_PROMPT = (
-    "You are a licensed hospital pharmacist writing a professional medication recommendation.\n"
+    "You are a licensed hospital pharmacist writing a professional over-the-counter medication recommendation.\n"
     "Tone: authoritative yet caring, like a senior pharmacist explaining a prescription.\n"
     "Instructions:\n"
     "  - Greet the patient by name if available.\n"
     "  - Summarize the symptom briefly.\n"
-    "  - Recommend 1–2 medications with brand names, active substances, and dosage.\n"
+    "  - Recommend 1–2 OTC medications with brand names, active substances, and dosage.\n"
     "  - Highlight any allergy warnings or contraindications explicitly.\n"
+    "  - If no OTC option is available, clearly say whether none were found or none appear safe for this profile.\n"
     "  - End with a mandatory disclaimer: 'Please consult your physician or pharmacist before starting any new medication.'\n"
     "  - Keep under 200 words.\n\n"
     "Patient Profile: {patient_summary}\n"
@@ -163,6 +164,9 @@ def _patient_summary(patient: dict[str, Any]) -> str:
     conditions = patient.get("chronic_conditions")
     if conditions:
         parts.append(f"conditions: {', '.join(str(c) for c in conditions)}")
+    current_meds = patient.get("current_medications")
+    if current_meds:
+        parts.append(f"current medications: {', '.join(str(m) for m in current_meds)}")
     return "; ".join(parts) or "Unknown patient"
 
 

@@ -60,7 +60,7 @@ export default function NotFound() {
           <div className="flex gap-6">
             <Link href="/patient" className="text-sm font-bold text-primary hover:underline">Patient Portal</Link>
             <Link href="/doctor" className="text-sm font-bold text-primary hover:underline">Doctor Clinic</Link>
-            <Link href="/auth/sign-in" className="text-sm font-bold text-primary hover:underline">Secure Login</Link>
+            <Link href="/sign-in" className="text-sm font-bold text-primary hover:underline">Secure Login</Link>
           </div>
         </div>
       </m.div>
